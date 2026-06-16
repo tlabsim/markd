@@ -66,12 +66,19 @@ function registerAppProtocol(): void {
     try {
       const url = new URL(request.url);
       let reqPath = decodeURIComponent(url.pathname).replace(/^\/+/, '');
-      if (!reqPath || reqPath.endsWith('/')) {
-        reqPath = 'index.html';
-      }
+      if (!reqPath || reqPath.endsWith('/')) reqPath = 'index.html';
       const filePath = path.join(rendererDir, reqPath);
-      return net.fetch(`file:///${filePath.replace(/\\/g, '/')}`);
-    } catch {
+      // Use fs.readFileSync — works reliably inside ASAR in production
+      const data = fs.readFileSync(filePath);
+      const ext = path.extname(reqPath).toLowerCase();
+      const mime: Record<string, string> = {
+        '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css',
+        '.svg': 'image/svg+xml', '.png': 'image/png', '.woff': 'font/woff',
+        '.woff2': 'font/woff2', '.ttf': 'font/ttf', '.json': 'application/json',
+      };
+      return new Response(data, { headers: { 'Content-Type': mime[ext] || 'application/octet-stream' } });
+    } catch (e) {
+      console.error('app:// serve error:', e);
       return new Response('Not found', { status: 404 });
     }
   });
