@@ -265,9 +265,24 @@ const AsyncImage: React.FC<{ src: string; alt: string; className?: string }> = (
         </span>
       );
     },
-    pre: ({ children, ...props }: any) => (
-      <pre className="my-4 p-3 bg-gray-50 dark:bg-[#181e26] rounded-lg overflow-x-auto border border-gray-200 dark:border-gray-700" {...props}>{children}</pre>
-    ),
+    pre: ({ children, ...props }: any) => {
+      const codeChild = React.Children.toArray(children).find(
+        (c: any) => c?.props?.className
+      ) as any;
+      const langClass = codeChild?.props?.className || '';
+      const langMatch = langClass.match(/language-(\w+)/);
+      const lang = langMatch ? langMatch[1] : null;
+      return (
+        <div className="my-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-[#f8f9fa] dark:bg-[#181e26] p-0">
+          {lang && (
+            <div className="flex px-4 -mt-2.5">
+              <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md bg-white dark:bg-[#1a222b] text-gray-400 dark:text-gray-500">{lang}</span>
+            </div>
+          )}
+          <pre className="overflow-x-auto m-0 px-4 py-4 bg-transparent" {...props}>{children}</pre>
+        </div>
+      );
+    },
     code: ({ className, children, ...props }: any) => {
       const isInline = !className;
       if (isInline) {

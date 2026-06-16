@@ -17,18 +17,26 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ content, onClose }) =
   const headings = useMemo(() => {
     const items: TocItem[] = [];
     const lines = content.split('\n');
+    let inFence = false;
     for (const line of lines) {
+      // Skip fenced code blocks
+      if (/^```/.test(line)) { inFence = !inFence; continue; }
+      if (inFence) continue;
       const match = line.match(/^(#{1,6})\s+(.+)$/);
       if (match) {
         const level = match[1].length;
-        const text = match[2].trim();
+        // Strip markdown formatting so ID matches the viewer's rendered heading
+        let text = match[2].trim();
+        text = text.replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1');
+        text = text.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
+        text = text.replace(/[*_`~]/g, '');
         const id = text
           .toLowerCase()
           .replace(/[^\w\s-]/g, '')
           .replace(/\s+/g, '-')
           .replace(/-+/g, '-')
           .trim();
-        items.push({ id, text, level });
+        items.push({ id, text: match[2].trim(), level });
       }
     }
     return items;
@@ -51,10 +59,17 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ content, onClose }) =
   }, [onClose]);
 
   const scrollToHeading = (id: string) => {
-    const element = document.getElementById(id);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth' });
-      onClose();
+    const isLarge = content.length > 50000;
+    const behavior = isLarge ? 'auto' as const : 'smooth' as const;
+    const previewContainer = document.querySelector('.markdown-body')?.parentElement;
+    if (!previewContainer) {
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior, block: 'start' });
+      return;
+    }
+    const heading = previewContainer.querySelector(`[id="${CSS.escape(id)}"]`) as HTMLElement | null;
+    if (heading) {
+      previewContainer.scrollTo({ top: heading.offsetTop - 16, behavior });
     }
   };
 
@@ -79,10 +94,16 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ content, onClose }) =
         </button>
       </div>
       <nav>
-        {headings.map((heading, index) => (
+        {headings.map((heading, index) => {
+          const borderColor = heading.level <= 2
+            ? 'border-l-slate-300 dark:border-l-slate-600'
+            : heading.level === 3
+            ? 'border-l-slate-200 dark:border-l-slate-700'
+            : 'border-l-slate-100 dark:border-l-slate-800';
+          return (
           <button
             key={index}
-            className={`block w-full text-left text-xs py-1 px-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors truncate
+            className={`block w-full text-left text-xs py-1 pr-2 rounded-r hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors truncate border-l-2 ${borderColor}
               ${heading.level === 1 ? 'font-semibold pl-2' : ''}
               ${heading.level === 2 ? 'pl-4' : ''}
               ${heading.level === 3 ? 'pl-6' : ''}
@@ -93,7 +114,7 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ content, onClose }) =
           >
             {heading.text}
           </button>
-        ))}
+        )})}
       </nav>
     </div>
   );

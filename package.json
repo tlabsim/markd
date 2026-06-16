@@ -57,10 +57,14 @@
       "output": "release"
     },
     "files": [
-      "dist/**/*",
+      "dist/main/**/*",
       "resources/**/*"
     ],
     "extraResources": [
+      {
+        "from": "dist/renderer",
+        "to": "renderer"
+      },
       {
         "from": "resources",
         "to": "resources"
@@ -71,7 +75,7 @@
       "target": [
         "nsis"
       ],
-      "icon": "resources/markd.ico"
+      "icon": "resources/markd.png"
     },
     "linux": {
       "target": [

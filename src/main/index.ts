@@ -8,7 +8,9 @@ let currentFilePath: string | null = null;
 const isDev = !app.isPackaged;
 
 // Path to the dist/renderer directory
-const rendererDir = path.join(__dirname, '../../dist/renderer');
+const rendererDir = isDev
+  ? path.join(__dirname, '../../dist/renderer')
+  : path.join(process.resourcesPath, 'renderer');
 
 // Register privileged protocol so ES modules work (unlike file://)
 protocol.registerSchemesAsPrivileged([
@@ -94,7 +96,7 @@ function createWindow(filePath?: string): void {
     title: 'Markd',
     icon: isDev
       ? path.join(__dirname, '../../resources/markd.png')
-      : path.join(process.resourcesPath, 'markd.png'),
+      : path.join(process.resourcesPath, 'resources', 'markd.ico'),
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,

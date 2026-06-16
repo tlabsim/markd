@@ -69,7 +69,7 @@
   }
 
   .btn-icon {
-    @apply btn-ghost p-1.5 px-2;
+    @apply btn-ghost p-1.5 px-1.5;
   }
 
   .panel {
@@ -158,11 +158,12 @@
 }
 
 .markdown-body pre {
-  @apply my-4 p-3 bg-gray-50 dark:bg-[#181e26] rounded-lg overflow-x-auto border border-md-border dark:border-md-border-dark;
+  @apply overflow-x-auto;
 }
 
 .markdown-body pre code {
   @apply bg-transparent p-0 text-sm leading-relaxed;
+  background: transparent !important;
 }
 
 .markdown-body hr {
@@ -208,7 +209,8 @@
 
 /* Highlight.js theme — light (github) by default, dark overrides below */
 .markdown-body .hljs {
-  @apply bg-transparent;
+  background: transparent !important;
+  padding: 0;
 }
 
 .dark .markdown-body .hljs {
