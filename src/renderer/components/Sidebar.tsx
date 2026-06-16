@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useStore } from '../store';
 import { FileEntry } from '../types';
 
@@ -113,6 +113,10 @@ const Sidebar: React.FC = () => {
 
   const [loading, setLoading] = useState(false);
   const rootChildren = currentFolderPath ? (folderChildren[currentFolderPath] || []) : [];
+
+  useEffect(() => {
+    console.log('[Markd] Sidebar recentFiles:', recentFiles);
+  }, [recentFiles]);
 
   const openFolderAtPath = useCallback(async (dirPath: string) => {
     setLoading(true);

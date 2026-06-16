@@ -90,7 +90,11 @@ const App: React.FC = () => {
       setCurrentFile(result.filePath ? result.filePath.split(/[/\\]/).pop() || null : null);
       setCurrentFilePath(result.filePath || null);
       setOriginalContent(result.content);
-      if (result.filePath) useStore.getState().addRecentFile(result.filePath);
+      if (result.filePath) {
+        console.log('[Markd] Adding recent file:', result.filePath);
+        useStore.getState().addRecentFile(result.filePath);
+        console.log('[Markd] Recent files:', useStore.getState().recentFiles);
+      }
     }
   }, []);
 
