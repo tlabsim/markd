@@ -1,6 +1,157 @@
 import React, { useRef, useEffect, useLayoutEffect, useCallback, useState } from 'react';
 import { useStore } from '../store';
 
+// ---- Regex-based Markdown syntax highlighter ----
+// Returns HTML string with colored spans. Operates line-by-line.
+// The output MUST preserve all original characters — only wraps in <span>s.
+
+function esc(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function highlightMarkdown(raw: string): string {
+  const lines = raw.split('\n');
+  let inFence = false;
+  return lines.map((line) => {
+    if (/^```/.test(line)) { inFence = !inFence; return `<span class="text-purple-500 dark:text-purple-400">${esc(line)}</span>`; }
+    if (inFence) return `<span class="text-emerald-600 dark:text-emerald-400">${esc(line)}</span>`;
+    let h = esc(line);
+    if (/^#{1,6}\s/.test(line)) return `<span class="text-blue-600 dark:text-blue-400 font-bold">${h}</span>`;
+    if (/^&gt;/.test(h)) return `<span class="text-orange-500 dark:text-orange-400">${h}</span>`;
+    h = h.replace(/`([^`]+)`/g, '<span class="text-emerald-600 dark:text-emerald-400 bg-gray-100 dark:bg-white/10 rounded px-px">`$1`</span>');
+    h = h.replace(/\*\*([^*]+)\*\*/g, '<strong class="text-gray-900 dark:text-gray-100">**$1**</strong>');
+    h = h.replace(/\*([^*]+)\*/g, '<em class="text-gray-700 dark:text-gray-300">*$1*</em>');
+    h = h.replace(/~~([^~]+)~~/g, '<span class="line-through text-gray-400 dark:text-gray-500">~~$1~~</span>');
+    h = h.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<span class="text-blue-500 dark:text-blue-400">[$1]($2)</span>');
+    if (/^(\s*)[-*+]\s/.test(line)) h = h.replace(/^(\s*)([-*+]\s)/, '$1<span class="text-amber-500 dark:text-amber-400">$2</span>');
+    return h;
+  }).join('\n');
+}
+
+// ---- Cursor save/restore for contentEditable ----
+
+function editorText(el: HTMLElement): string { return el.textContent || ''; }
+
+function saveCursor(editor: HTMLElement): number {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount || !editor.contains(sel.anchorNode)) return 0;
+  // Fast path: single text node (plain-text mode) — O(1)
+  if (editor.childNodes.length === 1 && editor.firstChild?.nodeType === Node.TEXT_NODE) {
+    return sel.anchorOffset;
+  }
+  // Slow path: highlighted content with many spans
+  const r = sel.getRangeAt(0);
+  const pre = document.createRange();
+  pre.selectNodeContents(editor);
+  pre.setEnd(r.startContainer, r.startOffset);
+  return pre.toString().length;
+}
+
+function restoreCursor(editor: HTMLElement, offset: number) {
+  const sel = window.getSelection();
+  if (!sel) return;
+  // Fast path: single text node (plain-text mode) — O(1)
+  if (editor.childNodes.length === 1 && editor.firstChild?.nodeType === Node.TEXT_NODE) {
+    const len = editor.firstChild.textContent?.length || 0;
+    const r = document.createRange();
+    r.setStart(editor.firstChild, Math.min(offset, len));
+    r.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(r);
+    return;
+  }
+  // Slow path: highlighted content — TreeWalker
+  let cur = 0;
+  const w = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
+  let n: Text | null;
+  while ((n = w.nextNode() as Text | null)) {
+    if (cur + n.length >= offset) {
+      const r = document.createRange();
+      r.setStart(n, offset - cur);
+      r.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(r);
+      return;
+    }
+    cur += n.length;
+  }
+  const r = document.createRange();
+  r.selectNodeContents(editor); r.collapse(false);
+  sel.removeAllRanges(); sel.addRange(r);
+}
+
+function getSelectionRange(editor: HTMLElement): { start: number; end: number; text: string } {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount || !editor.contains(sel.anchorNode)) return { start: 0, end: 0, text: '' };
+  const r = sel.getRangeAt(0);
+  const pre = document.createRange();
+  pre.selectNodeContents(editor);
+  pre.setEnd(r.startContainer, r.startOffset);
+  const start = pre.toString().length;
+  pre.setEnd(r.endContainer, r.endOffset);
+  const end = pre.toString().length;
+  return { start, end, text: sel.toString() };
+}
+
+function setSelectionRange(editor: HTMLElement, start: number, end: number) {
+  const sel = window.getSelection();
+  if (!sel) return;
+  let cur = 0; let startNode: Text | null = null; let startOff = 0; let endNode: Text | null = null; let endOff = 0;
+  const w = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
+  let n: Text | null;
+  while ((n = w.nextNode() as Text | null)) {
+    if (!startNode && cur + n.length >= start) { startNode = n; startOff = start - cur; }
+    if (cur + n.length >= end) { endNode = n; endOff = end - cur; break; }
+    cur += n.length;
+  }
+  if (!startNode || !endNode) return;
+  const r = document.createRange();
+  r.setStart(startNode, startOff);
+  r.setEnd(endNode, endOff);
+  sel.removeAllRanges();
+  sel.addRange(r);
+}
+
+// ---- Unified helpers (work with both <textarea> and contentEditable <div>) ----
+
+type EditorEl = HTMLTextAreaElement | HTMLDivElement;
+
+function getText(el: EditorEl): string {
+  return el instanceof HTMLTextAreaElement ? el.value : (el.textContent || '');
+}
+
+function getSel(el: EditorEl): { start: number; end: number; text: string } {
+  if (el instanceof HTMLTextAreaElement) {
+    return { start: el.selectionStart, end: el.selectionEnd, text: el.value.substring(el.selectionStart, el.selectionEnd) };
+  }
+  return getSelectionRange(el as HTMLDivElement);
+}
+
+function setSel(el: EditorEl, start: number, end: number) {
+  if (el instanceof HTMLTextAreaElement) {
+    el.selectionStart = start;
+    el.selectionEnd = end;
+  } else {
+    setSelectionRange(el as HTMLDivElement, start, end);
+  }
+}
+
+function focusEl(el: EditorEl) { el.focus(); }
+
+// Get plain text cursor offset (works for both element types)
+function getCursorOffset(el: EditorEl): number {
+  if (el instanceof HTMLTextAreaElement) return el.selectionStart;
+  return saveCursor(el as HTMLDivElement);
+}
+
+// Get line/col from EditorEl
+function getLineCol(el: EditorEl): { line: number; col: number; total: number } {
+  const text = getText(el);
+  const offset = getCursorOffset(el);
+  const lines = text.substring(0, offset).split('\n');
+  return { line: lines.length, col: lines[lines.length - 1].length + 1, total: text.split('\n').length };
+}
+
 interface MarkdownEditorProps {
   syncScroll?: 'off' | 'position' | 'content';
   onScrollRef?: (el: HTMLElement | null) => void;
@@ -8,19 +159,52 @@ interface MarkdownEditorProps {
   onToggleSync?: () => void;
   wordWrap?: boolean;
   onToggleWordWrap?: () => void;
+  onFlushRef?: (fn: () => void) => void;
 }
 
-const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef, onEditorScroll, onToggleSync, wordWrap, onToggleWordWrap }) => {
+const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef, onEditorScroll, onToggleSync, wordWrap, onToggleWordWrap, onFlushRef }) => {
   const { fileContent, setFileContent } = useStore();
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<EditorEl>(null);
   const lineNumbersRef = useRef<HTMLDivElement>(null);
   const [cursorPosition, setCursorPosition] = useState({ line: 1, col: 1 });
   const [lineCount, setLineCount] = useState(1);
   const [taWidth, setTaWidth] = useState(0);
+  const [syntaxHighlight, setSyntaxHighlight] = useState(false); // off by default = textarea
   const undoStack = useRef<string[]>([]);
   const redoStack = useRef<string[]>([]);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  const isHighlighting = useRef(false);
+  const highlightTimer = useRef<number>(0);
+  const storeTimer = useRef<number>(0);
+
+  // Push text to store (debounced for contentEditable, direct for textarea)
+  const pushToStore = useCallback((text: string) => {
+    clearTimeout(storeTimer.current);
+    if (!syntaxHighlight) { setFileContent(text); return; }
+    storeTimer.current = window.setTimeout(() => setFileContent(text), 300);
+  }, [setFileContent, syntaxHighlight]);
+
+  // Flush pending store update immediately (called before save)
+  const flushStore = useCallback(() => {
+    clearTimeout(storeTimer.current);
+    const el = editorRef.current;
+    if (el) setFileContent(getText(el));
+  }, [setFileContent]);
+
+  // Debounced async highlighting — contentEditable only
+  const applyHighlight = useCallback(() => {
+    if (!syntaxHighlight) return;
+    clearTimeout(highlightTimer.current);
+    highlightTimer.current = window.setTimeout(() => {
+      const el = editorRef.current;
+      if (!el || el instanceof HTMLTextAreaElement) return;
+      const cursor = saveCursor(el);
+      el.innerHTML = highlightMarkdown(getText(el)) || '<br>';
+      restoreCursor(el, cursor);
+      isHighlighting.current = false;
+    }, 600);
+  }, [syntaxHighlight]);
 
   const pushUndo = useCallback(() => {
     const current = useStore.getState().fileContent;
@@ -31,46 +215,29 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
     setCanRedo(false);
   }, []);
 
-  // Helper: wrap selection with prefix/suffix, also handles undo
+  // Helper: wrap selection with prefix/suffix
   const wrapSelection = useCallback((prefix: string, suffix: string, placeholder: string) => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
+    const el = editorRef.current; if (!el) return;
     pushUndo();
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const text = textarea.value;
-    const selected = text.substring(start, end);
-    const insertion = prefix + (selected || placeholder) + suffix;
-    const newText = text.substring(0, start) + insertion + text.substring(end);
+    const { start, end, text } = getSel(el);
+    const full = getText(el);
+    const selected = text || placeholder;
+    const insertion = prefix + selected + suffix;
+    const newText = full.substring(0, start) + insertion + full.substring(end);
     setFileContent(newText);
-    setTimeout(() => {
-      const selStart = start + prefix.length;
-      const selEnd = selStart + (selected.length || placeholder.length);
-      textarea.selectionStart = selStart;
-      textarea.selectionEnd = selEnd;
-      textarea.focus();
-      updateCursorPosition();
-    }, 0);
   }, [setFileContent, pushUndo]);
 
   // Helper: insert at start of line(s)
-  const prefixLines = useCallback((prefix: string, placeholder: string) => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
+  const prefixLines = useCallback((pfx: string, placeholder: string) => {
+    const el = editorRef.current; if (!el) return;
     pushUndo();
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const text = textarea.value;
-    const lineStart = text.lastIndexOf('\n', start - 1) + 1;
-    const selected = text.substring(start, end) || placeholder;
-    const insertion = prefix + selected;
-    const newText = text.substring(0, lineStart) + insertion + text.substring(end);
+    const full = getText(el);
+    const { start, end } = getSel(el);
+    const lineStart = full.lastIndexOf('\n', start - 1) + 1;
+    const selected = full.substring(start, end) || placeholder;
+    const insertion = pfx + selected;
+    const newText = full.substring(0, lineStart) + insertion + full.substring(end);
     setFileContent(newText);
-    setTimeout(() => {
-      textarea.selectionStart = textarea.selectionEnd = lineStart + insertion.length;
-      textarea.focus();
-      updateCursorPosition();
-    }, 0);
   }, [setFileContent, pushUndo]);
 
   const handleUndo = useCallback(() => {
@@ -81,10 +248,6 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
     setFileContent(prev);
     setCanUndo(undoStack.current.length > 0);
     setCanRedo(true);
-    setTimeout(() => {
-      const ta = textareaRef.current;
-      if (ta) { ta.focus(); ta.selectionStart = ta.selectionEnd = prev.length; updateCursorPosition(); }
-    }, 0);
   }, [setFileContent]);
 
   const handleRedo = useCallback(() => {
@@ -95,205 +258,154 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
     setFileContent(next);
     setCanUndo(true);
     setCanRedo(redoStack.current.length > 0);
-    setTimeout(() => {
-      const ta = textareaRef.current;
-      if (ta) { ta.focus(); ta.selectionStart = ta.selectionEnd = next.length; updateCursorPosition(); }
-    }, 0);
   }, [setFileContent]);
 
-  // Track textarea width synchronously before paint
+  // Pass flushStore to parent so App can flush pending text before saving
+  useEffect(() => {
+    if (onFlushRef) onFlushRef(flushStore);
+  }, [onFlushRef, flushStore]);
+
+  // Track editor width for word-wrap line calc
   useLayoutEffect(() => {
-    const ta = textareaRef.current;
-    if (!ta || !wordWrap) return;
-    setTaWidth(ta.clientWidth);
-    const observer = new ResizeObserver(([entry]) => {
-      setTaWidth(entry.contentRect.width);
-    });
-    observer.observe(ta);
+    const el = editorRef.current;
+    if (!el || !wordWrap) return;
+    setTaWidth(el.clientWidth);
+    const observer = new ResizeObserver(([entry]) => { setTaWidth(entry.contentRect.width); });
+    observer.observe(el);
     return () => observer.disconnect();
   }, [wordWrap]);
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.focus();
-    }
-  }, []);
+
+  // Auto-focus on mount
+  useEffect(() => { editorRef.current?.focus(); }, []);
 
   // Register scroll container for sync
   useEffect(() => {
-    const el = textareaRef.current;
+    const el = editorRef.current;
     if (el && onScrollRef) onScrollRef(el);
     return () => { if (onScrollRef) onScrollRef(null); };
   }, [onScrollRef]);
 
   // Sync scroll: listen to editor scroll
   useEffect(() => {
-    const el = textareaRef.current;
+    const el = editorRef.current;
     if (!el || syncScroll === 'off' || !onEditorScroll) return;
     el.addEventListener('scroll', onEditorScroll, { passive: true });
     return () => el.removeEventListener('scroll', onEditorScroll);
   }, [syncScroll, onEditorScroll]);
 
+  const updateCursorPosition = useCallback(() => {
+    const el = editorRef.current;
+    if (!el) return;
+    const { line, col, total } = getLineCol(el);
+    setCursorPosition({ line, col });
+    setLineCount(total);
+  }, []);
+
+  // Highlight and sync when fileContent changes externally (undo/redo, file open)
+  useEffect(() => {
+    const el = editorRef.current;
+    if (!el || isHighlighting.current) return;
+    if (el instanceof HTMLTextAreaElement) return; // textarea handles its own value
+    isHighlighting.current = true;
+    const cursor = saveCursor(el);
+    if (syntaxHighlight) {
+      el.innerHTML = highlightMarkdown(fileContent) || '<br>';
+    } else {
+      el.textContent = fileContent;
+    }
+    restoreCursor(el, Math.min(cursor, fileContent.length));
+    isHighlighting.current = false;
+    updateCursorPosition();
+  }, [fileContent, syntaxHighlight, updateCursorPosition]);
+
+  // Input handler: minimal for both modes
+  const handleInput = useCallback(() => {
+    const el = editorRef.current;
+    if (!el) return;
+    const text = getText(el);
+    pushToStore(text);
+    applyHighlight();
+    requestAnimationFrame(updateCursorPosition);
+  }, [pushToStore, applyHighlight, updateCursorPosition]);
+
+  // textarea onChange (direct, no debounce needed)
   const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setFileContent(e.target.value);
-  }, [setFileContent]);
+    updateCursorPosition();
+  }, [setFileContent, updateCursorPosition]);
 
   const handleScroll = useCallback(() => {
-    if (textareaRef.current && lineNumbersRef.current) {
-      lineNumbersRef.current.scrollTop = textareaRef.current.scrollTop;
+    if (editorRef.current && lineNumbersRef.current) {
+      lineNumbersRef.current.scrollTop = editorRef.current.scrollTop;
     }
   }, []);
 
-  const updateCursorPosition = useCallback(() => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-
-    const pos = textarea.selectionStart;
-    const text = textarea.value;
-    const lines = text.substring(0, pos).split('\n');
-    setCursorPosition({
-      line: lines.length,
-      col: lines[lines.length - 1].length + 1,
-    });
-    setLineCount(text.split('\n').length);
-  }, []);
-
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Undo/Redo
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    const el = editorRef.current; if (!el) return;
+    // Undo/Redo (works for both element types)
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
-      e.preventDefault();
-      handleUndo();
-      return;
+      e.preventDefault(); handleUndo(); return;
     }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
-      e.preventDefault();
-      handleRedo();
-      return;
+      e.preventDefault(); handleRedo(); return;
     }
-    // Tab key support
+    // Tab key
     if (e.key === 'Tab') {
       e.preventDefault();
-      const textarea = textareaRef.current;
-      if (!textarea) return;
-
-      const start = textarea.selectionStart;
-      const end = textarea.selectionEnd;
-      const value = textarea.value;
-
+      const { start, end } = getSel(el);
+      const value = getText(el);
+      const isDiv = !(el instanceof HTMLTextAreaElement);
       if (!e.shiftKey) {
-        // Insert tab (2 spaces)
-        const newValue = value.substring(0, start) + '  ' + value.substring(end);
-        setFileContent(newValue);
+        const nv = value.substring(0, start) + '  ' + value.substring(end);
+        setFileContent(nv);
         setTimeout(() => {
-          textarea.selectionStart = textarea.selectionEnd = start + 2;
+          const el2 = editorRef.current; if (!el2) return;
+          if (isDiv && syntaxHighlight && el2 instanceof HTMLDivElement) el2.innerHTML = highlightMarkdown(nv) || '<br>';
+          setSel(el2, start + 2, start + 2);
           updateCursorPosition();
         }, 0);
       } else {
-        // Remove tab (2 spaces) before cursor
-        const lineStart = value.lastIndexOf('\n', start - 1) + 1;
-        const beforeLine = value.substring(lineStart, start);
-        if (beforeLine.startsWith('  ')) {
-          const newValue = value.substring(0, lineStart) + beforeLine.substring(2) + value.substring(start);
-          setFileContent(newValue);
+        const ls = value.lastIndexOf('\n', start - 1) + 1;
+        const bl = value.substring(ls, start);
+        if (bl.startsWith('  ')) {
+          const nv = value.substring(0, ls) + bl.substring(2) + value.substring(start);
+          setFileContent(nv);
           setTimeout(() => {
-            textarea.selectionStart = textarea.selectionEnd = start - 2;
+            const el2 = editorRef.current; if (!el2) return;
+            if (isDiv && syntaxHighlight && el2 instanceof HTMLDivElement) el2.innerHTML = highlightMarkdown(nv) || '<br>';
+            setSel(el2, start - 2, start - 2);
             updateCursorPosition();
           }, 0);
         }
       }
+      return;
     }
-
-    // Handle auto-indent on Enter
+    // Enter — auto-indent (works for both)
     if (e.key === 'Enter') {
       e.preventDefault();
-      const textarea = textareaRef.current;
-      if (!textarea) return;
-
-      const start = textarea.selectionStart;
-      const value = textarea.value;
-      const lineStart = value.lastIndexOf('\n', start - 1) + 1;
-      const currentLine = value.substring(lineStart, start);
-      const indent = currentLine.match(/^\s*/)?.[0] || '';
-
-      // Check for task list items: - [ ] or - [x]
-      const taskMatch = currentLine.match(/^(\s*)[-*+]\s+\[([ x])\]\s*(.*)/);
-      if (taskMatch) {
-        const taskIndent = taskMatch[1];
-        const taskText = taskMatch[3];
-        if (!taskText) {
-          // Empty task – remove the marker and just break the line
-          setTimeout(() => {
-            const newStart = textarea.selectionStart;
-            const newValue = textarea.value;
-            const beforeLine = newValue.substring(0, lineStart);
-            const afterCursor = newValue.substring(newStart);
-            const updated = beforeLine + '\n' + taskIndent + afterCursor;
-            setFileContent(updated);
-            setTimeout(() => {
-              textarea.selectionStart = textarea.selectionEnd = lineStart + 1 + taskIndent.length;
-              updateCursorPosition();
-            }, 0);
-          }, 0);
-        } else {
-          // Continue task list
-          setTimeout(() => {
-            const newStart = textarea.selectionStart;
-            const newValue = textarea.value;
-            const insertion = '\n' + taskIndent + '- [ ] ';
-            const updated = newValue.substring(0, newStart) + insertion + newValue.substring(newStart);
-            setFileContent(updated);
-            setTimeout(() => {
-              textarea.selectionStart = textarea.selectionEnd = newStart + insertion.length;
-              updateCursorPosition();
-            }, 0);
-          }, 0);
-        }
-        return;
-      }
-
-      // Check if we're in a regular list
-      const listMatch = currentLine.match(/^(\s*)([-*+]\s+|(\d+\.)\s+)/);
-      if (listMatch) {
+      const value = getText(el);
+      const { start } = getSel(el);
+      const ls = value.lastIndexOf('\n', start - 1) + 1;
+      const cl = value.substring(ls, start);
+      const indent = cl.match(/^\s*/)?.[0] || '';
+      const isDiv = !(el instanceof HTMLTextAreaElement);
+      const apply = (nv: string, cursor: number) => {
+        setFileContent(nv);
         setTimeout(() => {
-          const newStart = textarea.selectionStart;
-          const newValue = textarea.value;
-          const insertion = '\n' + indent + (listMatch[3] ? `${parseInt(listMatch[3]) + 1}. ` : '- ');
-          const updated = newValue.substring(0, newStart) + insertion + newValue.substring(newStart);
-          setFileContent(updated);
-          setTimeout(() => {
-            textarea.selectionStart = textarea.selectionEnd = newStart + insertion.length;
-            updateCursorPosition();
-          }, 0);
+          const el2 = editorRef.current; if (!el2) return;
+          if (isDiv && syntaxHighlight && el2 instanceof HTMLDivElement) el2.innerHTML = highlightMarkdown(nv) || '<br>';
+          setSel(el2, cursor, cursor);
+          updateCursorPosition();
         }, 0);
-        return;
-      }
-
-      // Regular indent
-      if (indent) {
-        setTimeout(() => {
-          const newStart = textarea.selectionStart;
-          const newValue = textarea.value;
-          const updated = newValue.substring(0, newStart) + '\n' + indent + newValue.substring(newStart);
-          setFileContent(updated);
-          setTimeout(() => {
-            textarea.selectionStart = textarea.selectionEnd = newStart + 1 + indent.length;
-            updateCursorPosition();
-          }, 0);
-        }, 0);
-      } else {
-        // No indent, no list – just do a normal newline
-        setTimeout(() => {
-          const newStart = textarea.selectionStart;
-          const newValue = textarea.value;
-          const updated = newValue.substring(0, newStart) + '\n' + newValue.substring(newStart);
-          setFileContent(updated);
-          setTimeout(() => {
-            textarea.selectionStart = textarea.selectionEnd = newStart + 1;
-            updateCursorPosition();
-          }, 0);
-        }, 0);
-      }
+      };
+      const tm = cl.match(/^(\s*)[-*+]\s+\[([ x])\]\s*(.*)/);
+      if (tm) { const ti = tm[1]; const tt = tm[3]; if (!tt) apply(value.substring(0, ls) + '\n' + ti + value.substring(start), ls + 1 + ti.length); else { const ins = '\n' + ti + '- [ ] '; apply(value.substring(0, start) + ins + value.substring(start), start + ins.length); } return; }
+      const lm = cl.match(/^(\s*)([-*+]\s+|(\d+\.)\s+)/);
+      if (lm) { const ins = '\n' + indent + (lm[3] ? `${parseInt(lm[3]) + 1}. ` : '- '); apply(value.substring(0, start) + ins + value.substring(start), start + ins.length); return; }
+      const ins = indent ? '\n' + indent : '\n';
+      apply(value.substring(0, start) + ins + value.substring(start), start + ins.length);
     }
-  }, [setFileContent, updateCursorPosition, handleUndo, handleRedo]);
+  }, [setFileContent, updateCursorPosition, handleUndo, handleRedo, syntaxHighlight]);
 
   const handleCursorUpdate = useCallback(() => {
     updateCursorPosition();
@@ -304,7 +416,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
     if (!wordWrap) {
       return Array.from({ length: logicalLines.length || 1 }, (_, i) => i + 1);
     }
-    const ta = textareaRef.current;
+    const ta = editorRef.current;
     if (!ta) return Array.from({ length: logicalLines.length || 1 }, (_, i) => i + 1);
 
     const cs = getComputedStyle(ta);
@@ -396,14 +508,21 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
         </button>
         {/* Code block */}
         <button className="btn-icon" onClick={() => {
-          const ta = textareaRef.current; if (!ta) return;
+          const el = editorRef.current; if (!el) return;
           pushUndo();
-          const s = ta.selectionStart, e = ta.selectionEnd, t = ta.value;
-          const sel = t.substring(s, e);
+          const { start, end } = getSel(el);
+          const t = getText(el);
+          const sel = t.substring(start, end);
           const ins = sel ? `\`\`\`\n${sel}\n\`\`\`` : '```\ncode block\n```';
-          const nt = t.substring(0, s) + ins + t.substring(e);
+          const nt = t.substring(0, start) + ins + t.substring(end);
           setFileContent(nt);
-          setTimeout(() => { ta.focus(); ta.selectionStart = ta.selectionEnd = s + ins.length; updateCursorPosition(); }, 0);
+          setTimeout(() => {
+            const el2 = editorRef.current; if (!el2) return;
+            if (!(el2 instanceof HTMLTextAreaElement) && syntaxHighlight) el2.innerHTML = highlightMarkdown(nt) || '<br>';
+            setSel(el2, start + ins.length, start + ins.length);
+            focusEl(el2);
+            updateCursorPosition();
+          }, 0);
         }} title="Code block">
           <svg className="w-[18px] h-[18px] shrink-0" fill="currentColor" viewBox="0 0 256 256"><path d="m58.34 101.66l-32-32a8 8 0 0 1 0-11.32l32-32a8 8 0 0 1 11.32 11.32L43.31 64l26.35 26.34a8 8 0 0 1-11.32 11.32m40 0a8 8 0 0 0 11.32 0l32-32a8 8 0 0 0 0-11.32l-32-32a8 8 0 0 0-11.32 11.32L124.69 64L98.34 90.34a8 8 0 0 0 0 11.32M200 40h-24a8 8 0 0 0 0 16h24v144H56v-64a8 8 0 0 0-16 0v64a16 16 0 0 0 16 16h144a16 16 0 0 0 16-16V56a16 16 0 0 0-16-16"/></svg>
         </button>
@@ -422,26 +541,40 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
         </button>
         {/* Table */}
         <button className="btn-icon" onClick={() => {
-          const ta = textareaRef.current; if (!ta) return;
+          const el = editorRef.current; if (!el) return;
           pushUndo();
-          const s = ta.selectionStart, t = ta.value;
+          const { start } = getSel(el);
+          const t = getText(el);
           const ins = '\n| Col 1 | Col 2 | Col 3 |\n| --- | --- | --- |\n| Cell | Cell | Cell |\n';
-          const nt = t.substring(0, s) + ins + t.substring(s);
+          const nt = t.substring(0, start) + ins + t.substring(start);
           setFileContent(nt);
-          setTimeout(() => { ta.focus(); ta.selectionStart = ta.selectionEnd = s + ins.length; updateCursorPosition(); }, 0);
+          setTimeout(() => {
+            const el2 = editorRef.current; if (!el2) return;
+            if (!(el2 instanceof HTMLTextAreaElement) && syntaxHighlight) el2.innerHTML = highlightMarkdown(nt) || '<br>';
+            setSel(el2, start + ins.length, start + ins.length);
+            focusEl(el2);
+            updateCursorPosition();
+          }, 0);
         }} title="Insert table">
           <svg className="w-[18px] h-[18px] shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M5.616 20q-.691 0-1.153-.462T4 18.384V5.616q0-.691.463-1.153T5.616 4h12.769q.69 0 1.153.463T20 5.616v12.769q0 .69-.462 1.153T18.384 20zm5.884-5.596H5v3.98q0 .27.173.443t.443.173H11.5zm1 0V19h5.885q.269 0 .442-.173t.173-.442v-3.981zm-1-1V8.769H5v4.635zm1 0H19V8.769h-6.5zM5 7.769h14V5.615q0-.269-.173-.442T18.385 5H5.615q-.269 0-.442.173T5 5.616z"/></svg>
         </button>
         <div className="w-px h-5 bg-gray-200 dark:bg-gray-700" />
         {/* Horizontal separator */}
         <button className="btn-icon" title="Horizontal separator" onClick={() => {
-          const ta = textareaRef.current; if (!ta) return;
+          const el = editorRef.current; if (!el) return;
           pushUndo();
-          const s = ta.selectionStart, t = ta.value;
+          const { start } = getSel(el);
+          const t = getText(el);
           const ins = '\n---\n';
-          const nt = t.substring(0, s) + ins + t.substring(s);
+          const nt = t.substring(0, start) + ins + t.substring(start);
           setFileContent(nt);
-          setTimeout(() => { ta.focus(); ta.selectionStart = ta.selectionEnd = s + ins.length; updateCursorPosition(); }, 0);
+          setTimeout(() => {
+            const el2 = editorRef.current; if (!el2) return;
+            if (!(el2 instanceof HTMLTextAreaElement) && syntaxHighlight) el2.innerHTML = highlightMarkdown(nt) || '<br>';
+            setSel(el2, start + ins.length, start + ins.length);
+            focusEl(el2);
+            updateCursorPosition();
+          }, 0);
         }} >
           <svg className="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14"/></svg>
         </button>
@@ -458,6 +591,16 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
             </svg>
           </button>
         )}
+        {/* Syntax highlight toggle */}
+        <button
+          className={`btn-icon ${syntaxHighlight ? 'bg-blue-500/10 text-blue-500' : ''}`}
+          onClick={() => setSyntaxHighlight(v => !v)}
+          title={syntaxHighlight ? 'Disable syntax highlighting' : 'Enable syntax highlighting'}
+        >
+          <svg className="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9.53 16.122a3 3 0 0 0-5.78 1.128a2.25 2.25 0 0 1-2.4 2.245a4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128m0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42" />
+          </svg>
+        </button>
         <div className="flex-1" />
         {/* Sync scroll toggle */}
         {syncScroll !== undefined && (
@@ -489,20 +632,36 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
           ))}
         </div>
 
-        {/* Textarea */}
-        <textarea
-          ref={textareaRef}
-          value={fileContent}
-          onChange={handleChange}
-          onKeyDown={handleKeyDown}
-          onClick={handleCursorUpdate}
-          onKeyUp={handleCursorUpdate}
-          onScroll={handleScroll}
-          spellCheck={false}
-          className={`flex-1 bg-transparent text-sm leading-6 font-mono p-3 resize-none outline-none text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-600 ${wordWrap ? 'wrap' : 'no-wrap'}`}
-          placeholder="Start writing markdown..."
-          style={{ tabSize: 2, whiteSpace: wordWrap ? 'pre-wrap' : 'pre' }}
-        />
+        {/* Editor: textarea (fast, no highlight) or contentEditable div (syntax colored) */}
+        {!syntaxHighlight ? (
+          <textarea
+            ref={editorRef as React.RefObject<HTMLTextAreaElement>}
+            value={fileContent}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            onClick={handleCursorUpdate}
+            onKeyUp={handleCursorUpdate}
+            onScroll={handleScroll}
+            spellCheck={false}
+            className={`flex-1 bg-transparent text-sm leading-6 font-mono p-3 resize-none outline-none text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-600 ${wordWrap ? 'wrap' : 'no-wrap'}`}
+            placeholder="Start writing markdown..."
+            style={{ tabSize: 2, whiteSpace: wordWrap ? 'pre-wrap' : 'pre' }}
+          />
+        ) : (
+          <div
+            ref={editorRef as React.RefObject<HTMLDivElement>}
+            contentEditable
+            suppressContentEditableWarning
+            onInput={handleInput}
+            onKeyDown={handleKeyDown}
+            onClick={handleCursorUpdate}
+            onKeyUp={handleCursorUpdate}
+            onScroll={handleScroll}
+            spellCheck={false}
+            className={`flex-1 text-sm leading-6 font-mono p-3 outline-none whitespace-pre-wrap break-words overflow-y-auto overflow-x-auto text-gray-800 dark:text-gray-200 bg-transparent ${wordWrap ? '' : 'whitespace-pre'}`}
+            style={{ tabSize: 2, whiteSpace: wordWrap ? 'pre-wrap' : 'pre' }}
+          />
+        )}
       </div>
     </div>
   );

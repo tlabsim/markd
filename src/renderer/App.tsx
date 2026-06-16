@@ -41,6 +41,7 @@ const App: React.FC = () => {
   } = useStore();
 
   const editorRef = useRef<HTMLTextAreaElement>(null);
+  const flushEditorRef = useRef<(() => void) | null>(null);
   const [showFontMenu, setShowFontMenu] = useState(false);
   const [showPaletteMenu, setShowPaletteMenu] = useState(false);
   const [showToc, setShowToc] = useState(false);
@@ -127,24 +128,28 @@ const App: React.FC = () => {
   }, []);
 
   const handleSave = useCallback(async () => {
-    const result = await window.markd?.saveFile(fileContent);
+    flushEditorRef.current?.(); // flush any pending debounced text
+    const content = useStore.getState().fileContent;
+    const result = await window.markd?.saveFile(content);
     if (result?.success) {
-      setOriginalContent(fileContent);
+      setOriginalContent(content);
       if (result.filePath && !currentFilePath) {
         setCurrentFilePath(result.filePath);
         setCurrentFile(result.filePath.split(/[/\\]/).pop() || null);
       }
     }
-  }, [fileContent, currentFilePath]);
+  }, [currentFilePath]);
 
   const handleSaveAs = useCallback(async () => {
-    const result = await window.markd?.saveFileAs(fileContent);
+    flushEditorRef.current?.();
+    const content = useStore.getState().fileContent;
+    const result = await window.markd?.saveFileAs(content);
     if (result?.success) {
       setCurrentFile(result.filePath ? result.filePath.split(/[/\\]/).pop() || null : null);
       setCurrentFilePath(result.filePath || null);
-      setOriginalContent(fileContent);
+      setOriginalContent(content);
     }
-  }, [fileContent]);
+  }, []);
 
   const handleNewFile = useCallback(() => {
     setCurrentFile('Untitled.md');
@@ -766,6 +771,7 @@ const App: React.FC = () => {
                       onToggleSync={() => setSyncScroll(v => v === 'off' ? 'content' : v === 'content' ? 'position' : 'off')}
                       wordWrap={wordWrap}
                       onToggleWordWrap={() => setWordWrap(v => !v)}
+                      onFlushRef={(fn) => { flushEditorRef.current = fn; }}
                     />
                   </div>
                 )}
