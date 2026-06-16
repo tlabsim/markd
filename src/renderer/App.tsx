@@ -5,6 +5,7 @@ import TitleBar from './components/TitleBar';
 import Sidebar from './components/Sidebar';
 import MarkdownViewer from './components/MarkdownViewer';
 import MarkdownEditor from './components/MarkdownEditor';
+import ConfirmModal from './components/ConfirmModal';
 import SearchBar from './components/SearchBar';
 import WelcomeScreen from './components/WelcomeScreen';
 import StatusBar from './components/StatusBar';
@@ -45,6 +46,8 @@ const App: React.FC = () => {
   const [showToc, setShowToc] = useState(false);
   const [splitRatio, setSplitRatio] = useState(50); // percentage
   const [distractionFree, setDistractionFree] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingDropPath, setPendingDropPath] = useState<string | null>(null);
   const fontMenuRef = useRef<HTMLDivElement>(null);
   const paletteMenuRef = useRef<HTMLDivElement>(null);
   const tocButtonRef = useRef<HTMLButtonElement>(null);
@@ -460,8 +463,68 @@ const App: React.FC = () => {
   );
   };
 
+  // Drag-and-drop support
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.types.includes('Files')) {
+      e.dataTransfer.dropEffect = 'copy';
+    }
+  }, []);
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const files = e.dataTransfer.files;
+    if (files.length === 0) return;
+
+    const file = files[0];
+    // In Electron, dropped files have a .path property
+    const filePath = (file as any).path;
+    if (!filePath) return;
+
+    const ext = filePath.split('.').pop()?.toLowerCase();
+    if (ext !== 'md' && ext !== 'markdown') return;
+
+    // If a file is already loaded, ask for confirmation via modal
+    if (currentFile && currentFilePath) {
+      setPendingDropPath(filePath);
+      setConfirmOpen(true);
+      return;
+    }
+
+    await loadDroppedFile(filePath);
+  }, [currentFile, currentFilePath]);
+
+  const loadDroppedFile = useCallback(async (filePath: string) => {
+    const result = await window.markd?.getFileContent(filePath);
+    if (result?.success && result.content !== undefined) {
+      setCurrentFile(filePath.split(/[/\\]/).pop() || null);
+      setCurrentFilePath(filePath);
+      setOriginalContent(result.content);
+      useStore.getState().addRecentFile(filePath);
+    }
+  }, []);
+
+  const handleConfirmReplace = useCallback(async () => {
+    setConfirmOpen(false);
+    if (pendingDropPath) {
+      await loadDroppedFile(pendingDropPath);
+      setPendingDropPath(null);
+    }
+  }, [pendingDropPath, loadDroppedFile]);
+
+  const handleCancelReplace = useCallback(() => {
+    setConfirmOpen(false);
+    setPendingDropPath(null);
+  }, []);
+
   return (
-    <div className={`h-screen flex flex-col overflow-hidden ${distractionFree ? 'relative' : ''}`}>
+    <div
+      className={`h-screen flex flex-col overflow-hidden ${distractionFree ? 'relative' : ''}`}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
       <TitleBar
         onMinimize={() => window.markd?.minimizeWindow()}
         onMaximize={() => window.markd?.maximizeWindow()}
@@ -622,6 +685,17 @@ const App: React.FC = () => {
           {currentFile && !distractionFree && <StatusBar />}
         </div>
       </div>
+
+      {/* Confirm modal for drag-and-drop replacement */}
+      <ConfirmModal
+        open={confirmOpen}
+        title="Replace File"
+        message={`Replace "${currentFile}" with "${pendingDropPath?.split(/[/\\]/).pop() || ''}"?\n\nUnsaved changes will be lost.`}
+        confirmLabel="Replace"
+        cancelLabel="Cancel"
+        onConfirm={handleConfirmReplace}
+        onCancel={handleCancelReplace}
+      />
     </div>
   );
 };
