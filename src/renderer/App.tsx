@@ -657,30 +657,20 @@ const App: React.FC = () => {
             isSidebarOpen && !distractionFree ? 'w-64' : 'w-0'
           } flex-shrink-0 border-r border-md-border dark:border-md-border-dark bg-md-surface dark:bg-md-surface-dark overflow-hidden flex flex-col transition-all duration-200`}
         >
-          {isSidebarOpen && <Sidebar />}
+          {isSidebarOpen && <Sidebar onOpenFile={handleOpen} />}
         </div>
-
-        {/* Floating sidebar toggle when collapsed */}
-        {!isSidebarOpen && !distractionFree && (
-          <button
-            className="absolute left-0 top-1/2 -translate-y-1/2 z-20 w-6 h-12 flex items-center justify-center bg-white/70 dark:bg-[#222c36]/70 backdrop-blur-sm border border-gray-300/50 dark:border-gray-600/50 rounded-r-md shadow-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-            onClick={toggleSidebar}
-            title="Open sidebar (Ctrl+B)"
-          >
-            <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-            </svg>
-          </button>
-        )}
 
         {/* Main Content */}
         <div className="flex-1 flex flex-col overflow-hidden relative">
-          {/* Search Bar */}
-          {isSearchOpen && <SearchBar />}
-
           {/* Toolbar */}
           {currentFile && !distractionFree && (
-            <div className="flex items-center gap-0.5 px-3 h-10 border-b border-gray-200/60 dark:border-gray-700/60 bg-white/85 dark:bg-[#222c36]/85 relative z-10">
+            <div className="flex items-center gap-0.5 px-2 h-10 border-b border-gray-200/60 dark:border-gray-700/60 bg-white/85 dark:bg-[#222c36]/85 relative z-10">
+              {/* Sidebar toggle — always left-aligned */}
+              {!isSidebarOpen && (
+                <button className="btn-icon shrink-0" onClick={toggleSidebar} title="Open sidebar (Ctrl+B)">
+                  <svg className="w-[20px] h-[20px] shrink-0" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><path d="M9 3.5v17M14 9l3 3l-3 3"/><path d="M3 9.4c0-2.24 0-3.36.436-4.216a4 4 0 0 1 1.748-1.748C6.04 3 7.16 3 9.4 3h5.2c2.24 0 3.36 0 4.216.436a4 4 0 0 1 1.748 1.748C21 6.04 21 7.16 21 9.4v5.2c0 2.24 0 3.36-.436 4.216a4 4 0 0 1-1.748 1.748C17.96 21 16.84 21 14.6 21H9.4c-2.24 0-3.36 0-4.216-.436a4 4 0 0 1-1.748-1.748C3 17.96 3 16.84 3 14.6z"/></g></svg>
+                </button>
+              )}
               {/* Left spacer — pushes tools to center on lg+ */}
               <div className="flex-1 hidden lg:block" />
               {/* ---- View mode toggle group ---- */}
@@ -712,13 +702,6 @@ const App: React.FC = () => {
                   </svg>
                 </button>
               </div>
-              <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-1 shrink-0" />
-              {/* Save button */}
-              <button className="btn-icon shrink-0" onClick={handleSave} title="Save (Ctrl+S)">
-                <svg className="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                </svg>
-              </button>
               <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-1 shrink-0" />
               {/* Font selector */}
               <FontSelector />
@@ -753,7 +736,18 @@ const App: React.FC = () => {
           )}
 
           {/* Content Area */}
-          <div ref={contentRef} className="flex-1 overflow-hidden flex">
+          <div ref={contentRef} className="flex-1 overflow-hidden flex flex-col relative">
+            {/* Search bar — centered floating overlay */}
+            {isSearchOpen && (
+              <div className="absolute top-3 left-1/2 -translate-x-1/2 z-50 w-full max-w-xl">
+                <SearchBar
+                  editorRef={editorScrollRef as React.RefObject<HTMLTextAreaElement | HTMLDivElement | null>}
+                  viewerRef={viewerScrollRef as React.RefObject<HTMLDivElement | null>}
+                  viewMode={viewMode}
+                />
+              </div>
+            )}
+            <div className="flex-1 overflow-hidden flex">
             {!currentFile ? (
               <WelcomeScreen onOpen={handleOpen} onOpenFolder={handleOpenFolder} onNew={handleNewFile} />
             ) : (
@@ -772,6 +766,7 @@ const App: React.FC = () => {
                       wordWrap={wordWrap}
                       onToggleWordWrap={() => setWordWrap(v => !v)}
                       onFlushRef={(fn) => { flushEditorRef.current = fn; }}
+                      onSave={handleSave}
                     />
                   </div>
                 )}
@@ -794,6 +789,7 @@ const App: React.FC = () => {
                 )}
               </>
             )}
+          </div>
           </div>
 
           {/* Status Bar */}
