@@ -12,35 +12,37 @@
     "build:main": "tsc -p tsconfig.node.json",
     "preview": "vite preview",
     "dist": "npm run build && electron-builder",
-    "dist:win": "npm run build && electron-builder --win",
+    "dist:win": "npm run build && electron-builder --win -c.win.signAndEditExecutable=false",
     "dist:linux": "npm run build && electron-builder --linux",
     "dist:mac": "npm run build && electron-builder --mac",
-    "dist:all": "npm run build && electron-builder --win --linux --mac"
+    "dist:all": "npm run build && electron-builder --win --linux --mac -c.win.signAndEditExecutable=false",
+    "dist:win:unsigned": "npm run build && set CSC_IDENTITY_AUTO_DISCOVERY=false && electron-builder --win -c.win.signAndEditExecutable=false",
+    "generate-icons": "node scripts/generate-icons.mjs"
   },
   "dependencies": {
+    "katex": "^0.16.9",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-markdown": "^9.0.1",
-    "remark-gfm": "^4.0.0",
-    "rehype-highlight": "^7.0.0",
+    "rehype-highlight": "^7.0.2",
     "rehype-katex": "^7.0.0",
+    "rehype-raw": "^7.0.0",
+    "remark-emoji": "^5.0.2",
+    "remark-frontmatter": "^5.0.0",
+    "remark-gfm": "^4.0.0",
     "remark-math": "^6.0.0",
-    "react-syntax-highlighter": "^15.5.0",
-    "katex": "^0.16.9",
-    "lucide-react": "^0.395.0",
-    "zustand": "^4.5.2",
-    "uuid": "^9.0.1"
+    "zustand": "^4.5.2"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
-    "@types/uuid": "^9.0.8",
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.19",
     "concurrently": "^8.2.2",
     "electron": "^31.0.0",
     "electron-builder": "^24.13.3",
     "postcss": "^8.4.38",
+    "sharp": "^0.35.1",
     "tailwindcss": "^3.4.4",
     "typescript": "^5.5.2",
     "vite": "^5.3.1",
@@ -56,21 +58,37 @@
       "dist/**/*",
       "resources/**/*"
     ],
+    "extraResources": [
+      {
+        "from": "resources",
+        "to": "resources"
+      }
+    ],
+    "compression": "maximum",
     "win": {
-      "target": ["nsis"],
-      "icon": "resources/icon.png"
+      "target": [
+        "nsis"
+      ],
+      "icon": "resources/markd.png"
     },
     "linux": {
-      "target": ["AppImage", "deb"],
-      "icon": "resources/icon.png"
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "resources/markd.png"
     },
     "mac": {
-      "target": ["dmg"],
-      "icon": "resources/icon.png"
+      "target": [
+        "dmg"
+      ],
+      "icon": "resources/markd.png"
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "resources/markd.ico",
+      "uninstallerIcon": "resources/markd.ico"
     }
   }
 }

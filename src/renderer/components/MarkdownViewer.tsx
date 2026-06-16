@@ -2,16 +2,23 @@ import React, { useMemo, useRef, useEffect, useState, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
+import remarkEmoji from 'remark-emoji';
+import remarkFrontmatter from 'remark-frontmatter';
 import rehypeKatex from 'rehype-katex';
+import rehypeHighlight from 'rehype-highlight';
+import rehypeRaw from 'rehype-raw';
 import { useStore } from '../store';
 import TableOfContents from './TableOfContents';
 
 interface MarkdownViewerProps {
   showToc?: boolean;
   onToggleToc?: () => void;
+  syncScroll?: 'off' | 'position' | 'content';
+  onScrollRef?: (el: HTMLElement | null) => void;
+  onViewerScroll?: () => void;
 }
 
-const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc }) => {
+const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, syncScroll, onScrollRef, onViewerScroll }) => {
   const { fileContent, currentFilePath, fontFamily, zoomLevel, previewPalette, zoomIn, zoomOut } = useStore();
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -35,6 +42,21 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc })
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
   }, [zoomIn, zoomOut]);
+
+  // Register scroll container for sync
+  useEffect(() => {
+    const el = contentRef.current;
+    if (el && onScrollRef) onScrollRef(el);
+    return () => { if (onScrollRef) onScrollRef(null); };
+  }, [onScrollRef]);
+
+  // Sync scroll: listen to viewer scroll
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el || syncScroll === 'off' || !onViewerScroll) return;
+    el.addEventListener('scroll', onViewerScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onViewerScroll);
+  }, [syncScroll, onViewerScroll]);
 
 // Async image resolver component (handles async data URL loading)
 const AsyncImage: React.FC<{ src: string; alt: string; className?: string }> = ({ src, alt, className }) => {
@@ -204,7 +226,7 @@ const AsyncImage: React.FC<{ src: string; alt: string; className?: string }> = (
       );
     },
     pre: ({ children, ...props }: any) => (
-      <pre className="my-4 p-4 bg-gray-50 dark:bg-[#181e26] rounded-lg overflow-x-auto border border-gray-200 dark:border-gray-700" {...props}>{children}</pre>
+      <pre className="my-4 p-3 bg-gray-50 dark:bg-[#181e26] rounded-lg overflow-x-auto border border-gray-200 dark:border-gray-700" {...props}>{children}</pre>
     ),
     code: ({ className, children, ...props }: any) => {
       const isInline = !className;
@@ -238,8 +260,8 @@ const AsyncImage: React.FC<{ src: string; alt: string; className?: string }> = (
         >
           {fileContent ? (
             <ReactMarkdown
-              remarkPlugins={[remarkGfm, remarkMath]}
-              rehypePlugins={[rehypeKatex]}
+              remarkPlugins={[remarkGfm, remarkMath, remarkEmoji, remarkFrontmatter]}
+              rehypePlugins={[rehypeKatex, rehypeHighlight, rehypeRaw]}
               components={components}
             >
               {fileContent}

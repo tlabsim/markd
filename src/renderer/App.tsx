@@ -48,11 +48,16 @@ const App: React.FC = () => {
   const [distractionFree, setDistractionFree] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDropPath, setPendingDropPath] = useState<string | null>(null);
+  const [syncScroll, setSyncScroll] = useState<'off' | 'position' | 'content'>('off');
+  const [wordWrap, setWordWrap] = useState(true);
   const fontMenuRef = useRef<HTMLDivElement>(null);
   const paletteMenuRef = useRef<HTMLDivElement>(null);
   const tocButtonRef = useRef<HTMLButtonElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
+  const isSyncing = useRef(false); // prevent scroll feedback loop
+  const editorScrollRef = useRef<HTMLElement | null>(null);
+  const viewerScrollRef = useRef<HTMLElement | null>(null);
   const dragRatio = useRef(50); // ref for instant drag updates
 
   // Split view drag handlers — use ref for performance, commit on mouseup
@@ -158,6 +163,103 @@ const App: React.FC = () => {
       useStore.getState().addRecentFile(filePath);
     }
   }, []);
+
+  // Shared slugify — must match the one in MarkdownViewer
+  const syncSlugify = (text: string) =>
+    text.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').trim();
+
+  // Sync scroll handlers
+  const handleEditorScroll = useCallback(() => {
+    if (syncScroll === 'off' || isSyncing.current || !editorScrollRef.current || !viewerScrollRef.current) return;
+    isSyncing.current = true;
+    const editor = editorScrollRef.current;
+    const viewer = viewerScrollRef.current;
+
+    if (syncScroll === 'position') {
+      const pct = editor.scrollTop / (editor.scrollHeight - editor.clientHeight);
+      viewer.scrollTop = pct * (viewer.scrollHeight - viewer.clientHeight);
+    } else if (syncScroll === 'content') {
+      // Use actual line height from computed style
+      const cs = getComputedStyle(editor);
+      const lineHeight = parseInt(cs.lineHeight) || 24;
+      const padTop = parseInt(cs.paddingTop) || 0;
+      const effectiveScroll = Math.max(0, editor.scrollTop - padTop);
+      const topLine = Math.floor(effectiveScroll / lineHeight);
+      const content = useStore.getState().fileContent;
+      const lines = content.split('\n');
+
+      // Find the nearest heading above or at topLine
+      let headingId: string | null = null;
+      for (let i = Math.min(topLine, lines.length - 1); i >= 0; i--) {
+        const match = lines[i].match(/^(#{1,6})\s+(.+)/);
+        if (match) {
+          headingId = syncSlugify(match[2]);
+          break;
+        }
+      }
+
+      if (headingId) {
+        const el = viewer.querySelector(`[id="${headingId}"]`);
+        if (el) {
+          el.scrollIntoView({ block: 'start', behavior: 'auto' });
+        } else {
+          // Fallback: position-based if heading not found in preview
+          const pct = editor.scrollTop / (editor.scrollHeight - editor.clientHeight);
+          viewer.scrollTop = pct * (viewer.scrollHeight - viewer.clientHeight);
+        }
+      }
+    }
+
+    requestAnimationFrame(() => { isSyncing.current = false; });
+  }, [syncScroll]);
+
+  const handleViewerScroll = useCallback(() => {
+    if (syncScroll === 'off' || isSyncing.current || !editorScrollRef.current || !viewerScrollRef.current) return;
+    isSyncing.current = true;
+    const editor = editorScrollRef.current;
+    const viewer = viewerScrollRef.current;
+
+    if (syncScroll === 'position') {
+      const pct = viewer.scrollTop / (viewer.scrollHeight - viewer.clientHeight);
+      editor.scrollTop = pct * (editor.scrollHeight - editor.clientHeight);
+    } else if (syncScroll === 'content') {
+      // Find the nearest heading above the viewport
+      const headings = viewer.querySelectorAll<HTMLElement>('h1[id],h2[id],h3[id],h4[id],h5[id],h6[id]');
+      let matchedId: string | null = null;
+      const viewTop = viewer.scrollTop + 40;
+      for (const h of headings) {
+        if (h.offsetTop <= viewTop) {
+          matchedId = h.id;
+        } else {
+          break;
+        }
+      }
+
+      if (matchedId) {
+        const content = useStore.getState().fileContent;
+        const contentLines = content.split('\n');
+        let found = false;
+        for (let i = 0; i < contentLines.length; i++) {
+          const match = contentLines[i].match(/^(#{1,6})\s+(.+)/);
+          if (match && syncSlugify(match[2]) === matchedId) {
+            const cs = getComputedStyle(editor);
+            const lineHeight = parseInt(cs.lineHeight) || 24;
+            const padTop = parseInt(cs.paddingTop) || 0;
+            editor.scrollTop = Math.max(0, i * lineHeight - padTop);
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          // Fallback to position-based
+          const pct = viewer.scrollTop / (viewer.scrollHeight - viewer.clientHeight);
+          editor.scrollTop = pct * (editor.scrollHeight - editor.clientHeight);
+        }
+      }
+    }
+
+    requestAnimationFrame(() => { isSyncing.current = false; });
+  }, [syncScroll]);
 
   // Use refs so effects always get the latest handler without stale closures
   const handlersRef = useRef({ handleOpen, handleOpenFolder, handleSave, handleSaveAs, handleNewFile });
@@ -657,7 +759,14 @@ const App: React.FC = () => {
                     className="flex flex-col min-w-0"
                     style={viewMode === 'split' ? { width: `${splitRatio}%` } : { flex: 1 }}
                   >
-                    <MarkdownEditor />
+                    <MarkdownEditor
+                      syncScroll={syncScroll}
+                      onScrollRef={(el) => { editorScrollRef.current = el; }}
+                      onEditorScroll={handleEditorScroll}
+                      onToggleSync={() => setSyncScroll(v => v === 'off' ? 'content' : v === 'content' ? 'position' : 'off')}
+                      wordWrap={wordWrap}
+                      onToggleWordWrap={() => setWordWrap(v => !v)}
+                    />
                   </div>
                 )}
                 {viewMode === 'split' && (
@@ -674,7 +783,7 @@ const App: React.FC = () => {
                     className="overflow-hidden"
                     style={viewMode === 'split' ? { flex: 1 } : { flex: 1 }}
                   >
-                    <MarkdownViewer showToc={showToc} onToggleToc={() => setShowToc(false)} />
+                    <MarkdownViewer showToc={showToc} onToggleToc={() => setShowToc(false)} syncScroll={syncScroll} onScrollRef={(el) => { viewerScrollRef.current = el; }} onViewerScroll={handleViewerScroll} />
                   </div>
                 )}
               </>

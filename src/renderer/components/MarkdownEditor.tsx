@@ -1,12 +1,22 @@
-import React, { useRef, useEffect, useCallback, useState } from 'react';
+import React, { useRef, useEffect, useLayoutEffect, useCallback, useState } from 'react';
 import { useStore } from '../store';
 
-const MarkdownEditor: React.FC = () => {
+interface MarkdownEditorProps {
+  syncScroll?: 'off' | 'position' | 'content';
+  onScrollRef?: (el: HTMLElement | null) => void;
+  onEditorScroll?: () => void;
+  onToggleSync?: () => void;
+  wordWrap?: boolean;
+  onToggleWordWrap?: () => void;
+}
+
+const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef, onEditorScroll, onToggleSync, wordWrap, onToggleWordWrap }) => {
   const { fileContent, setFileContent } = useStore();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const lineNumbersRef = useRef<HTMLDivElement>(null);
   const [cursorPosition, setCursorPosition] = useState({ line: 1, col: 1 });
   const [lineCount, setLineCount] = useState(1);
+  const [taWidth, setTaWidth] = useState(0);
   const undoStack = useRef<string[]>([]);
   const redoStack = useRef<string[]>([]);
   const [canUndo, setCanUndo] = useState(false);
@@ -91,12 +101,37 @@ const MarkdownEditor: React.FC = () => {
     }, 0);
   }, [setFileContent]);
 
-  // Focus textarea when component mounts
+  // Track textarea width synchronously before paint
+  useLayoutEffect(() => {
+    const ta = textareaRef.current;
+    if (!ta || !wordWrap) return;
+    setTaWidth(ta.clientWidth);
+    const observer = new ResizeObserver(([entry]) => {
+      setTaWidth(entry.contentRect.width);
+    });
+    observer.observe(ta);
+    return () => observer.disconnect();
+  }, [wordWrap]);
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.focus();
     }
   }, []);
+
+  // Register scroll container for sync
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (el && onScrollRef) onScrollRef(el);
+    return () => { if (onScrollRef) onScrollRef(null); };
+  }, [onScrollRef]);
+
+  // Sync scroll: listen to editor scroll
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el || syncScroll === 'off' || !onEditorScroll) return;
+    el.addEventListener('scroll', onEditorScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onEditorScroll);
+  }, [syncScroll, onEditorScroll]);
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setFileContent(e.target.value);
@@ -265,9 +300,56 @@ const MarkdownEditor: React.FC = () => {
   }, [updateCursorPosition]);
 
   const lines = useCallback(() => {
-    const count = fileContent.split('\n').length;
-    return Array.from({ length: count || 1 }, (_, i) => i + 1);
-  }, [fileContent]);
+    const logicalLines = fileContent.split('\n');
+    if (!wordWrap) {
+      return Array.from({ length: logicalLines.length || 1 }, (_, i) => i + 1);
+    }
+    const ta = textareaRef.current;
+    if (!ta) return Array.from({ length: logicalLines.length || 1 }, (_, i) => i + 1);
+
+    const cs = getComputedStyle(ta);
+    const padH = parseInt(cs.paddingLeft) + parseInt(cs.paddingRight);
+    const textWidth = ta.clientWidth - padH;
+    if (textWidth <= 0) {
+      return Array.from({ length: logicalLines.length || 1 }, (_, i) => i + 1);
+    }
+
+    // Monospace font: measure avg char width using a longer string for accuracy
+    const measurer = document.createElement('span');
+    measurer.style.fontFamily = cs.fontFamily;
+    measurer.style.fontSize = cs.fontSize;
+    measurer.style.fontWeight = cs.fontWeight;
+    measurer.style.letterSpacing = cs.letterSpacing;
+    measurer.style.position = 'absolute';
+    measurer.style.visibility = 'hidden';
+    measurer.style.whiteSpace = 'pre';
+    measurer.textContent = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'; // 50 chars
+    document.body.appendChild(measurer);
+    const charWidth = measurer.getBoundingClientRect().width / 50;
+    document.body.removeChild(measurer);
+
+    if (charWidth <= 0) {
+      return Array.from({ length: logicalLines.length || 1 }, (_, i) => i + 1);
+    }
+
+    // Use floor and subtract 1px safety margin for sub-pixel rounding
+    const charsPerLine = Math.max(1, Math.floor((textWidth - 1) / charWidth));
+    const tabSize = 2;
+
+    const visualLines: number[] = [];
+    let lineNum = 1;
+    for (const line of logicalLines) {
+      const expandedLen = line.replace(/\t/g, ' '.repeat(tabSize)).length;
+      const wrapped = Math.max(1, Math.ceil(expandedLen / charsPerLine));
+      visualLines.push(lineNum);
+      for (let w = 1; w < wrapped; w++) {
+        visualLines.push(0);
+      }
+      lineNum++;
+    }
+
+    return visualLines;
+  }, [fileContent, wordWrap, taWidth]);
 
   return (
     <div className="h-full flex flex-col bg-white dark:bg-[#1c2733]">
@@ -363,6 +445,35 @@ const MarkdownEditor: React.FC = () => {
         }} >
           <svg className="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14"/></svg>
         </button>
+        {/* Spacer */}
+        {/* Word wrap toggle */}
+        {onToggleWordWrap && (
+          <button
+            className={`btn-icon ${wordWrap ? 'bg-blue-500/10 text-blue-500' : ''}`}
+            onClick={onToggleWordWrap}
+            title={wordWrap ? 'Disable word wrap' : 'Enable word wrap'}
+          >
+            <svg className="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 6h16M4 18h5m-5-6h13a3 3 0 0 1 0 6h-4l2-2m0 4l-2-2"/>
+            </svg>
+          </button>
+        )}
+        <div className="flex-1" />
+        {/* Sync scroll toggle */}
+        {syncScroll !== undefined && (
+          <button
+            className={`btn-icon flex items-center gap-1 ${syncScroll !== 'off' ? 'bg-blue-500/10 text-blue-500' : ''}`}
+            onClick={onToggleSync}
+            title={`Sync scroll: ${syncScroll === 'off' ? 'Off' : syncScroll === 'content' ? 'Content (H)' : 'Position (P)'}`}
+          >
+            <svg className="w-[24px] h-[20px] shrink-0" fill="currentColor" viewBox="0 0 30 24">
+              <path fill="currentColor" d="m 11.557955,2 c 1.242641,0 2.25,1.0073593 2.25,2.25 v 15.5 c 0,1.242641 -1.007359,2.25 -2.25,2.25 H 3.1522946 C 1.9096539,22 0.90229465,20.992641 0.90229465,19.75 V 4.25 C 0.90229465,3.0073593 1.9096539,2 3.1522946,2 Z m 0,1.5 H 3.1522946 c -0.4142136,0 -0.75,0.3357864 -0.75,0.75 v 15.5 c 0,0.414 0.336,0.75 0.75,0.75 h 8.4056604 c 0.414214,0 0.75,-0.335786 0.75,-0.75 V 4.25 c 0,-0.4142136 -0.335786,-0.75 -0.75,-0.75 m -1.397641,9.964 c 0.265315,0.26011 0.300195,0.675267 0.082,0.976 l -0.071,0.085 -2.2500005,2.296 c -0.2637141,0.269069 -0.6861129,0.300739 -0.987,0.074 l -0.084,-0.074 -2.253,-2.296 c -0.6499436,-0.662627 0.2459247,-1.682846 0.987,-1.124 l 0.083,0.074 1.718,1.75 1.714,-1.75 c 0.2901616,-0.295899 0.7653131,-0.300377 1.0610005,-0.01 M 7.9203135,7.226 10.170314,9.522 c 0.749316,0.713375 -0.3708894,1.812641 -1.0700005,1.05 l -1.715,-1.752 -1.718,1.75 c -0.7000468,0.66647 -1.7231439,-0.337504 -1.07,-1.05 l 2.253,-2.296 c 0.293929,-0.2991751 0.776071,-0.2991751 1.07,0 M 26.934795,2 c 1.242641,0 2.25,1.0073593 2.25,2.25 v 15.499999 c 0,1.242641 -1.007359,2.25 -2.25,2.25 h -8.40566 c -1.24264,0 -2.25,-1.007359 -2.25,-2.25 V 4.25 c 0,-1.2426407 1.00736,-2.25 2.25,-2.25 z m 0,1.5 h -8.40566 c -0.414214,0 -0.75,0.3357864 -0.75,0.75 v 15.499999 c 0,0.414 0.336,0.75 0.75,0.75 h 8.40566 c 0.414214,0 0.75,-0.335786 0.75,-0.75 V 4.25 c 0,-0.4142136 -0.335786,-0.75 -0.75,-0.75 m -1.397641,9.964 c 0.265315,0.26011 0.300195,0.675267 0.082,0.976 l -0.071,0.085 -2.25,2.296 c -0.263714,0.269069 -0.686113,0.300739 -0.987,0.074 l -0.084,-0.074 -2.253,-2.296 c -0.649944,-0.662626 0.245925,-1.682845 0.987,-1.123999 l 0.083,0.074 1.718,1.749999 1.714,-1.749999 c 0.290161,-0.295899 0.765313,-0.300377 1.061,-0.01 m -2.24,-6.2390001 2.25,2.2959999 c 0.749316,0.7133752 -0.370889,1.8126412 -1.07,1.0500002 l -1.715,-1.7520002 -1.718,1.7500002 c -0.700047,0.66647 -1.723144,-0.337504 -1.07,-1.0500002 l 2.253,-2.2959999 c 0.293929,-0.2991751 0.776071,-0.2991751 1.07,0"/>
+            </svg>
+            {syncScroll !== 'off' && (
+              <span className="text-[11px] font-medium">Sync {syncScroll === 'content' ? 'H' : 'P'}</span>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Textarea with line numbers */}
@@ -370,11 +481,11 @@ const MarkdownEditor: React.FC = () => {
         {/* Line numbers */}
         <div
           ref={lineNumbersRef}
-          className="select-none text-right px-3 py-3 text-xs leading-6 font-mono text-gray-400 dark:text-gray-600 bg-gray-50 dark:bg-[#141c24] border-r border-gray-200 dark:border-gray-700/50 overflow-hidden"
-          style={{ minWidth: '3.5rem', scrollbarWidth: 'none' }}
+          className="select-none text-right px-3 py-3 text-sm leading-6 font-mono text-gray-400 dark:text-gray-600 bg-gray-50 dark:bg-[#141c24] border-r border-gray-200 dark:border-gray-700/50 overflow-hidden"
+          style={{ minWidth: '4rem', scrollbarWidth: 'none' }}
         >
-          {lines().map((num) => (
-            <div key={num}>{num}</div>
+          {lines().map((num, idx) => (
+            <div key={idx} style={{ height: '1.5rem', lineHeight: '1.5rem' }}>{num > 0 ? num : '\u00A0'}</div>
           ))}
         </div>
 
@@ -388,9 +499,9 @@ const MarkdownEditor: React.FC = () => {
           onKeyUp={handleCursorUpdate}
           onScroll={handleScroll}
           spellCheck={false}
-          className="flex-1 bg-transparent text-sm leading-6 font-mono p-3 resize-none outline-none text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-600"
+          className={`flex-1 bg-transparent text-sm leading-6 font-mono p-3 resize-none outline-none text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-600 ${wordWrap ? 'wrap' : 'no-wrap'}`}
           placeholder="Start writing markdown..."
-          style={{ tabSize: 2 }}
+          style={{ tabSize: 2, whiteSpace: wordWrap ? 'pre-wrap' : 'pre' }}
         />
       </div>
     </div>

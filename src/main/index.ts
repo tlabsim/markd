@@ -62,19 +62,17 @@ function registerLocalFileProtocol(): void {
 
 // Serve built renderer files via app:// protocol
 function registerAppProtocol(): void {
-  protocol.registerFileProtocol('app', (request, callback) => {
+  protocol.handle('app', (request) => {
     try {
-      // request.url formats: app://index.html, app://assets/foo.js, or app:///path
-      let reqPath = decodeURIComponent(request.url)
-        .replace(/^app:\/\/+/, '')      // strip app:// or app:///
-        .replace(/^\/+/, '');            // strip any leading slashes
+      const url = new URL(request.url);
+      let reqPath = decodeURIComponent(url.pathname).replace(/^\/+/, '');
       if (!reqPath || reqPath.endsWith('/')) {
         reqPath = 'index.html';
       }
       const filePath = path.join(rendererDir, reqPath);
-      callback({ path: filePath });
+      return net.fetch(`file:///${filePath.replace(/\\/g, '/')}`);
     } catch {
-      callback({ error: -2 });
+      return new Response('Not found', { status: 404 });
     }
   });
 }
@@ -88,8 +86,8 @@ function createWindow(filePath?: string): void {
     center: true,
     title: 'Markd',
     icon: isDev
-      ? path.join(__dirname, '../../resources/icon.png')
-      : path.join(process.resourcesPath, 'icon.png'),
+      ? path.join(__dirname, '../../resources/markd.png')
+      : path.join(process.resourcesPath, 'markd.png'),
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,
