@@ -1,5 +1,6 @@
 import React, { useEffect, useCallback, useRef, useState } from 'react';
-import { useStore, FONT_OPTIONS, PALETTE_OPTIONS } from './store';
+import { useStore, FONT_OPTIONS } from './store';
+import { PALETTE_OPTIONS } from './palettes';
 import TitleBar from './components/TitleBar';
 import Sidebar from './components/Sidebar';
 import MarkdownViewer from './components/MarkdownViewer';
@@ -49,16 +50,27 @@ const App: React.FC = () => {
   const tocButtonRef = useRef<HTMLButtonElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
+  const dragRatio = useRef(50); // ref for instant drag updates
 
-  // Split view drag handlers
+  // Split view drag handlers — use ref for performance, commit on mouseup
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
       if (!isDragging.current || !contentRef.current) return;
       const rect = contentRef.current.getBoundingClientRect();
-      const pct = ((e.clientX - rect.left) / rect.width) * 100;
-      setSplitRatio(Math.max(20, Math.min(80, pct)));
+      const pct = Math.max(20, Math.min(80, ((e.clientX - rect.left) / rect.width) * 100));
+      dragRatio.current = pct;
+      // Direct DOM update for instant visual feedback, no React re-render
+      const editorPanel = contentRef.current.querySelector('[data-panel="editor"]') as HTMLElement | null;
+      if (editorPanel) editorPanel.style.width = `${pct}%`;
+      const viewerPanel = contentRef.current.querySelector('[data-panel="viewer"]') as HTMLElement | null;
+      if (viewerPanel) viewerPanel.style.flex = '1';
     };
-    const onUp = () => { isDragging.current = false; document.body.style.cursor = ''; document.body.style.userSelect = ''; };
+    const onUp = () => {
+      isDragging.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      setSplitRatio(dragRatio.current); // commit final value to React state
+    };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
     return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
@@ -66,6 +78,7 @@ const App: React.FC = () => {
 
   const startDrag = () => {
     isDragging.current = true;
+    dragRatio.current = splitRatio;
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
   };
@@ -90,11 +103,7 @@ const App: React.FC = () => {
       setCurrentFile(result.filePath ? result.filePath.split(/[/\\]/).pop() || null : null);
       setCurrentFilePath(result.filePath || null);
       setOriginalContent(result.content);
-      if (result.filePath) {
-        console.log('[Markd] Adding recent file:', result.filePath);
-        useStore.getState().addRecentFile(result.filePath);
-        console.log('[Markd] Recent files:', useStore.getState().recentFiles);
-      }
+      if (result.filePath) useStore.getState().addRecentFile(result.filePath);
     }
   }, []);
 
@@ -403,12 +412,19 @@ const App: React.FC = () => {
                 }`}
                 onClick={() => { setPreviewPalette(opt.value); setShowPaletteMenu(false); }}
               >
-                <span className="w-[18px] h-[18px] shrink-0 flex items-center justify-center">
-                  {isSelected && (
-                    <svg className="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 24 24"><path d="m9.55 15.15l8.475-8.475q.3-.3.7-.3t.7.3t.3.713t-.3.712l-9.175 9.2q-.3.3-.7.3t-.7-.3L4.55 13q-.3-.3-.288-.712t.313-.713t.713-.3t.712.3z"/></svg>
-                  )}
+                {/* Color swatches */}
+                <span className="flex gap-0.5 shrink-0">
+                  <span className="w-2.5 h-2.5 rounded-full inline dark:hidden ring-1 ring-black/10" style={{ backgroundColor: opt.swatches[0] }} />
+                  <span className="w-2.5 h-2.5 rounded-full inline dark:hidden" style={{ backgroundColor: opt.swatches[1] }} />
+                  <span className="w-2.5 h-2.5 rounded-full inline dark:hidden" style={{ backgroundColor: opt.swatches[2] }} />
+                  <span className="w-2.5 h-2.5 rounded-full hidden dark:inline ring-1 ring-white/10" style={{ backgroundColor: opt.swatchesDark[0] }} />
+                  <span className="w-2.5 h-2.5 rounded-full hidden dark:inline" style={{ backgroundColor: opt.swatchesDark[1] }} />
+                  <span className="w-2.5 h-2.5 rounded-full hidden dark:inline" style={{ backgroundColor: opt.swatchesDark[2] }} />
                 </span>
-                {opt.label}
+                <span className="flex-1">{opt.label}</span>
+                {isSelected && (
+                  <svg className="w-3.5 h-3.5 text-blue-500 shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="m9.55 15.15l8.475-8.475q.3-.3.7-.3t.7.3t.3.713t-.3.712l-9.175 9.2q-.3.3-.7.3t-.7-.3L4.55 13q-.3-.3-.288-.712t.313-.713t.713-.3t.712.3z"/></svg>
+                )}
               </button>
             );
           })}
@@ -434,6 +450,8 @@ const App: React.FC = () => {
         recentFiles={recentFiles}
         distractionFree={distractionFree}
         onToggleDistractionFree={() => setDistractionFree(v => !v)}
+        paletteBg={PALETTE_OPTIONS.find(o => o.value === previewPalette)?.bg || '#ffffff'}
+        paletteBgDark={PALETTE_OPTIONS.find(o => o.value === previewPalette)?.bgDark || '#1a222b'}
       />
 
       <div className={`flex flex-1 overflow-hidden ${distractionFree ? '' : ''}`}>
@@ -467,52 +485,51 @@ const App: React.FC = () => {
           {/* Toolbar */}
           {currentFile && !distractionFree && (
             <div className="flex items-center gap-0.5 px-3 h-10 border-b border-gray-200/60 dark:border-gray-700/60 bg-white/85 dark:bg-[#222c36]/85 relative z-10">
-              {/* ---- View modes ---- */}
-              <button
-                className={`btn-icon ${viewMode === 'view' ? 'bg-blue-500/10 text-blue-500' : ''}`}
-                onClick={() => setViewMode('view')}
-                title="Preview mode"
-              >
-                <svg className="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 13c3.6-8 14.4-8 18 0" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 17a3 3 0 1 1 0-6a3 3 0 0 1 0 6" />
-                </svg>
-              </button>
-              {/* ---- Edit mode ---- */}
-              <button
-                className={`btn-icon ${viewMode === 'edit' ? 'bg-blue-500/10 text-blue-500' : ''}`}
-                onClick={() => setViewMode('edit')}
-                title="Edit mode"
-              >
-                {/* <svg className="w-[18px] h-[18px] shrink-0" fill="currentColor" viewBox="0 0 24 24">
-                  <path fillRule="evenodd" d="M11.943 1.25H13.5a.75.75 0 0 1 0 1.5H12c-2.378 0-4.086.002-5.386.176c-1.279.172-2.05.5-2.62 1.069c-.569.57-.896 1.34-1.068 2.619c-.174 1.3-.176 3.008-.176 5.386s.002 4.086.176 5.386c.172 1.279.5 2.05 1.069 2.62c.57.569 1.34.896 2.619 1.068c1.3.174 3.008.176 5.386.176s4.086-.002 5.386-.176c1.279-.172 2.05-.5 2.62-1.069c.569-.57.896-1.34 1.068-2.619c.174-1.3.176-3.008.176-5.386v-1.5a.75.75 0 0 1 1.5 0v1.557c0 2.309 0 4.118-.19 5.53c-.194 1.444-.6 2.584-1.494 3.479c-.895.895-2.035 1.3-3.48 1.494c-1.411.19-3.22.19-5.529.19h-.114c-2.309 0-4.118 0-5.53-.19c-1.444-.194-2.584-.6-3.479-1.494c-.895-.895-1.3-2.035-1.494-3.48c-.19-1.411-.19-3.22-.19-5.529v-.114c0-2.309 0-4.118.19-5.53c.194-1.444.6-2.584 1.494-3.479c.895-.895 2.035-1.3 3.48-1.494c1.411-.19 3.22-.19 5.529-.19m4.827 1.026a3.503 3.503 0 0 1 4.954 4.953l-6.648 6.649c-.371.37-.604.604-.863.806a5.3 5.3 0 0 1-.987.61c-.297.141-.61.245-1.107.411l-2.905.968a1.492 1.492 0 0 1-1.887-1.887l.968-2.905c.166-.498.27-.81.411-1.107q.252-.526.61-.987c.202-.26.435-.492.806-.863zm3.893 1.06a2.003 2.003 0 0 0-2.832 0l-.376.377q.032.145.098.338c.143.413.415.957.927 1.469a3.9 3.9 0 0 0 1.807 1.025l.376-.376a2.003 2.003 0 0 0 0-2.832m-1.558 4.391a5.4 5.4 0 0 1-1.686-1.146a5.4 5.4 0 0 1-1.146-1.686L11.218 9.95c-.417.417-.58.582-.72.76a4 4 0 0 0-.437.71c-.098.203-.172.423-.359.982l-.431 1.295l1.032 1.033l1.295-.432c.56-.187.779-.261.983-.358q.378-.18.71-.439c.177-.139.342-.302.759-.718z" clipRule="evenodd" />
-                </svg> */}
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-[18px] h-[18px] shrink-0" viewBox="0 0 24 24"><path fill="currentColor" d="M16.443 7.328a.75.75 0 0 1 1.059-.056l1.737 1.564c.737.663 1.347 1.212 1.767 1.71c.44.525.754 1.088.754 1.784c0 .695-.313 1.258-.754 1.782c-.42.499-1.03 1.049-1.767 1.711l-1.737 1.564a.75.75 0 1 1-1.004-1.115l1.697-1.527c.788-.709 1.319-1.19 1.663-1.598c.33-.393.402-.622.402-.817c0-.196-.072-.425-.402-.818c-.344-.409-.875-.889-1.663-1.598l-1.697-1.527a.75.75 0 0 1-.056-1.06m-8.94 1.06a.75.75 0 0 0-1.004-1.115L4.761 8.836c-.737.663-1.347 1.212-1.767 1.71c-.44.525-.754 1.088-.754 1.784c0 .695.313 1.258.754 1.782c.42.499 1.03 1.049 1.767 1.711l1.737 1.564a.75.75 0 1 0 1.004-1.115l-1.697-1.527c-.788-.709-1.319-1.19-1.663-1.598c-.33-.393-.402-.622-.402-.817c0-.196.072-.425.402-.818c.344-.409.875-.889 1.663-1.598z"/><path fill="currentColor" d="M14.182 4.276a.75.75 0 0 1 .53.918l-3.974 14.83a.75.75 0 1 1-1.449-.389l3.974-14.83a.75.75 0 0 1 .919-.53" opacity=".5"/></svg>
-              </button>
-              {/* ---- Split mode ---- */}
-              <button
-                className={`btn-icon ${viewMode === 'split' ? 'bg-blue-500/10 text-blue-500' : ''}`}
-                onClick={() => setViewMode('split')}
-                title="Split mode"
-              >
-                <svg className="w-[18px] h-[18px] shrink-0" fill="currentColor" viewBox="0 0 16 16">
-                  <path d="M0 3a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm8.5-1v12H14a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1zm-1 0H2a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h5.5z" />
-                </svg>
-              </button>
-              <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-1" />
+              {/* Left spacer — pushes tools to center on lg+ */}
+              <div className="flex-1 hidden lg:block" />
+              {/* ---- View mode toggle group ---- */}
+              <div className="flex rounded-md border border-slate-300 dark:border-gray-600 overflow-hidden mr-1 shrink-0">
+                <button
+                  className={`px-2.5 py-1 text-xs font-medium transition-colors border-r border-slate-300 dark:border-gray-600 ${viewMode === 'view' ? 'bg-slate-200 dark:bg-[#3a4552] text-slate-800 dark:text-gray-100' : 'text-slate-600 dark:text-gray-400 hover:bg-slate-100 dark:hover:bg-white/10'}`}
+                  onClick={() => setViewMode('view')}
+                  title="Preview mode"
+                >
+                  <svg className="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 13c3.6-8 14.4-8 18 0" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 17a3 3 0 1 1 0-6a3 3 0 0 1 0 6" />
+                  </svg>
+                </button>
+                <button
+                  className={`px-2.5 py-1 text-xs font-medium transition-colors border-r border-slate-300 dark:border-gray-600 ${viewMode === 'edit' ? 'bg-slate-200 dark:bg-[#3a4552] text-slate-800 dark:text-gray-100' : 'text-slate-600 dark:text-gray-400 hover:bg-slate-100 dark:hover:bg-white/10'}`}
+                  onClick={() => setViewMode('edit')}
+                  title="Edit mode"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-[18px] h-[18px] shrink-0" viewBox="0 0 24 24"><path fill="currentColor" d="M16.443 7.328a.75.75 0 0 1 1.059-.056l1.737 1.564c.737.663 1.347 1.212 1.767 1.71c.44.525.754 1.088.754 1.784c0 .695-.313 1.258-.754 1.782c-.42.499-1.03 1.049-1.767 1.711l-1.737 1.564a.75.75 0 1 1-1.004-1.115l1.697-1.527c.788-.709 1.319-1.19 1.663-1.598c.33-.393.402-.622.402-.817c0-.196-.072-.425-.402-.818c-.344-.409-.875-.889-1.663-1.598l-1.697-1.527a.75.75 0 0 1-.056-1.06m-8.94 1.06a.75.75 0 0 0-1.004-1.115L4.761 8.836c-.737.663-1.347 1.212-1.767 1.71c-.44.525-.754 1.088-.754 1.784c0 .695.313 1.258.754 1.782c.42.499 1.03 1.049 1.767 1.711l1.737 1.564a.75.75 0 1 0 1.004-1.115l-1.697-1.527c-.788-.709-1.319-1.19-1.663-1.598c-.33-.393-.402-.622-.402-.817c0-.196.072-.425.402-.818c.344-.409.875-.889 1.663-1.598z"/><path fill="currentColor" d="M14.182 4.276a.75.75 0 0 1 .53.918l-3.974 14.83a.75.75 0 1 1-1.449-.389l3.974-14.83a.75.75 0 0 1 .919-.53" opacity=".5"/></svg>
+                </button>
+                <button
+                  className={`px-2.5 py-1 text-xs font-medium transition-colors ${viewMode === 'split' ? 'bg-slate-200 dark:bg-[#3a4552] text-slate-800 dark:text-gray-100' : 'text-slate-600 dark:text-gray-400 hover:bg-slate-100 dark:hover:bg-white/10'}`}
+                  onClick={() => setViewMode('split')}
+                  title="Split mode"
+                >
+                  <svg className="w-[18px] h-[18px] shrink-0" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M0 3a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm8.5-1v12H14a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1zm-1 0H2a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h5.5z" />
+                  </svg>
+                </button>
+              </div>
+              <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-1 shrink-0" />
               {/* Save button */}
-              <button className="btn-icon" onClick={handleSave} title="Save (Ctrl+S)">
+              <button className="btn-icon shrink-0" onClick={handleSave} title="Save (Ctrl+S)">
                 <svg className="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
                 </svg>
               </button>
-              <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-1" />
+              <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-1 shrink-0" />
               {/* Font selector */}
               <FontSelector />
-              <div className="w-px h-5 bg-gray-200 dark:bg-gray-700" />
+              <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 shrink-0" />
               {/* Palette selector */}
               <PaletteSelector />
-              <div className="w-px h-5 bg-gray-200 dark:bg-gray-700" />
+              <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 shrink-0" />
               {/* Zoom controls */}
               <button className="btn-icon" onClick={zoomOut} title="Zoom out">
                 <svg className="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
@@ -526,7 +543,7 @@ const App: React.FC = () => {
                 </svg>
               </button>
               <div className="flex-1" />
-              {/* TOC button — only in view and split modes */}
+              {/* TOC button — only in view and split modes, always at right */}
               {viewMode !== 'edit' && (
               <button
                 className="btn-icon"
@@ -547,7 +564,8 @@ const App: React.FC = () => {
               <>
                 {(viewMode === 'edit' || viewMode === 'split') && (
                   <div
-                    className="overflow-hidden"
+                    data-panel="editor"
+                    className="flex flex-col min-w-0"
                     style={viewMode === 'split' ? { width: `${splitRatio}%` } : { flex: 1 }}
                   >
                     <MarkdownEditor />
@@ -563,6 +581,7 @@ const App: React.FC = () => {
                 )}
                 {(viewMode === 'view' || viewMode === 'split') && (
                   <div
+                    data-panel="viewer"
                     className="overflow-hidden"
                     style={viewMode === 'split' ? { flex: 1 } : { flex: 1 }}
                   >

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { ViewMode, ThemeMode, FileEntry } from './types';
+import { PALETTE_OPTIONS } from './palettes';
 
 interface EditorState {
   // File state
@@ -74,13 +75,6 @@ const FONT_OPTIONS = [
   { label: 'Lora', value: 'Lora, Georgia, serif' },
   { label: 'Nunito', value: 'Nunito, Arial, sans-serif' },
   { label: 'Inter', value: "'Inter', 'Segoe UI', Arial, sans-serif" },
-];
-
-const PALETTE_OPTIONS = [
-  { label: 'Default', value: 'default' },
-  { label: 'Sepia', value: 'sepia' },
-  { label: 'High Contrast', value: 'contrast' },
-  { label: 'Cool Blue', value: 'cool' },
 ];
 
 export { FONT_OPTIONS, PALETTE_OPTIONS };

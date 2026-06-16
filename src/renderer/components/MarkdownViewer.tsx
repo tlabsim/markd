@@ -203,6 +203,9 @@ const AsyncImage: React.FC<{ src: string; alt: string; className?: string }> = (
         </span>
       );
     },
+    pre: ({ children, ...props }: any) => (
+      <pre className="my-4 p-4 bg-gray-50 dark:bg-[#181e26] rounded-lg overflow-x-auto border border-gray-200 dark:border-gray-700" {...props}>{children}</pre>
+    ),
     code: ({ className, children, ...props }: any) => {
       const isInline = !className;
       if (isInline) {
@@ -213,9 +216,7 @@ const AsyncImage: React.FC<{ src: string; alt: string; className?: string }> = (
         );
       }
       return (
-        <pre className="my-4 p-4 bg-gray-50 dark:bg-[#181e26] rounded-lg overflow-x-auto border border-gray-200 dark:border-gray-700">
-          <code className={className} {...props}>{children}</code>
-        </pre>
+        <code className={className} {...props}>{children}</code>
       );
     },
   }), []);

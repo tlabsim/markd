@@ -14,11 +14,13 @@ interface TitleBarProps {
   onSaveFileAs: () => void;
   onOpenRecentFile?: (filePath: string) => void;
   recentFiles?: string[];
+  paletteBg?: string;
+  paletteBgDark?: string;
   distractionFree?: boolean;
   onToggleDistractionFree?: () => void;
 }
 
-const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, isMaximized, onOpenFile, onOpenFolder, onNewFile, onSaveFile, onSaveFileAs, onOpenRecentFile, recentFiles, distractionFree, onToggleDistractionFree }) => {
+const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, isMaximized, onOpenFile, onOpenFolder, onNewFile, onSaveFile, onSaveFileAs, onOpenRecentFile, recentFiles, paletteBg, paletteBgDark, distractionFree, onToggleDistractionFree }) => {
   const { currentFile, isModified, theme, setTheme, toggleSidebar } = useStore();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -54,10 +56,15 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
   return (
     <div className={`titlebar flex items-center justify-between px-3 border-b transition-colors duration-300 select-none
       ${distractionFree
-        ? 'absolute top-0 left-0 right-0 z-50 bg-white/85 dark:bg-[#1a222b]/85 backdrop-blur-xl border-transparent'
+        ? 'absolute top-0 left-0 right-0 z-50 backdrop-blur-xl border-transparent'
         : 'bg-white dark:bg-[#222c36] border-gray-200 dark:border-gray-700/50'
       }`}
-      style={{ height: 40 }}
+      style={{
+        height: 40,
+        ...(distractionFree ? {
+          backgroundColor: theme === 'dark' ? (paletteBgDark || '#1a222b') : (paletteBg || '#ffffff'),
+        } : {}),
+      }}
     >
       {/* Left: Brand + Menu */}
       <div className="flex items-center gap-2 relative" ref={menuRef}>
@@ -77,7 +84,7 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
 
         {/* Context Menu */}
         {menuOpen && (
-          <div className="absolute top-full left-0 mt-1 w-56 bg-white dark:bg-[#222c36] border border-gray-200 dark:border-gray-600 rounded-md shadow-2xl z-50 py-1">
+          <div className="absolute top-full left-0 mt-1 w-56 bg-white dark:bg-[#28323e] border border-gray-200 dark:border-gray-600 rounded-md shadow-2xl z-50 py-1">
             <div className="px-2 pb-1 mb-1 border-b border-gray-200 dark:border-gray-600">
               <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">File</span>
             </div>
@@ -88,28 +95,39 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
             {menuItem('Save', 'Ctrl+S', onSaveFile)}
             {menuItem('Save As...', 'Ctrl+Shift+S', onSaveFileAs)}
             <div className="border-t border-gray-200 dark:border-gray-600 my-1" />
-            <div className="px-2 pb-1 mb-1 border-b border-gray-200 dark:border-gray-600 flex items-center justify-between">
-              <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Recent</span>
+            {/* Recent Files — CSS-driven submenu */}
+            <div className="relative group">
+              <button
+                className="w-full flex items-center justify-between px-3 py-1.5 text-xs text-left group-hover:bg-blue-600 group-hover:text-white rounded-sm transition-colors"
+              >
+                <span>Recent Files</span>
+                <svg className="w-3 h-3 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m9 5l7 7-7 7" />
+                </svg>
+              </button>
+              {/* Submenu flyout — CSS hover, no gap */}
+              <div className="absolute left-full top-0 w-52 bg-white dark:bg-[#28323e] border border-gray-200 dark:border-gray-600 rounded-md shadow-2xl py-1 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity duration-75 -translate-y-2">
+                {recentFiles && recentFiles.length > 0 ? (
+                  recentFiles.slice(0, 10).map((filePath) => {
+                      const name = filePath.split(/[/\\]/).pop() || filePath;
+                      const dir = filePath.split(/[/\\]/).slice(0, -1).join('\\') || filePath;
+                      return (
+                        <button
+                          key={filePath}
+                          className="w-full flex flex-col items-start px-3 py-1 text-xs text-left hover:bg-blue-600 hover:text-white rounded-sm transition-colors"
+                          onClick={() => { onOpenRecentFile?.(filePath); closeMenu(); }}
+                          title={filePath}
+                        >
+                          <span className="truncate w-full">{name}</span>
+                          <span className="text-[10px] text-gray-400 truncate w-full">{dir}</span>
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <p className="px-3 py-1 text-[11px] text-gray-400 dark:text-gray-600 italic">No recent files</p>
+                  )}
+                </div>
             </div>
-            {recentFiles && recentFiles.length > 0 ? (
-              recentFiles.slice(0, 8).map((filePath) => {
-                const name = filePath.split(/[/\\]/).pop() || filePath;
-                const dir = filePath.split(/[/\\]/).slice(0, -1).join('\\') || filePath;
-                return (
-                  <button
-                    key={filePath}
-                    className="w-full flex flex-col items-start px-3 py-1 text-xs text-left hover:bg-blue-600 hover:text-white rounded-sm transition-colors"
-                    onClick={() => { onOpenRecentFile?.(filePath); closeMenu(); }}
-                    title={filePath}
-                  >
-                    <span className="truncate w-full">{name}</span>
-                    <span className="text-[10px] text-gray-400 truncate w-full">{dir}</span>
-                  </button>
-                );
-              })
-            ) : (
-              <p className="px-3 py-1 text-[11px] text-gray-400 dark:text-gray-600 italic">No recent files</p>
-            )}
             <div className="border-t border-gray-200 dark:border-gray-600 my-1" />
             <div className="px-2 pb-1 mb-1 border-b border-gray-200 dark:border-gray-600">
               <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">View</span>
