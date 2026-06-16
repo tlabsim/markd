@@ -79,12 +79,13 @@ function registerAppProtocol(): void {
   });
 }
 
-function createWindow(): void {
-  mainWindow = new BrowserWindow({
-    width: 1400,
-    height: 900,
+function createWindow(filePath?: string): void {
+  const win = new BrowserWindow({
+    width: 1200,
+    height: 800,
     minWidth: 800,
     minHeight: 600,
+    center: true,
     title: 'Markd',
     icon: isDev
       ? path.join(__dirname, '../../resources/icon.png')
@@ -99,37 +100,61 @@ function createWindow(): void {
     backgroundColor: '#222c36',
   });
 
+  const loadUrl = (base: string) => {
+    const params = new URLSearchParams();
+    if (filePath) params.set('file', filePath);
+    params.set('distractionFree', filePath ? '1' : '0');
+    const qs = params.toString();
+    return `${base}${qs ? `?${qs}` : ''}`;
+  };
+
   if (isDev) {
-    // Check if Vite dev server is available
     net.fetch('http://localhost:5173/', { method: 'HEAD' }).then(() => {
-      mainWindow?.loadURL('http://localhost:5173');
+      win.loadURL(loadUrl('http://localhost:5173'));
     }).catch(() => {
-      mainWindow?.loadURL('app://index.html');
+      win.loadURL(loadUrl('app://index.html'));
     });
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
+    win.webContents.openDevTools({ mode: 'detach' });
   } else {
-    mainWindow.loadURL('app://index.html');
+    win.loadURL(loadUrl('app://index.html'));
   }
 
-  mainWindow.on('closed', () => {
-    mainWindow = null;
+  win.on('closed', () => {
+    if (win === mainWindow) mainWindow = null;
   });
 
-  mainWindow.on('maximize', () => {
-    mainWindow?.webContents.send('window-state-changed', 'maximized');
+  win.on('maximize', () => {
+    win.webContents.send('window-state-changed', 'maximized');
   });
 
-  mainWindow.on('unmaximize', () => {
-    mainWindow?.webContents.send('window-state-changed', 'normal');
+  win.on('unmaximize', () => {
+    win.webContents.send('window-state-changed', 'normal');
   });
 
-  setupMenu();
+  // Only set mainWindow for the first window
+  if (!mainWindow) {
+    mainWindow = win;
+    setupMenu();
+  }
 }
+
+// Handle macOS open-file event (must be registered before app.whenReady)
+app.on('open-file', (_event, filePath) => {
+  if (filePath.endsWith('.md') || filePath.endsWith('.markdown')) {
+    createWindow(filePath);
+  }
+});
 
 app.whenReady().then(() => {
   registerAppProtocol();
   registerLocalFileProtocol();
-  createWindow();
+
+  // On Windows/Linux, check command line for file path
+  const cliFile = process.argv.find((arg, i) =>
+    i > 0 && (arg.endsWith('.md') || arg.endsWith('.markdown')) && !arg.startsWith('-')
+  );
+
+  createWindow(cliFile);
 });
 
 function setupMenu(): void {

@@ -212,6 +212,32 @@ const App: React.FC = () => {
     window.markd?.isMaximized().then(setMaximized);
   }, []);
 
+  // Startup: load file from query params (double-click open)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const filePath = params.get('file');
+    const df = params.get('distractionFree') === '1';
+
+    if (df) {
+      setDistractionFree(true);
+      // Collapse sidebar directly (don't toggle)
+      useStore.setState({ isSidebarOpen: false });
+    }
+
+    if (filePath) {
+      (async () => {
+        const result = await window.markd?.getFileContent(filePath);
+        if (result?.success && result.content !== undefined) {
+          setCurrentFile(filePath.split(/[/\\]/).pop() || null);
+          setCurrentFilePath(filePath);
+          setOriginalContent(result.content);
+          useStore.getState().addRecentFile(filePath);
+          setViewMode('view'); // distraction-free opens in preview mode
+        }
+      })();
+    }
+  }, []);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

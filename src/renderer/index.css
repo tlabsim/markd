@@ -89,6 +89,7 @@
   word-wrap: break-word;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  user-select: text;
 }
 
 .markdown-body h1 {

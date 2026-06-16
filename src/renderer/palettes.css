@@ -4,6 +4,15 @@
    Edit colors here — they apply automatically.
    ======================================== */
 
+/* ---- Selection colors (shared base) ---- */
+.markdown-body ::selection {
+  background-color: rgba(9, 105, 218, 0.2);
+  color: inherit;
+}
+.dark .markdown-body ::selection {
+  background-color: rgba(88, 166, 255, 0.2);
+}
+
 /* ---- Sepia — warm parchment ---- */
 .preview-sepia {
   @apply bg-[#f5f0e8] dark:bg-[#26211a];
@@ -44,6 +53,12 @@
 }
 .markdown-body[data-palette="sepia"] hr {
   @apply border-[#d8ccb8] dark:border-[#4a4030];
+}
+.markdown-body[data-palette="sepia"] ::selection {
+  background-color: rgba(122, 96, 64, 0.28);
+}
+.dark .markdown-body[data-palette="sepia"] ::selection {
+  background-color: rgba(196, 168, 124, 0.28);
 }
 
 /* ---- High Contrast — maximum legibility ---- */
@@ -87,6 +102,12 @@
 .markdown-body[data-palette="contrast"] hr {
   @apply border-gray-400 dark:border-gray-600;
 }
+.markdown-body[data-palette="contrast"] ::selection {
+  background-color: rgba(100, 100, 100, 0.3);
+}
+.dark .markdown-body[data-palette="contrast"] ::selection {
+  background-color: rgba(200, 200, 200, 0.3);
+}
 
 /* ---- Cool Blue — calm slate tones ---- */
 .preview-cool {
@@ -128,4 +149,10 @@
 }
 .markdown-body[data-palette="cool"] hr {
   @apply border-slate-200 dark:border-slate-700;
+}
+.markdown-body[data-palette="cool"] ::selection {
+  background-color: rgba(37, 99, 235, 0.22);
+}
+.dark .markdown-body[data-palette="cool"] ::selection {
+  background-color: rgba(96, 165, 250, 0.22);
 }

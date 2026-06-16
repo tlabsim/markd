@@ -179,7 +179,7 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
               onClick={onToggleDistractionFree}
               title={distractionFree ? 'Exit Distraction-Free (Ctrl+Shift+F)' : 'Distraction-Free Mode (Ctrl+Shift+F)'}
             >
-              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth={0.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 20v-4.423h1V19h3.423v1zm11.596 0v-1h3.423v-3.423h1V20zM4 8.423V4h4.423v1H5v3.423zm15.02 0V5h-3.424V4h4.423v4.423z"/></svg>
+              <svg className="w-[18px] h-[18px]" viewBox="0 0 28 28"><path fill="currentColor" d="M3 6a3 3 0 0 1 3-3h3.5a1 1 0 1 1 0 2H6a1 1 0 0 0-1 1v3.5a1 1 0 1 1-2 0zm14.5-2a1 1 0 0 1 1-1H22a3 3 0 0 1 3 3v3.5a1 1 0 1 1-2 0V6a1 1 0 0 0-1-1h-3.5a1 1 0 0 1-1-1M4 17.5a1 1 0 0 1 1 1V22a1 1 0 0 0 1 1h3.5a1 1 0 1 1 0 2H6a3 3 0 0 1-3-3v-3.5a1 1 0 0 1 1-1m20 0a1 1 0 0 1 1 1V22a3 3 0 0 1-3 3h-3.5a1 1 0 1 1 0-2H22a1 1 0 0 0 1-1v-3.5a1 1 0 0 1 1-1"/></svg>
             </button>
           </>
         )}
