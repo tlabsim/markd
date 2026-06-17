@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore, FONT_OPTIONS } from '../store';
 import { PALETTE_OPTIONS } from '../palettes';
 import markdLogo from '../assets/markd.svg';
@@ -8,6 +8,7 @@ type Tab = 'settings' | 'shortcuts' | 'about';
 interface SettingsModalProps {
   open: boolean;
   onClose: () => void;
+  initialTab?: Tab;
 }
 
 // ----- Keyboard shortcuts list -----
@@ -19,6 +20,9 @@ const SHORTCUTS: { key: string; label: string }[] = [
   { key: 'Ctrl+Shift+S', label: 'Save As…' },
   { key: 'Ctrl+W', label: 'Close File' },
   { key: 'Ctrl+F', label: 'Search' },
+  { key: 'Ctrl+T', label: 'Toggle Table of Contents' },
+  { key: 'Ctrl+,', label: 'Open Settings' },
+  { key: 'Ctrl+/', label: 'Show Keyboard Shortcuts' },
   { key: 'Ctrl+B', label: 'Toggle Sidebar' },
   { key: 'Ctrl+Shift+D', label: 'Toggle Theme (Dark/Light)' },
   { key: 'Ctrl+Shift+F', label: 'Distraction-Free Mode' },
@@ -131,8 +135,21 @@ const TabBar: React.FC<{ activeTab: Tab; onTab: (t: Tab) => void }> = ({ activeT
   );
 };
 
-const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose }) => {
-  const [tab, setTab] = useState<Tab>('settings');
+const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab }) => {
+  const [tab, setTab] = useState<Tab>(initialTab || 'settings');
+  const [multiInstance, setMultiInstance] = useState(false);
+
+  // Reset tab when modal opens
+  useEffect(() => {
+    if (open) setTab(initialTab || 'settings');
+  }, [open, initialTab]);
+
+  // Load multi-instance preference from main process on mount
+  useEffect(() => {
+    window.markd?.getSetting('multiInstance').then((v: unknown) => {
+      if (typeof v === 'boolean') setMultiInstance(v);
+    });
+  }, [open]);
 
   const {
     theme,
@@ -290,6 +307,20 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose }) => {
                   checked={useStore.getState().isSidebarOpen}
                   onChange={() => useStore.getState().toggleSidebar()}
                 />
+              </SettingRow>
+
+              <SettingRow label="Allow Multiple Windows">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-gray-400 dark:text-gray-500">Restart required</span>
+                  <ToggleSwitch
+                    checked={multiInstance}
+                    onChange={() => {
+                      const next = !multiInstance;
+                      setMultiInstance(next);
+                      window.markd?.setSetting('multiInstance', next);
+                    }}
+                  />
+                </div>
               </SettingRow>
 
               <div className="h-4" />

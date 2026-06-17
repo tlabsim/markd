@@ -95,6 +95,20 @@
       "allowToChangeInstallationDirectory": true,
       "installerIcon": "resources/markd.ico",
       "uninstallerIcon": "resources/markd.ico"
-    }
+    },
+    "fileAssociations": [
+      {
+        "ext": "md",
+        "name": "Markdown File",
+        "description": "Markd Markdown Document",
+        "role": "Viewer"
+      },
+      {
+        "ext": "markdown",
+        "name": "Markdown File",
+        "description": "Markd Markdown Document",
+        "role": "Viewer"
+      }
+    ]
   }
 }

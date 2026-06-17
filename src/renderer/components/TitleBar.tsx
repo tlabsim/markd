@@ -147,7 +147,7 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
               onToggleDistractionFree
             )}
             <div className="border-t border-gray-200 dark:border-gray-600 my-1" />
-            {onSettings && menuItem('Settings…', null, onSettings)}
+            {onSettings && menuItem('Settings…', 'Ctrl+,', onSettings)}
           </div>
         )}
       </div>

@@ -55,6 +55,7 @@ const App: React.FC = () => {
   const [dirtyModalOpen, setDirtyModalOpen] = useState(false);
   const [reloadModalOpen, setReloadModalOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<'settings' | 'shortcuts' | 'about'>('settings');
   const pendingOpenAction = useRef<(() => void) | null>(null);
   const pendingFilePath = useRef<string | null>(null);
   const [syncScroll, setSyncScroll] = useState<'off' | 'position' | 'content'>('off');
@@ -432,6 +433,28 @@ const App: React.FC = () => {
             e.preventDefault();
             setSearchOpen(true);
             break;
+          case 't':
+            e.preventDefault();
+            setShowToc(v => !v);
+            break;
+          case ',':
+            e.preventDefault();
+            if (settingsOpen && settingsTab === 'settings') {
+              setSettingsOpen(false);
+            } else {
+              setSettingsTab('settings');
+              setSettingsOpen(true);
+            }
+            break;
+          case '/':
+            e.preventDefault();
+            if (settingsOpen && settingsTab === 'shortcuts') {
+              setSettingsOpen(false);
+            } else {
+              setSettingsTab('shortcuts');
+              setSettingsOpen(true);
+            }
+            break;
           case '-':
             e.preventDefault();
             zoomOut();
@@ -476,7 +499,7 @@ const App: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [fileContent, currentFile, theme]);
+  }, [fileContent, currentFile, theme, settingsOpen, settingsTab]);
 
   // Close font menu on click outside
   useEffect(() => {
@@ -736,6 +759,16 @@ const App: React.FC = () => {
     }
   }, [loadFileIntoEditor]);
 
+  // Listen for custom event from StatusBar to open shortcuts
+  useEffect(() => {
+    const handler = () => {
+      setSettingsTab('shortcuts');
+      setSettingsOpen(true);
+    };
+    window.addEventListener('markd:open-shortcuts', handler);
+    return () => window.removeEventListener('markd:open-shortcuts', handler);
+  }, []);
+
   return (
     <div
       className={`h-screen flex flex-col overflow-hidden ${distractionFree ? 'relative' : ''}`}
@@ -759,7 +792,7 @@ const App: React.FC = () => {
         onToggleDistractionFree={() => setDistractionFree(v => !v)}
         paletteBg={PALETTE_OPTIONS.find(o => o.value === previewPalette)?.bg || '#ffffff'}
         paletteBgDark={PALETTE_OPTIONS.find(o => o.value === previewPalette)?.bgDark || '#1a222b'}
-        onSettings={() => setSettingsOpen(true)}
+        onSettings={() => { setSettingsTab('settings'); setSettingsOpen(true); }}
       />
 
       <div className={`flex flex-1 overflow-hidden ${distractionFree ? '' : ''}`}>
@@ -858,9 +891,13 @@ const App: React.FC = () => {
               <button
                 className="btn-icon"
                 onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); setShowToc(v => !v); }}
-                title="Table of Contents"
+                title="Table of Contents (Ctrl+T)"
               >
-                <svg className="w-[18px] h-[18px] shrink-0" fill="currentColor" viewBox="0 0 16 16"><path d="M1 1v14h14V1zM0 0h16v16H0zm9 1v14h1V1zM3 3.5h4v-1H3zm0 3h4v-1H3zm0 3h4v-1H3z"/></svg>
+                {/* <svg className="w-[18px] h-[18px] shrink-0" fill="currentColor" viewBox="0 0 16 16"><path d="M1 1v14h14V1zM0 0h16v16H0zm9 1v14h1V1zM3 3.5h4v-1H3zm0 3h4v-1H3zm0 3h4v-1H3z"/></svg> */}
+                <svg className="w-[20px] h-[20px] shrink-0" fill="currentColor" viewBox="0 0 16 16">
+                  <path  fill="currentColor" d="M 0,3 C 0,1.8954305 0.8954305,1 2,1 h 12 c 1.104569,0 2,0.8954305 2,2 v 10 c 0,1.104569 -0.895431,2 -2,2 H 2 C 0.8954305,15 0,14.104569 0,13 Z M 9.5,2 V 14 H 14 c 0.552285,0 1,-0.447715 1,-1 V 3 C 15,2.4477153 14.552285,2 14,2 Z m -1,0 H 2 C 1.4477153,2 1,2.4477153 1,3 v 10 c 0,0.552285 0.4477153,1 1,1 h 6.5 z"/>
+                  <path className="opacity-70" d="M 3.1376953 4.0068359 C 2.8606956 4.0068359 2.6376953 4.2298362 2.6376953 4.5068359 C 2.6376953 4.7838357 2.8606956 5.0068359 3.1376953 5.0068359 L 6.6376953 5.0068359 C 6.914695 5.0068359 7.1376953 4.7838357 7.1376953 4.5068359 C 7.1376953 4.2298362 6.914695 4.0068359 6.6376953 4.0068359 L 3.1376953 4.0068359 z M 3.1376953 6.3574219 C 2.8606956 6.3574219 2.6376953 6.5804222 2.6376953 6.8574219 C 2.6376953 7.1344216 2.8606956 7.3574219 3.1376953 7.3574219 L 6.6376953 7.3574219 C 6.914695 7.3574219 7.1376953 7.1344216 7.1376953 6.8574219 C 7.1376953 6.5804222 6.914695 6.3574219 6.6376953 6.3574219 L 3.1376953 6.3574219 z M 3.1376953 8.7080078 C 2.8606956 8.7080078 2.6376953 8.9310081 2.6376953 9.2080078 C 2.6376953 9.4850075 2.8606956 9.7080078 3.1376953 9.7080078 L 6.6376953 9.7080078 C 6.914695 9.7080078 7.1376953 9.4850075 7.1376953 9.2080078 C 7.1376953 8.9310081 6.914695 8.7080078 6.6376953 8.7080078 L 3.1376953 8.7080078 z M 3.1376953 11.057617 C 2.8606956 11.057617 2.6376953 11.280617 2.6376953 11.557617 C 2.6376953 11.834617 2.8606956 12.057617 3.1376953 12.057617 L 6.6376953 12.057617 C 6.914695 12.057617 7.1376953 11.834617 7.1376953 11.557617 C 7.1376953 11.280617 6.914695 11.057617 6.6376953 11.057617 L 3.1376953 11.057617 z " />
+                  </svg>
               </button>
               )}
             </div>
@@ -967,6 +1004,7 @@ const App: React.FC = () => {
       <SettingsModal
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
+        initialTab={settingsTab}
       />
     </div>
   );

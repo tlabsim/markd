@@ -7,6 +7,64 @@ let currentFilePath: string | null = null;
 
 const isDev = !app.isPackaged;
 
+// ---- Settings file (JSON in user data) ----
+const settingsPath = path.join(app.getPath('userData'), 'settings.json');
+
+function readSettings(): Record<string, unknown> {
+  try {
+    if (fs.existsSync(settingsPath)) {
+      return JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+    }
+  } catch { /* ignore */ }
+  return {};
+}
+
+function writeSetting(key: string, value: unknown): void {
+  const settings = readSettings();
+  settings[key] = value;
+  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
+}
+
+// Read multi-instance preference before deciding behaviour
+const settings = readSettings();
+const multiInstance = settings.multiInstance === true;
+
+if (multiInstance) {
+  // Multi-instance: allow multiple windows, each second-instance creates a new window
+  const gotTheLock = app.requestSingleInstanceLock();
+  if (!gotTheLock) {
+    app.quit();
+  } else {
+    app.on('second-instance', (_event, argv) => {
+      const cliFile = argv.find((arg, i) =>
+        i > 0 && (arg.endsWith('.md') || arg.endsWith('.markdown')) && !arg.startsWith('-')
+      );
+      createWindow(cliFile);
+    });
+  }
+} else {
+  // Single-instance: reuse the existing window
+  const gotTheLock = app.requestSingleInstanceLock();
+  if (!gotTheLock) {
+    app.quit();
+  } else {
+    app.on('second-instance', (_event, argv) => {
+      const cliFile = argv.find((arg, i) =>
+        i > 0 && (arg.endsWith('.md') || arg.endsWith('.markdown')) && !arg.startsWith('-')
+      );
+      if (cliFile && mainWindow) {
+        const params = new URLSearchParams();
+        params.set('file', cliFile);
+        params.set('distractionFree', '1');
+        mainWindow.loadURL(`app://index.html?${params.toString()}`);
+        mainWindow.focus();
+      } else if (mainWindow) {
+        mainWindow.focus();
+      }
+    });
+  }
+}
+
 // Path to the dist/renderer directory
 const rendererDir = isDev
   ? path.join(__dirname, '../../dist/renderer')
@@ -138,11 +196,11 @@ function createWindow(filePath?: string): void {
     win.webContents.send('window-state-changed', 'normal');
   });
 
-  // Only set mainWindow for the first window
-  if (!mainWindow) {
-    mainWindow = win;
-    setupMenu();
-  }
+  // Each window registers its own menu
+  setupMenu();
+
+  // Track the first window for backwards compat, but allow multiple
+  if (!mainWindow) mainWindow = win;
 }
 
 // Handle macOS open-file event (must be registered before app.whenReady)
@@ -172,33 +230,51 @@ function setupMenu(): void {
         {
           label: 'New File',
           accelerator: 'CmdOrCtrl+N',
-          click: () => mainWindow?.webContents.send('menu-action', 'new'),
+          click: () => {
+            const win = BrowserWindow.getFocusedWindow();
+            win?.webContents.send('menu-action', 'new');
+          },
         },
         {
           label: 'Open File...',
           accelerator: 'CmdOrCtrl+O',
-          click: () => openFile(),
+          click: () => {
+            const win = BrowserWindow.getFocusedWindow();
+            if (win) openFile(win);
+          },
         },
         {
           label: 'Open Folder...',
           accelerator: 'CmdOrCtrl+Shift+O',
-          click: () => openFolder(),
+          click: () => {
+            const win = BrowserWindow.getFocusedWindow();
+            if (win) openFolder(win);
+          },
         },
         { type: 'separator' },
         {
           label: 'Save',
           accelerator: 'CmdOrCtrl+S',
-          click: () => saveFile(),
+          click: () => {
+            const win = BrowserWindow.getFocusedWindow();
+            if (win) saveFile(win);
+          },
         },
         {
           label: 'Save As...',
           accelerator: 'CmdOrCtrl+Shift+S',
-          click: () => saveFileAs(),
+          click: () => {
+            const win = BrowserWindow.getFocusedWindow();
+            if (win) saveFileAs(win);
+          },
         },
         { type: 'separator' },
         {
           label: 'Export as HTML...',
-          click: () => exportHtml(),
+          click: () => {
+            const win = BrowserWindow.getFocusedWindow();
+            if (win) exportHtml(win);
+          },
         },
         { type: 'separator' },
         { role: 'quit' },
@@ -217,7 +293,10 @@ function setupMenu(): void {
         {
           label: 'Find...',
           accelerator: 'CmdOrCtrl+F',
-          click: () => mainWindow?.webContents.send('menu-action', 'find'),
+          click: () => {
+            const win = BrowserWindow.getFocusedWindow();
+            win?.webContents.send('menu-action', 'find');
+          },
         },
       ],
     },
@@ -236,12 +315,18 @@ function setupMenu(): void {
         {
           label: 'Toggle Dark Mode',
           accelerator: 'CmdOrCtrl+Shift+D',
-          click: () => mainWindow?.webContents.send('menu-action', 'toggle-theme'),
+          click: () => {
+            const win = BrowserWindow.getFocusedWindow();
+            win?.webContents.send('menu-action', 'toggle-theme');
+          },
         },
         {
           label: 'Toggle Sidebar',
           accelerator: 'CmdOrCtrl+B',
-          click: () => mainWindow?.webContents.send('menu-action', 'toggle-sidebar'),
+          click: () => {
+            const win = BrowserWindow.getFocusedWindow();
+            win?.webContents.send('menu-action', 'toggle-sidebar');
+          },
         },
       ],
     },
@@ -251,12 +336,15 @@ function setupMenu(): void {
         {
           label: 'About Markd',
           click: () => {
-            dialog.showMessageBox(mainWindow!, {
-              type: 'info',
-              title: 'About Markd',
-              message: 'Markd v1.0.0',
-              detail: 'A beautiful, feature-rich desktop markdown viewer and editor.\n\nBuilt with Electron, React, and TypeScript.',
-            });
+            const win = BrowserWindow.getFocusedWindow();
+            if (win) {
+              dialog.showMessageBox(win, {
+                type: 'info',
+                title: 'About Markd',
+                message: 'Markd v1.0.0',
+                detail: 'A beautiful, feature-rich desktop markdown viewer and editor.\n\nBuilt with Electron, React, and TypeScript.',
+              });
+            }
           },
         },
       ],
@@ -268,20 +356,28 @@ function setupMenu(): void {
 }
 
 // IPC Handlers
-ipcMain.handle('open-file', async () => {
-  return await openFile();
+ipcMain.handle('open-file', async (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win) return null;
+  return await openFile(win);
 });
 
-ipcMain.handle('open-folder', async () => {
-  return await openFolder();
+ipcMain.handle('open-folder', async (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win) return null;
+  return await openFolder(win);
 });
 
-ipcMain.handle('save-file', async (_event, content: string) => {
-  return await saveFile(content);
+ipcMain.handle('save-file', async (event, content: string) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win) return { success: false, error: 'No window' };
+  return await saveFile(win, content);
 });
 
-ipcMain.handle('save-file-as', async (_event, content: string) => {
-  return await saveFileAs(content);
+ipcMain.handle('save-file-as', async (event, content: string) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win) return { success: false, error: 'No window' };
+  return await saveFileAs(win, content);
 });
 
 ipcMain.handle('get-file-content', async (_event, filePath: string) => {
@@ -343,33 +439,44 @@ ipcMain.handle('get-app-path', () => {
   return app.getPath('documents');
 });
 
-ipcMain.handle('window-minimize', () => {
-  mainWindow?.minimize();
+// Settings IPC
+ipcMain.handle('get-setting', (_event, key: string) => {
+  return readSettings()[key] ?? null;
 });
 
-ipcMain.handle('window-maximize', () => {
-  if (mainWindow?.isMaximized()) {
-    mainWindow.unmaximize();
+ipcMain.handle('set-setting', (_event, key: string, value: unknown) => {
+  writeSetting(key, value);
+});
+
+ipcMain.handle('window-minimize', (event) => {
+  BrowserWindow.fromWebContents(event.sender)?.minimize();
+});
+
+ipcMain.handle('window-maximize', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win?.isMaximized()) {
+    win.unmaximize();
   } else {
-    mainWindow?.maximize();
+    win?.maximize();
   }
 });
 
-ipcMain.handle('window-close', () => {
-  mainWindow?.close();
+ipcMain.handle('window-close', (event) => {
+  BrowserWindow.fromWebContents(event.sender)?.close();
 });
 
-ipcMain.handle('window-is-maximized', () => {
-  return mainWindow?.isMaximized() ?? false;
+ipcMain.handle('window-is-maximized', (event) => {
+  return BrowserWindow.fromWebContents(event.sender)?.isMaximized() ?? false;
 });
 
-ipcMain.handle('export-html', async (_event, { content, title }) => {
-  return await exportHtml(content, title);
+ipcMain.handle('export-html', async (event, { content, title }) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win) return null;
+  return await exportHtml(win, content, title);
 });
 
-async function openFile(): Promise<{ success: boolean; content?: string; filePath?: string; error?: string } | null> {
-  if (!mainWindow) return null;
-  const result = await dialog.showOpenDialog(mainWindow, {
+async function openFile(senderWindow: BrowserWindow): Promise<{ success: boolean; content?: string; filePath?: string; error?: string } | null> {
+  const result = await dialog.showOpenDialog(senderWindow, {
     title: 'Open Markdown File',
     filters: [
       { name: 'Markdown Files', extensions: ['md', 'markdown'] },
@@ -383,17 +490,15 @@ async function openFile(): Promise<{ success: boolean; content?: string; filePat
   const filePath = result.filePaths[0];
   try {
     const content = fs.readFileSync(filePath, 'utf-8');
-    currentFilePath = filePath;
-    mainWindow.setTitle(`Markd - ${path.basename(filePath)}`);
+    senderWindow.setTitle(`Markd - ${path.basename(filePath)}`);
     return { success: true, content, filePath };
   } catch (err: any) {
     return { success: false, error: err.message };
   }
 }
 
-async function openFolder(): Promise<{ success: boolean; path?: string; error?: string } | null> {
-  if (!mainWindow) return null;
-  const result = await dialog.showOpenDialog(mainWindow, {
+async function openFolder(senderWindow: BrowserWindow): Promise<{ success: boolean; path?: string; error?: string } | null> {
+  const result = await dialog.showOpenDialog(senderWindow, {
     title: 'Open Folder',
     properties: ['openDirectory'],
   });
@@ -403,9 +508,9 @@ async function openFolder(): Promise<{ success: boolean; path?: string; error?: 
   return { success: true, path: result.filePaths[0] };
 }
 
-async function saveFile(content?: string): Promise<{ success: boolean; filePath?: string; error?: string }> {
+async function saveFile(senderWindow: BrowserWindow, content?: string): Promise<{ success: boolean; filePath?: string; error?: string }> {
   if (!currentFilePath) {
-    return await saveFileAs(content);
+    return await saveFileAs(senderWindow, content);
   }
 
   try {
@@ -418,10 +523,8 @@ async function saveFile(content?: string): Promise<{ success: boolean; filePath?
   }
 }
 
-async function saveFileAs(content?: string): Promise<{ success: boolean; filePath?: string; error?: string }> {
-  if (!mainWindow) return { success: false, error: 'No window' };
-
-  const result = await dialog.showSaveDialog(mainWindow, {
+async function saveFileAs(senderWindow: BrowserWindow, content?: string): Promise<{ success: boolean; filePath?: string; error?: string }> {
+  const result = await dialog.showSaveDialog(senderWindow, {
     title: 'Save Markdown File',
     filters: [
       { name: 'Markdown Files', extensions: ['md', 'markdown'] },
@@ -436,17 +539,17 @@ async function saveFileAs(content?: string): Promise<{ success: boolean; filePat
       fs.writeFileSync(result.filePath, content, 'utf-8');
     }
     currentFilePath = result.filePath;
-    mainWindow.setTitle(`Markd - ${path.basename(result.filePath)}`);
+    senderWindow.setTitle(`Markd - ${path.basename(result.filePath)}`);
     return { success: true, filePath: result.filePath };
   } catch (err: any) {
     return { success: false, error: err.message };
   }
 }
 
-async function exportHtml(content?: string, title?: string): Promise<{ success: boolean; filePath?: string; error?: string } | null> {
-  if (!mainWindow || !content) return null;
+async function exportHtml(senderWindow: BrowserWindow, content?: string, title?: string): Promise<{ success: boolean; filePath?: string; error?: string } | null> {
+  if (!content) return null;
 
-  const result = await dialog.showSaveDialog(mainWindow, {
+  const result = await dialog.showSaveDialog(senderWindow, {
     title: 'Export as HTML',
     filters: [{ name: 'HTML Files', extensions: ['html', 'htm'] }],
     defaultPath: title ? `${title}.html` : 'export.html',
