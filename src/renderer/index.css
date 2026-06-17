@@ -69,7 +69,7 @@
   }
 
   .btn-icon {
-    @apply btn-ghost p-1.5 px-1.5;
+    @apply btn-ghost p-1.5 px-2;
   }
 
   .panel {

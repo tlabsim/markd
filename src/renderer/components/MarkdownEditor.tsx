@@ -173,19 +173,17 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
   const [syntaxHighlight, setSyntaxHighlight] = useState(false); // off by default = textarea
   const undoStack = useRef<string[]>([]);
   const redoStack = useRef<string[]>([]);
-  const [canUndo, setCanUndo] = useState(false);
-  const [canRedo, setCanRedo] = useState(false);
   const isHighlighting = useRef(false);
   const highlightTimer = useRef<number>(0);
   const storeTimer = useRef<number>(0);
-  const lastTypedRef = useRef(fileContent); // tracks latest user-typed text for textarea
+  const lastTypedRef = useRef(fileContent);
+  const syncGuard = useRef(false); // prevents effect from overwriting textarea during programmatic changes
 
-  // Push text to store (debounced for contentEditable, direct for textarea)
+  // Push text to store (debounced for both modes to prevent effect from destroying undo)
   const pushToStore = useCallback((text: string) => {
     clearTimeout(storeTimer.current);
-    if (!syntaxHighlight) { setFileContent(text); return; }
     storeTimer.current = window.setTimeout(() => setFileContent(text), 300);
-  }, [setFileContent, syntaxHighlight]);
+  }, [setFileContent]);
 
   // Flush pending store update immediately (called before save)
   const flushStore = useCallback(() => {
@@ -194,8 +192,6 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
     if (!el) return;
     const text = getText(el);
     setFileContent(text);
-    // Also update defaultValue ref for uncontrolled textarea — key change triggers React re-render
-    if (el instanceof HTMLTextAreaElement) setFileContent(text); // already done, just being explicit
   }, [setFileContent]);
 
   // Debounced async highlighting — contentEditable only
@@ -213,12 +209,11 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
   }, [syntaxHighlight]);
 
   const pushUndo = useCallback(() => {
-    const current = useStore.getState().fileContent;
-    undoStack.current.push(current);
+    const el = editorRef.current;
+    if (!el) return;
+    undoStack.current.push(getText(el));
     if (undoStack.current.length > 100) undoStack.current.shift();
     redoStack.current = [];
-    setCanUndo(true);
-    setCanRedo(false);
   }, []);
 
   // Helper: wrap selection with prefix/suffix
@@ -247,24 +242,32 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
   }, [setFileContent, pushUndo]);
 
   const handleUndo = useCallback(() => {
-    if (undoStack.current.length === 0) return;
-    const current = useStore.getState().fileContent;
+    const el = editorRef.current;
+    if (!el || undoStack.current.length === 0) return;
+    const current = getText(el);
     redoStack.current.push(current);
     const prev = undoStack.current.pop()!;
+    syncGuard.current = true;
+    if (el instanceof HTMLDivElement && syntaxHighlight) {
+      el.innerHTML = highlightMarkdown(prev) || '<br>';
+    }
     setFileContent(prev);
-    setCanUndo(undoStack.current.length > 0);
-    setCanRedo(true);
-  }, [setFileContent]);
+    setTimeout(() => { syncGuard.current = false; }, 100);
+  }, [setFileContent, syntaxHighlight]);
 
   const handleRedo = useCallback(() => {
-    if (redoStack.current.length === 0) return;
-    const current = useStore.getState().fileContent;
+    const el = editorRef.current;
+    if (!el || redoStack.current.length === 0) return;
+    const current = getText(el);
     undoStack.current.push(current);
     const next = redoStack.current.pop()!;
+    syncGuard.current = true;
+    if (el instanceof HTMLDivElement && syntaxHighlight) {
+      el.innerHTML = highlightMarkdown(next) || '<br>';
+    }
     setFileContent(next);
-    setCanUndo(true);
-    setCanRedo(redoStack.current.length > 0);
-  }, [setFileContent]);
+    setTimeout(() => { syncGuard.current = false; }, 100);
+  }, [setFileContent, syntaxHighlight]);
 
   // Pass flushStore to parent so App can flush pending text before saving
   useEffect(() => {
@@ -307,40 +310,29 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
     setLineCount(total);
   }, []);
 
-  // Highlight and sync when fileContent changes externally (undo/redo, file open)
+  // Sync editor from store for external changes only (file open)
   useEffect(() => {
     const el = editorRef.current;
-    if (!el || isHighlighting.current) return;
-    // textarea: sync external changes (file open, undo/redo) without overwriting user typing
-    if (el instanceof HTMLTextAreaElement) {
-      if (fileContent !== lastTypedRef.current && el.value !== fileContent) {
-        el.value = fileContent;
-        lastTypedRef.current = fileContent;
-      }
-      return;
-    }
-    // contentEditable: re-highlight
-    isHighlighting.current = true;
-    const cursor = saveCursor(el);
-    if (syntaxHighlight) {
+    if (!el || isHighlighting.current || syncGuard.current) return;
+    if (el instanceof HTMLTextAreaElement) return;
+    // contentEditable: set initial content when file opens or mode switches
+    if (el instanceof HTMLDivElement && syntaxHighlight) {
+      syncGuard.current = true;
       el.innerHTML = highlightMarkdown(fileContent) || '<br>';
-    } else {
-      el.textContent = fileContent;
+      setTimeout(() => { syncGuard.current = false; }, 100);
     }
-    restoreCursor(el, Math.min(cursor, fileContent.length));
-    isHighlighting.current = false;
-    updateCursorPosition();
-  }, [fileContent, syntaxHighlight, updateCursorPosition]);
+  }, [fileContent, syntaxHighlight]);
 
-  // Input handler: minimal for both modes
+  // Input handler: push undo, debounce store, schedule highlighting
   const handleInput = useCallback(() => {
     const el = editorRef.current;
     if (!el) return;
     const text = getText(el);
+    pushUndo(); // per-keystroke undo for contentEditable
     pushToStore(text);
     applyHighlight();
     requestAnimationFrame(updateCursorPosition);
-  }, [pushToStore, applyHighlight, updateCursorPosition]);
+  }, [pushToStore, applyHighlight, updateCursorPosition, pushUndo]);
 
   // textarea onChange — short debounce (150ms) + startTransition for interruptible preview
   const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -348,7 +340,6 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
     lastTypedRef.current = text;
     clearTimeout(storeTimer.current);
     storeTimer.current = window.setTimeout(() => {
-      // Only push if text hasn't changed (user stopped typing)
       if (text === lastTypedRef.current) {
         startTransition(() => { setFileContent(text); });
       }
@@ -363,12 +354,11 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     const el = editorRef.current; if (!el) return;
-    // Undo/Redo
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
-      e.preventDefault(); handleUndo(); return;
+      e.preventDefault(); toolbarUndo(); return;
     }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
-      e.preventDefault(); handleRedo(); return;
+      e.preventDefault(); toolbarRedo(); return;
     }
     const isTa = el instanceof HTMLTextAreaElement;
     // Tab — insert 2 spaces natively, debounce store
@@ -492,18 +482,35 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
     return visualLines;
   }, [fileContent, wordWrap, taWidth]);
 
+  const toolbarUndo = useCallback(() => {
+    const el = editorRef.current;
+    if (!el) return;
+    el.focus();
+    if (el instanceof HTMLTextAreaElement) { document.execCommand('undo'); return; }
+    handleUndo();
+  }, [handleUndo]);
+
+  const toolbarRedo = useCallback(() => {
+    const el = editorRef.current;
+    if (!el) return;
+    el.focus();
+    if (el instanceof HTMLTextAreaElement) { document.execCommand('redo'); return; }
+    handleRedo();
+  }, [handleRedo]);
+
   return (
     <div className="h-full flex flex-col bg-white dark:bg-[#1c2733]">
       {/* Editor toolbar */}
       <div className="flex items-center gap-0.5 px-3 py-1.5 border-b border-gray-200/60 dark:border-gray-700/50 bg-gray-50/85 dark:bg-[#181e26]/85 backdrop-blur-md flex-wrap">
         {/* Undo */}
-        <button className="btn-icon" onClick={handleUndo} disabled={!canUndo} title="Undo (Ctrl+Z)">
+        <button className="btn-icon" onClick={toolbarUndo} title="Undo (Ctrl+Z)">
           <svg className="w-[18px] h-[18px] shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="m4 10l-.707.707L2.586 10l.707-.707zm17 8a1 1 0 1 1-2 0zM8.293 15.707l-5-5l1.414-1.414l5 5zm-5-6.414l5-5l1.414 1.414l-5 5zM4 9h10v2H4zm17 7v2h-2v-2zm-7-7a7 7 0 0 1 7 7h-2a5 5 0 0 0-5-5z"/></svg>
         </button>
         {/* Redo */}
-        <button className="btn-icon" onClick={handleRedo} disabled={!canRedo} title="Redo (Ctrl+Y)">
+        <button className="btn-icon" onClick={toolbarRedo} title="Redo (Ctrl+Y)">
           <svg className="w-[18px] h-[18px] shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="m20 10l.707.707l.707-.707l-.707-.707zM3 18a1 1 0 1 0 2 0zm12.707-2.293l5-5l-1.414-1.414l-5 5zm5-6.414l-5-5l-1.414 1.414l5 5zM20 9H10v2h10zM3 16v2h2v-2zm7-7a7 7 0 0 0-7 7h2a5 5 0 0 1 5-5z"/></svg>
         </button>
+        <div className="w-px h-5 bg-gray-200 dark:bg-gray-700" />
         {/* Save */}
         {onSave && (
           <button className="btn-icon" onClick={onSave} title="Save (Ctrl+S)">
@@ -536,7 +543,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
         </button>
         {/* Image */}
         <button className="btn-icon" onClick={() => wrapSelection('![', '](image-url)', 'alt text')} title="Insert image">
-          <svg className="w-[18px] h-[18px] shrink-0" fill="currentColor" viewBox="0 0 256 256"><g><path d="M224 56v122.06l-39.72-39.72a8 8 0 0 0-11.31 0L147.31 164l-49.65-49.66a8 8 0 0 0-11.32 0L32 168.69V56a8 8 0 0 1 8-8h176a8 8 0 0 1 8 8" opacity=".2"/><path d="M216 40H40a16 16 0 0 0-16 16v144a16 16 0 0 0 16 16h176a16 16 0 0 0 16-16V56a16 16 0 0 0-16-16m0 16v102.75l-26.07-26.06a16 16 0 0 0-22.63 0l-20 20l-44-44a16 16 0 0 0-22.62 0L40 149.37V56ZM40 172l52-52l80 80H40Zm176 28h-21.37l-36-36l20-20L216 181.38zm-72-100a12 12 0 1 1 12 12a12 12 0 0 1-12-12"/></g></svg>
+          {/* <svg className="w-[18px] h-[18px] shrink-0" fill="currentColor" viewBox="0 0 256 256"><g><path d="M224 56v122.06l-39.72-39.72a8 8 0 0 0-11.31 0L147.31 164l-49.65-49.66a8 8 0 0 0-11.32 0L32 168.69V56a8 8 0 0 1 8-8h176a8 8 0 0 1 8 8" opacity=".2"/><path d="M216 40H40a16 16 0 0 0-16 16v144a16 16 0 0 0 16 16h176a16 16 0 0 0 16-16V56a16 16 0 0 0-16-16m0 16v102.75l-26.07-26.06a16 16 0 0 0-22.63 0l-20 20l-44-44a16 16 0 0 0-22.62 0L40 149.37V56ZM40 172l52-52l80 80H40Zm176 28h-21.37l-36-36l20-20L216 181.38zm-72-100a12 12 0 1 1 12 12a12 12 0 0 1-12-12"/></g></svg> */}
+          <svg className="w-[18px] h-[18px] shrink-0" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5"><path d="M15 8h.01M3 6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z"/><path d="m3 16l5-5c.928-.893 2.072-.893 3 0l5 5"/><path d="m14 14l1-1c.928-.893 2.072-.893 3 0l3 3"/></g></svg>
         </button>
         <div className="w-px h-5 bg-gray-200 dark:bg-gray-700" />
         {/* Inline code */}
@@ -650,7 +658,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
               <path fill="currentColor" d="m 11.557955,2 c 1.242641,0 2.25,1.0073593 2.25,2.25 v 15.5 c 0,1.242641 -1.007359,2.25 -2.25,2.25 H 3.1522946 C 1.9096539,22 0.90229465,20.992641 0.90229465,19.75 V 4.25 C 0.90229465,3.0073593 1.9096539,2 3.1522946,2 Z m 0,1.5 H 3.1522946 c -0.4142136,0 -0.75,0.3357864 -0.75,0.75 v 15.5 c 0,0.414 0.336,0.75 0.75,0.75 h 8.4056604 c 0.414214,0 0.75,-0.335786 0.75,-0.75 V 4.25 c 0,-0.4142136 -0.335786,-0.75 -0.75,-0.75 m -1.397641,9.964 c 0.265315,0.26011 0.300195,0.675267 0.082,0.976 l -0.071,0.085 -2.2500005,2.296 c -0.2637141,0.269069 -0.6861129,0.300739 -0.987,0.074 l -0.084,-0.074 -2.253,-2.296 c -0.6499436,-0.662627 0.2459247,-1.682846 0.987,-1.124 l 0.083,0.074 1.718,1.75 1.714,-1.75 c 0.2901616,-0.295899 0.7653131,-0.300377 1.0610005,-0.01 M 7.9203135,7.226 10.170314,9.522 c 0.749316,0.713375 -0.3708894,1.812641 -1.0700005,1.05 l -1.715,-1.752 -1.718,1.75 c -0.7000468,0.66647 -1.7231439,-0.337504 -1.07,-1.05 l 2.253,-2.296 c 0.293929,-0.2991751 0.776071,-0.2991751 1.07,0 M 26.934795,2 c 1.242641,0 2.25,1.0073593 2.25,2.25 v 15.499999 c 0,1.242641 -1.007359,2.25 -2.25,2.25 h -8.40566 c -1.24264,0 -2.25,-1.007359 -2.25,-2.25 V 4.25 c 0,-1.2426407 1.00736,-2.25 2.25,-2.25 z m 0,1.5 h -8.40566 c -0.414214,0 -0.75,0.3357864 -0.75,0.75 v 15.499999 c 0,0.414 0.336,0.75 0.75,0.75 h 8.40566 c 0.414214,0 0.75,-0.335786 0.75,-0.75 V 4.25 c 0,-0.4142136 -0.335786,-0.75 -0.75,-0.75 m -1.397641,9.964 c 0.265315,0.26011 0.300195,0.675267 0.082,0.976 l -0.071,0.085 -2.25,2.296 c -0.263714,0.269069 -0.686113,0.300739 -0.987,0.074 l -0.084,-0.074 -2.253,-2.296 c -0.649944,-0.662626 0.245925,-1.682845 0.987,-1.123999 l 0.083,0.074 1.718,1.749999 1.714,-1.749999 c 0.290161,-0.295899 0.765313,-0.300377 1.061,-0.01 m -2.24,-6.2390001 2.25,2.2959999 c 0.749316,0.7133752 -0.370889,1.8126412 -1.07,1.0500002 l -1.715,-1.7520002 -1.718,1.7500002 c -0.700047,0.66647 -1.723144,-0.337504 -1.07,-1.0500002 l 2.253,-2.2959999 c 0.293929,-0.2991751 0.776071,-0.2991751 1.07,0"/>
             </svg>
             {syncScroll !== 'off' && (
-              <span className="text-[11px] font-medium">Sync {syncScroll === 'content' ? 'H' : 'P'}</span>
+              <span className="text-[11px] font-medium">{syncScroll === 'content' ? 'H' : 'P'}</span>
             )}
           </button>
         )}

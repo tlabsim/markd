@@ -7,14 +7,12 @@ const TreeNode: React.FC<{
   entry: FileEntry;
   depth: number;
   onToggle: (entry: FileEntry) => void;
-}> = ({ entry, depth, onToggle }) => {
+  onOpenFile?: (path: string) => void;
+}> = ({ entry, depth, onToggle, onOpenFile }) => {
   const {
     currentFilePath,
     folderChildren,
     expandedFolderPaths,
-    setCurrentFile,
-    setCurrentFilePath,
-    setOriginalContent,
     setFolderChildren,
     toggleExpandedFolder,
   } = useStore();
@@ -35,15 +33,9 @@ const TreeNode: React.FC<{
         }
       }
     } else {
-      const result = await window.markd?.getFileContent(entry.path);
-      if (result?.success && result.content !== undefined) {
-        setCurrentFile(entry.name);
-        setCurrentFilePath(entry.path);
-        setOriginalContent(result.content);
-        useStore.getState().addRecentFile(entry.path);
-      }
+      onOpenFile?.(entry.path);
     }
-  }, [entry, isDir, isExpanded]);
+  }, [entry, isDir, isExpanded, onOpenFile]);
 
   return (
     <>
@@ -87,7 +79,7 @@ const TreeNode: React.FC<{
       {isDir && isExpanded && children && children.length > 0 && (
         <div>
           {children.map((child) => (
-            <TreeNode key={child.path} entry={child} depth={depth + 1} onToggle={onToggle} />
+            <TreeNode key={child.path} entry={child} depth={depth + 1} onToggle={onToggle} onOpenFile={onOpenFile} />
           ))}
         </div>
       )}
@@ -98,7 +90,7 @@ const TreeNode: React.FC<{
   );
 };
 
-const Sidebar: React.FC<{ onOpenFile?: () => void }> = ({ onOpenFile }) => {
+const Sidebar: React.FC<{ onOpenFile?: () => void; onOpenPath?: (path: string) => void }> = ({ onOpenFile, onOpenPath }) => {
   const {
     currentFolderPath,
     folderChildren,
@@ -107,9 +99,6 @@ const Sidebar: React.FC<{ onOpenFile?: () => void }> = ({ onOpenFile }) => {
     clearFolderChildren,
     toggleSidebar,
     recentFiles,
-    setCurrentFile,
-    setCurrentFilePath,
-    setOriginalContent,
   } = useStore();
 
   const [loading, setLoading] = useState(false);
@@ -160,7 +149,8 @@ const Sidebar: React.FC<{ onOpenFile?: () => void }> = ({ onOpenFile }) => {
             {/* <svg className="w-[20px] h-[20px] shrink-0" fill="currentColor" viewBox="0 0 24 24">
               <path fillRule="evenodd" d="M9.51 5.274c-.105-.02-.23-.024-.687-.024H6.2c-.572 0-.957 0-1.253.025c-.287.023-.424.065-.514.111a1.25 1.25 0 0 0-.547.547c-.046.09-.088.227-.111.514c-.024.296-.025.68-.025 1.253v8.6c0 .572 0 .957.025 1.252c.023.288.065.425.111.515c.12.236.311.427.547.547c.09.046.227.088.514.111c.296.024.68.025 1.253.025h11.6c.572 0 .957 0 1.252-.025c.288-.023.425-.065.515-.111a1.25 1.25 0 0 0 .547-.547c.046-.09.088-.227.111-.515c.024-.295.025-.68.025-1.252v-5.6c0-.572 0-.957-.025-1.253c-.023-.287-.065-.424-.111-.514a1.25 1.25 0 0 0-.547-.547c-.09-.046-.227-.088-.515-.111c-.295-.024-.68-.025-1.252-.025h-4.123c-.394 0-.696.003-.98-.053a2.75 2.75 0 0 1-1.631-1.008c-.498-.64-.641-1.731-1.557-1.915M8.886 3.75c.364 0 .648 0 .917.053a2.75 2.75 0 0 1 1.63 1.008c.179.23.31.5.487.854c.244.488.479.942 1.07 1.06c.104.022.228.025.686.025h4.153c.535 0 .98 0 1.345.03c.38.03.736.098 1.073.27a2.75 2.75 0 0 1 1.202 1.202c.172.337.24.693.27 1.073c.03.365.03.81.03 1.345v5.66c0 .535 0 .98-.03 1.345c-.03.38-.098.736-.27 1.073a2.75 2.75 0 0 1-1.201 1.202c-.338.172-.694.24-1.074.27c-.365.03-.81.03-1.344.03H6.17c-.535 0-.98 0-1.345-.03c-.38-.03-.736-.098-1.073-.27a2.75 2.75 0 0 1-1.202-1.2c-.172-.338-.24-.694-.27-1.074c-.03-.365-.03-.81-.03-1.345V7.67c0-.535 0-.98.03-1.345c.03-.38.098-.736.27-1.073A2.75 2.75 0 0 1 3.752 4.05c.337-.172.693-.24 1.073-.27c.365-.03.81-.03 1.345-.03z" clipRule="evenodd" />
             </svg> */}
-            <svg className="w-[20px] h-[20px] shrink-0" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 7h-7.34a2 2 0 0 1-1.322-.5l-2.272-2M19 7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1.745a2 2 0 0 1 1.322.5M19 7a2.5 2.5 0 0 0-2.5-2.5H8.066"/></svg>
+            {/* <svg className="w-[20px] h-[20px] shrink-0" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M19 7h-7.34a2 2 0 0 1-1.322-.5l-2.272-2M19 7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1.745a2 2 0 0 1 1.322.5M19 7a2.5 2.5 0 0 0-2.5-2.5H8.066"/></svg> */}
+            <svg className="w-[20px] h-[20px] shrink-0" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M11.661 7H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7m8.661 0a2 2 0 0 1-1.322-.5l-2.272-2A2 2 0 0 0 6.745 4H5a2 2 0 0 0-2 2v1m8.661 0H3"/></svg>
           </button>
           <button
             className="opacity-70 w-6 h-6 flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-gray-600/50 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
@@ -212,15 +202,7 @@ const Sidebar: React.FC<{ onOpenFile?: () => void }> = ({ onOpenFile }) => {
                       <button
                         key={filePath}
                         className="w-full text-left px-2 py-1 rounded text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 truncate transition-colors"
-                        onClick={async () => {
-                          const result = await window.markd?.getFileContent(filePath);
-                          if (result?.success && result.content !== undefined) {
-                            setCurrentFile(name);
-                            setCurrentFilePath(filePath);
-                            setOriginalContent(result.content);
-                            useStore.getState().addRecentFile(filePath);
-                          }
-                        }}
+                        onClick={() => onOpenPath?.(filePath)}
                         title={filePath}
                       >
                         <svg className="w-[16px] h-[16px] inline-block mr-1.5 text-blue-500 dark:text-blue-400 flex-shrink-0" fill="currentColor" viewBox="0 0 16 16">
@@ -238,7 +220,7 @@ const Sidebar: React.FC<{ onOpenFile?: () => void }> = ({ onOpenFile }) => {
         ) : (
           <div className="space-y-px">
             {rootChildren.map((entry) => (
-              <TreeNode key={entry.path} entry={entry} depth={0} onToggle={() => {}} />
+              <TreeNode key={entry.path} entry={entry} depth={0} onToggle={() => {}} onOpenFile={onOpenPath} />
             ))}
           </div>
         )}

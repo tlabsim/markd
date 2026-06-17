@@ -49,6 +49,10 @@ const App: React.FC = () => {
   const [distractionFree, setDistractionFree] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDropPath, setPendingDropPath] = useState<string | null>(null);
+  const [dirtyModalOpen, setDirtyModalOpen] = useState(false);
+  const [reloadModalOpen, setReloadModalOpen] = useState(false);
+  const pendingOpenAction = useRef<(() => void) | null>(null);
+  const pendingFilePath = useRef<string | null>(null);
   const [syncScroll, setSyncScroll] = useState<'off' | 'position' | 'content'>('off');
   const [wordWrap, setWordWrap] = useState(true);
   const fontMenuRef = useRef<HTMLDivElement>(null);
@@ -104,19 +108,45 @@ const App: React.FC = () => {
     return () => document.removeEventListener('mousedown', handler);
   }, [showFontMenu]);
 
-  // ---------- HANDLERS (defined first, before effects that reference them) ----------
-
-  const handleOpen = useCallback(async () => {
-    const result = await window.markd?.openFile();
-    if (result?.success && result.content !== undefined) {
-      setCurrentFile(result.filePath ? result.filePath.split(/[/\\]/).pop() || null : null);
-      setCurrentFilePath(result.filePath || null);
-      setOriginalContent(result.content);
-      if (result.filePath) useStore.getState().addRecentFile(result.filePath);
+  // Helper: load file content into both store and editor (textarea/contentEditable)
+  const loadFileIntoEditor = useCallback((name: string | null, filePath: string | null, content: string) => {
+    setCurrentFile(name);
+    setCurrentFilePath(filePath);
+    setOriginalContent(content); // sets both originalContent + fileContent in store
+    // Force-sync the editor (uncontrolled textarea needs explicit update)
+    if (editorScrollRef.current instanceof HTMLTextAreaElement) {
+      editorScrollRef.current.value = content;
+    } else if (editorScrollRef.current instanceof HTMLDivElement) {
+      editorScrollRef.current.textContent = content;
+    }
+  }, []);
+  const openWithDirtyCheck = useCallback((action: () => void) => {
+    // Flush any pending debounced text to the store before checking
+    flushEditorRef.current?.();
+    const content = useStore.getState().fileContent;
+    const original = useStore.getState().originalContent;
+    const current = useStore.getState().currentFile;
+    if (current && content !== original) {
+      pendingOpenAction.current = action;
+      setDirtyModalOpen(true);
+    } else {
+      action();
     }
   }, []);
 
+  const handleOpen = useCallback(async () => {
+    openWithDirtyCheck(async () => {
+      const result = await window.markd?.openFile();
+      if (result?.success && result.content !== undefined) {
+        const name = result.filePath ? result.filePath.split(/[/\\]/).pop() || null : null;
+        loadFileIntoEditor(name, result.filePath || null, result.content);
+        if (result.filePath) useStore.getState().addRecentFile(result.filePath);
+      }
+    });
+  }, [openWithDirtyCheck, loadFileIntoEditor]);
+
   const handleOpenFolder = useCallback(async () => {
+    // Opening a folder doesn't close the current file, no dirty check needed
     const result = await window.markd?.openFolder();
     if (result?.success && result.path) {
       useStore.getState().setCurrentFolderPath(result.path);
@@ -128,14 +158,17 @@ const App: React.FC = () => {
   }, []);
 
   const handleSave = useCallback(async () => {
-    flushEditorRef.current?.(); // flush any pending debounced text
+    flushEditorRef.current?.();
     const content = useStore.getState().fileContent;
     const result = await window.markd?.saveFile(content);
     if (result?.success) {
       setOriginalContent(content);
-      if (result.filePath && !currentFilePath) {
-        setCurrentFilePath(result.filePath);
-        setCurrentFile(result.filePath.split(/[/\\]/).pop() || null);
+      if (result.filePath) {
+        useStore.getState().addRecentFile(result.filePath);
+        if (!currentFilePath) {
+          setCurrentFilePath(result.filePath);
+          setCurrentFile(result.filePath.split(/[/\\]/).pop() || null);
+        }
       }
     }
   }, [currentFilePath]);
@@ -148,26 +181,48 @@ const App: React.FC = () => {
       setCurrentFile(result.filePath ? result.filePath.split(/[/\\]/).pop() || null : null);
       setCurrentFilePath(result.filePath || null);
       setOriginalContent(content);
+      if (result.filePath) useStore.getState().addRecentFile(result.filePath);
     }
   }, []);
 
   const handleNewFile = useCallback(() => {
-    setCurrentFile('Untitled.md');
-    setCurrentFilePath(null);
-    setOriginalContent('');
-    setSearchQuery('');
-    setViewMode('split');
-  }, []);
+    openWithDirtyCheck(() => {
+      loadFileIntoEditor('Untitled.md', null, '');
+      setSearchQuery('');
+      setViewMode('split');
+    });
+  }, [openWithDirtyCheck, loadFileIntoEditor]);
 
-  const handleOpenRecentFile = useCallback(async (filePath: string) => {
-    const result = await window.markd?.getFileContent(filePath);
-    if (result?.success && result.content !== undefined) {
-      setCurrentFile(filePath.split(/[/\\]/).pop() || null);
-      setCurrentFilePath(filePath);
-      setOriginalContent(result.content);
-      useStore.getState().addRecentFile(filePath);
+  const handleCloseFile = useCallback(() => {
+    openWithDirtyCheck(() => {
+      setCurrentFile(null);
+      setCurrentFilePath(null);
+      setOriginalContent('');
+      useStore.setState({ fileContent: '' });
+    });
+  }, [openWithDirtyCheck]);
+
+  const handleOpenRecentFile = useCallback((filePath: string) => {
+    if (filePath === currentFilePath) {
+      // Same file — show reload confirmation instead
+      flushEditorRef.current?.();
+      const content = useStore.getState().fileContent;
+      const original = useStore.getState().originalContent;
+      if (content !== original) {
+        pendingFilePath.current = filePath;
+        setReloadModalOpen(true);
+      }
+      return;
     }
-  }, []);
+    openWithDirtyCheck(async () => {
+      const result = await window.markd?.getFileContent(filePath);
+      if (result?.success && result.content !== undefined) {
+        const name = filePath.split(/[/\\]/).pop() || null;
+        loadFileIntoEditor(name, filePath, result.content);
+        useStore.getState().addRecentFile(filePath);
+      }
+    });
+  }, [openWithDirtyCheck, loadFileIntoEditor, currentFilePath]);
 
   // Shared slugify — must match the one in MarkdownViewer
   const syncSlugify = (text: string) =>
@@ -267,8 +322,8 @@ const App: React.FC = () => {
   }, [syncScroll]);
 
   // Use refs so effects always get the latest handler without stale closures
-  const handlersRef = useRef({ handleOpen, handleOpenFolder, handleSave, handleSaveAs, handleNewFile });
-  handlersRef.current = { handleOpen, handleOpenFolder, handleSave, handleSaveAs, handleNewFile };
+  const handlersRef = useRef({ handleOpen, handleOpenFolder, handleSave, handleSaveAs, handleNewFile, handleCloseFile });
+  handlersRef.current = { handleOpen, handleOpenFolder, handleSave, handleSaveAs, handleNewFile, handleCloseFile };
 
   // ---------- EFFECTS ----------
 
@@ -365,6 +420,10 @@ const App: React.FC = () => {
           case 'n':
             e.preventDefault();
             h.handleNewFile();
+            break;
+          case 'w':
+            e.preventDefault();
+            h.handleCloseFile();
             break;
           case 'f':
             e.preventDefault();
@@ -626,6 +685,43 @@ const App: React.FC = () => {
     setPendingDropPath(null);
   }, []);
 
+  // Dirty-check modal handlers
+  const handleDirtySave = useCallback(async () => {
+    setDirtyModalOpen(false);
+    flushEditorRef.current?.();
+    const content = useStore.getState().fileContent;
+    const result = await window.markd?.saveFile(content);
+    if (result?.success) {
+      setOriginalContent(content);
+      if (result.filePath) useStore.getState().addRecentFile(result.filePath);
+    }
+    pendingOpenAction.current?.();
+    pendingOpenAction.current = null;
+  }, []);
+
+  const handleDirtyDiscard = useCallback(() => {
+    setDirtyModalOpen(false);
+    pendingOpenAction.current?.();
+    pendingOpenAction.current = null;
+  }, []);
+
+  const handleDirtyCancel = useCallback(() => {
+    setDirtyModalOpen(false);
+    pendingOpenAction.current = null;
+  }, []);
+
+  const handleReloadConfirm = useCallback(async () => {
+    setReloadModalOpen(false);
+    const filePath = pendingFilePath.current;
+    pendingFilePath.current = null;
+    if (filePath) {
+      const result = await window.markd?.getFileContent(filePath);
+      if (result?.success && result.content !== undefined) {
+        loadFileIntoEditor(filePath.split(/[/\\]/).pop() || null, filePath, result.content);
+      }
+    }
+  }, [loadFileIntoEditor]);
+
   return (
     <div
       className={`h-screen flex flex-col overflow-hidden ${distractionFree ? 'relative' : ''}`}
@@ -642,6 +738,7 @@ const App: React.FC = () => {
         onNewFile={handleNewFile}
         onSaveFile={handleSave}
         onSaveFileAs={handleSaveAs}
+        onCloseFile={handleCloseFile}
         onOpenRecentFile={handleOpenRecentFile}
         recentFiles={recentFiles}
         distractionFree={distractionFree}
@@ -657,7 +754,26 @@ const App: React.FC = () => {
             isSidebarOpen && !distractionFree ? 'w-64' : 'w-0'
           } flex-shrink-0 border-r border-md-border dark:border-md-border-dark bg-md-surface dark:bg-md-surface-dark overflow-hidden flex flex-col transition-all duration-200`}
         >
-          {isSidebarOpen && <Sidebar onOpenFile={handleOpen} />}
+          {isSidebarOpen && <Sidebar onOpenFile={handleOpen} onOpenPath={(path) => {
+            if (path === currentFilePath) {
+              flushEditorRef.current?.();
+              const content = useStore.getState().fileContent;
+              const original = useStore.getState().originalContent;
+              if (content !== original) {
+                pendingFilePath.current = path;
+                setReloadModalOpen(true);
+              }
+              return;
+            }
+            openWithDirtyCheck(async () => {
+              const result = await window.markd?.getFileContent(path);
+              if (result?.success && result.content !== undefined) {
+                const name = path.split(/[/\\]/).pop() || null;
+                loadFileIntoEditor(name, path, result.content);
+                useStore.getState().addRecentFile(path);
+              }
+            });
+          }} />}
         </div>
 
         {/* Main Content */}
@@ -697,7 +813,7 @@ const App: React.FC = () => {
                   onClick={() => setViewMode('split')}
                   title="Split mode"
                 >
-                  <svg className="w-[18px] h-[18px] shrink-0" fill="currentColor" viewBox="0 0 16 16">
+                  <svg className="w-[18px] h-[18px] shrink-0" fill="currentColor" viewBox="0 0 18 18">
                     <path d="M0 3a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm8.5-1v12H14a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1zm-1 0H2a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h5.5z" />
                   </svg>
                 </button>
@@ -759,10 +875,10 @@ const App: React.FC = () => {
                     style={viewMode === 'split' ? { width: `${splitRatio}%` } : { flex: 1 }}
                   >
                     <MarkdownEditor
-                      syncScroll={syncScroll}
+                      syncScroll={viewMode === 'edit' ? undefined : syncScroll}
                       onScrollRef={(el) => { editorScrollRef.current = el; }}
                       onEditorScroll={handleEditorScroll}
-                      onToggleSync={() => setSyncScroll(v => v === 'off' ? 'content' : v === 'content' ? 'position' : 'off')}
+                      onToggleSync={viewMode === 'edit' ? undefined : () => setSyncScroll(v => v === 'off' ? 'content' : v === 'content' ? 'position' : 'off')}
                       wordWrap={wordWrap}
                       onToggleWordWrap={() => setWordWrap(v => !v)}
                       onFlushRef={(fn) => { flushEditorRef.current = fn; }}
@@ -806,6 +922,30 @@ const App: React.FC = () => {
         cancelLabel="Cancel"
         onConfirm={handleConfirmReplace}
         onCancel={handleCancelReplace}
+      />
+
+      {/* Dirty-check modal for unsaved changes */}
+      <ConfirmModal
+        open={dirtyModalOpen}
+        title="Unsaved Changes"
+        message={`"${currentFile || 'Untitled'}" has unsaved changes. Would you like to save before proceeding?`}
+        saveLabel="Save"
+        confirmLabel="Discard"
+        cancelLabel="Cancel"
+        onSave={handleDirtySave}
+        onConfirm={handleDirtyDiscard}
+        onCancel={handleDirtyCancel}
+      />
+
+      {/* Reload confirmation — same file, different message */}
+      <ConfirmModal
+        open={reloadModalOpen}
+        title="Reload File"
+        message={`Reload "${currentFile}" from disk? Unsaved changes will be lost.`}
+        confirmLabel="Reload"
+        cancelLabel="Cancel"
+        onConfirm={handleReloadConfirm}
+        onCancel={() => setReloadModalOpen(false)}
       />
     </div>
   );

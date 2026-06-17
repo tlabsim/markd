@@ -12,6 +12,7 @@ interface TitleBarProps {
   onNewFile: () => void;
   onSaveFile: () => void;
   onSaveFileAs: () => void;
+  onCloseFile?: () => void;
   onOpenRecentFile?: (filePath: string) => void;
   recentFiles?: string[];
   paletteBg?: string;
@@ -20,7 +21,7 @@ interface TitleBarProps {
   onToggleDistractionFree?: () => void;
 }
 
-const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, isMaximized, onOpenFile, onOpenFolder, onNewFile, onSaveFile, onSaveFileAs, onOpenRecentFile, recentFiles, paletteBg, paletteBgDark, distractionFree, onToggleDistractionFree }) => {
+const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, isMaximized, onOpenFile, onOpenFolder, onNewFile, onSaveFile, onSaveFileAs, onCloseFile, onOpenRecentFile, recentFiles, paletteBg, paletteBgDark, distractionFree, onToggleDistractionFree }) => {
   const { currentFile, isModified, theme, setTheme, toggleSidebar } = useStore();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -94,6 +95,7 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
             <div className="border-t border-gray-200 dark:border-gray-600 my-1" />
             {menuItem('Save', 'Ctrl+S', onSaveFile)}
             {menuItem('Save As...', 'Ctrl+Shift+S', onSaveFileAs)}
+            {currentFile && onCloseFile && menuItem('Close File', 'Ctrl+W', onCloseFile)}
             <div className="border-t border-gray-200 dark:border-gray-600 my-1" />
             {/* Recent Files — CSS-driven submenu */}
             <div className="relative group">
