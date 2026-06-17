@@ -273,10 +273,10 @@ const AsyncImage: React.FC<{ src: string; alt: string; className?: string }> = (
       const langMatch = langClass.match(/language-(\w+)/);
       const lang = langMatch ? langMatch[1] : null;
       return (
-        <div className="my-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-[#f8f9fa] dark:bg-[#181e26] p-0">
+        <div className="code-block my-6 rounded-lg border p-0">
           {lang && (
             <div className="flex px-4 -mt-2.5">
-              <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md bg-white dark:bg-[#1a222b] text-gray-400 dark:text-gray-500">{lang}</span>
+              <span className="code-block-lang text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md">{lang}</span>
             </div>
           )}
           <pre className="overflow-x-auto m-0 px-4 py-4 bg-transparent" {...props}>{children}</pre>

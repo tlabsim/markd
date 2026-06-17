@@ -652,8 +652,19 @@ const App: React.FC = () => {
     const ext = filePath.split('.').pop()?.toLowerCase();
     if (ext !== 'md' && ext !== 'markdown') return;
 
-    // If a file is already loaded, ask for confirmation via modal
+    // If a file is already loaded, check if it's the same file
     if (currentFile && currentFilePath) {
+      if (filePath === currentFilePath) {
+        // Same file — show reload confirmation if dirty
+        flushEditorRef.current?.();
+        const content = useStore.getState().fileContent;
+        const original = useStore.getState().originalContent;
+        if (content !== original) {
+          pendingFilePath.current = filePath;
+          setReloadModalOpen(true);
+        }
+        return;
+      }
       setPendingDropPath(filePath);
       setConfirmOpen(true);
       return;
