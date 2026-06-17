@@ -42,7 +42,11 @@
     @apply bg-gray-600/50;
   }
 }
-
+/* Fix scrollbar cursor on editor elements */
+textarea,
+[contentEditable="true"] {
+  cursor: auto;
+}
 @layer components {
   .titlebar {
     @apply flex items-center h-10 bg-md-surface dark:bg-md-surface-dark px-4 select-none;

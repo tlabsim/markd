@@ -129,8 +129,9 @@ function getSel(el: EditorEl): { start: number; end: number; text: string } {
 
 function setSel(el: EditorEl, start: number, end: number) {
   if (el instanceof HTMLTextAreaElement) {
-    el.selectionStart = start;
-    el.selectionEnd = end;
+    const len = el.value.length;
+    el.selectionStart = Math.max(0, Math.min(start, len));
+    el.selectionEnd = Math.max(0, Math.min(end, len));
   } else {
     setSelectionRange(el as HTMLDivElement, start, end);
   }
@@ -170,7 +171,19 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
   const [cursorPosition, setCursorPosition] = useState({ line: 1, col: 1 });
   const [lineCount, setLineCount] = useState(1);
   const [taWidth, setTaWidth] = useState(0);
-  const [syntaxHighlight, setSyntaxHighlight] = useState(false); // off by default = textarea
+  const [syntaxHighlight, setSyntaxHighlight] = useState(false);
+  const [headingOpen, setHeadingOpen] = useState(false);
+  const headingRef = useRef<HTMLDivElement>(null);
+
+  // Close heading dropdown on click outside
+  useEffect(() => {
+    if (!headingOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (headingRef.current && !headingRef.current.contains(e.target as Node)) setHeadingOpen(false);
+    };
+    setTimeout(() => document.addEventListener('mousedown', handler), 0);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [headingOpen]);
   const undoStack = useRef<string[]>([]);
   const redoStack = useRef<string[]>([]);
   const isHighlighting = useRef(false);
@@ -216,29 +229,110 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
     redoStack.current = [];
   }, []);
 
-  // Helper: wrap selection with prefix/suffix
-  const wrapSelection = useCallback((prefix: string, suffix: string, placeholder: string) => {
+  // Smart toggle: wrap/unwrap selection with prefix/suffix
+  const toggleWrap = useCallback((prefix: string, suffix: string, placeholder: string) => {
     const el = editorRef.current; if (!el) return;
     pushUndo();
     const { start, end, text } = getSel(el);
     const full = getText(el);
+    const pLen = prefix.length, sLen = suffix.length;
     const selected = text || placeholder;
-    const insertion = prefix + selected + suffix;
-    const newText = full.substring(0, start) + insertion + full.substring(end);
+    // Check multiple unwrap conditions
+    const boundaryMatch = full.substring(start - pLen, start) === prefix && full.substring(end, end + sLen) === suffix;
+    const innerMatch = selected.startsWith(prefix) && selected.endsWith(suffix) && selected.length > pLen + sLen;
+    let newText: string; let selStart: number; let selEnd: number;
+    if (boundaryMatch) {
+      // Selection is exactly inside wrapped text — unwrap
+      newText = full.substring(0, start - pLen) + selected + full.substring(end + sLen);
+      selStart = start - pLen;
+      selEnd = selStart + selected.length;
+    } else if (innerMatch) {
+      // Selected text itself is wrapped — unwrap inner
+      const inner = selected.substring(pLen, selected.length - sLen);
+      newText = full.substring(0, start) + inner + full.substring(end);
+      selStart = start;
+      selEnd = selStart + inner.length;
+    } else {
+      // Wrap
+      newText = full.substring(0, start) + prefix + selected + suffix + full.substring(end);
+      selStart = start + pLen;
+      selEnd = selStart + selected.length;
+    }
+    if (el instanceof HTMLTextAreaElement) { el.value = newText; lastTypedRef.current = newText; }
     setFileContent(newText);
+    setTimeout(() => {
+      const el2 = editorRef.current; if (!el2) return;
+      setSel(el2, selStart, selEnd);
+      focusEl(el2);
+    }, 0);
   }, [setFileContent, pushUndo]);
 
-  // Helper: insert at start of line(s)
-  const prefixLines = useCallback((pfx: string, placeholder: string) => {
+  // Smart toggle: add/remove/replace line prefix (heading, quote, list)
+  const toggleLinePrefix = useCallback((pfx: string, placeholder: string) => {
     const el = editorRef.current; if (!el) return;
     pushUndo();
     const full = getText(el);
-    const { start, end } = getSel(el);
+    const { start } = getSel(el);
     const lineStart = full.lastIndexOf('\n', start - 1) + 1;
-    const selected = full.substring(start, end) || placeholder;
-    const insertion = pfx + selected;
-    const newText = full.substring(0, lineStart) + insertion + full.substring(end);
+    const lineEnd = full.indexOf('\n', start) === -1 ? full.length : full.indexOf('\n', start);
+    const currentLine = full.substring(lineStart, lineEnd);
+    let newLine: string; let cursorDelta: number;
+    // Check if line already starts with this prefix
+    if (currentLine.startsWith(pfx)) {
+      // Remove prefix
+      newLine = currentLine.substring(pfx.length);
+      cursorDelta = -pfx.length;
+    } else {
+      // Add prefix
+      newLine = pfx + currentLine;
+      cursorDelta = pfx.length;
+    }
+    const newText = full.substring(0, lineStart) + newLine + full.substring(lineEnd);
+    if (el instanceof HTMLTextAreaElement) { el.value = newText; lastTypedRef.current = newText; }
     setFileContent(newText);
+    setTimeout(() => {
+      const el2 = editorRef.current; if (!el2) return;
+      setSel(el2, start + cursorDelta, start + cursorDelta);
+      focusEl(el2);
+    }, 0);
+  }, [setFileContent, pushUndo]);
+
+  // Smart heading toggle
+  const toggleHeading = useCallback((level: number) => {
+    const el = editorRef.current; if (!el) return;
+    pushUndo();
+    const full = getText(el);
+    const { start } = getSel(el);
+    const lineStart = full.lastIndexOf('\n', start - 1) + 1;
+    const lineEnd = full.indexOf('\n', start) === -1 ? full.length : full.indexOf('\n', start);
+    const currentLine = full.substring(lineStart, lineEnd);
+    const hMatch = currentLine.match(/^(#{1,6})\s/);
+    const pfx = '#'.repeat(level) + ' ';
+    let newLine: string; let cursorDelta: number;
+    if (hMatch) {
+      const currentLevel = hMatch[1].length;
+      if (currentLevel === level) {
+        // Same level → remove heading
+        newLine = currentLine.substring(hMatch[0].length);
+        cursorDelta = -hMatch[0].length;
+      } else {
+        // Different level → replace
+        newLine = pfx + currentLine.substring(hMatch[0].length);
+        cursorDelta = pfx.length - hMatch[0].length;
+      }
+    } else {
+      // No heading → add
+      newLine = pfx + currentLine;
+      cursorDelta = pfx.length;
+    }
+    const newText = full.substring(0, lineStart) + newLine + full.substring(lineEnd);
+    if (el instanceof HTMLTextAreaElement) { el.value = newText; lastTypedRef.current = newText; }
+    setFileContent(newText);
+    setTimeout(() => {
+      const el2 = editorRef.current; if (!el2) return;
+      setSel(el2, start + cursorDelta, start + cursorDelta);
+      focusEl(el2);
+    }, 0);
   }, [setFileContent, pushUndo]);
 
   const handleUndo = useCallback(() => {
@@ -514,41 +608,69 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
         {/* Save */}
         {onSave && (
           <button className="btn-icon" onClick={onSave} title="Save (Ctrl+S)">
-            <svg className="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+            {/* <svg className="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-            </svg>
+            </svg> */}
+            <svg className="w-[18px] h-[18px] shrink-0" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M16.25 21v-4.765a1.59 1.59 0 0 0-1.594-1.588H9.344a1.59 1.59 0 0 0-1.594 1.588V21m8.5-17.715v2.362a1.59 1.59 0 0 1-1.594 1.588H9.344A1.59 1.59 0 0 1 7.75 5.647V3m8.5.285A3.2 3.2 0 0 0 14.93 3H7.75m8.5.285c.344.156.661.374.934.645l2.382 2.375A3.17 3.17 0 0 1 20.5 8.55v9.272A3.18 3.18 0 0 1 17.313 21H6.688A3.18 3.18 0 0 1 3.5 17.823V6.176A3.18 3.18 0 0 1 6.688 3H7.75"/></svg>
           </button>
         )}
         <div className="w-px h-5 bg-gray-200 dark:bg-gray-700" />
         {/* Bold */}
-        <button className="btn-icon" onClick={() => wrapSelection('**', '**', 'bold')} title="Bold (Ctrl+B)">
+        <button className="btn-icon" onClick={() => toggleWrap('**', '**', 'bold')} title="Bold (Ctrl+B)">
           <svg className="w-[18px] h-[18px] shrink-0" fill="currentColor" viewBox="0 0 16 16"><path d="M8.193 13H4V3h4.151c1.816 0 2.987.977 2.987 2.495c0 1.074-.797 2.01-1.823 2.176v.055c1.359.132 2.308 1.11 2.308 2.433c0 1.76-1.296 2.841-3.43 2.841M5.788 4.393v2.82h1.635c1.248 0 1.948-.526 1.948-1.455c0-.873-.603-1.365-1.67-1.365zm0 7.214h1.996c1.316 0 2.016-.547 2.016-1.573c0-1.019-.72-1.552-2.092-1.552h-1.92z"/></svg>
         </button>
         {/* Italic */}
-        <button className="btn-icon" onClick={() => wrapSelection('*', '*', 'italic')} title="Italic (Ctrl+I)">
+        <button className="btn-icon" onClick={() => toggleWrap('*', '*', 'italic')} title="Italic (Ctrl+I)">
           <svg className="w-[18px] h-[18px] shrink-0" fill="currentColor" viewBox="0 0 16 16"><path d="M8.16 12H9.5a.5.5 0 1 1 0 1h-4a.5.5 0 1 1 0-1h1.639l1.7-8H7.5a.5.5 0 0 1 0-1h4a.5.5 0 1 1 0 1H9.861z"/></svg>
         </button>
         {/* Strikethrough */}
-        <button className="btn-icon" onClick={() => wrapSelection('~~', '~~', 'strikethrough')} title="Strikethrough">
+        <button className="btn-icon" onClick={() => toggleWrap('~~', '~~', 'strikethrough')} title="Strikethrough">
           <svg className="w-[18px] h-[18px] shrink-0" fill="currentColor" viewBox="0 0 16 16"><path d="M6.333 5.686c0 .31.083.581.27.814H5.166a2.8 2.8 0 0 1-.099-.76c0-1.627 1.436-2.768 3.48-2.768c1.969 0 3.39 1.175 3.445 2.85h-1.23c-.11-1.08-.964-1.743-2.25-1.743c-1.23 0-2.18.602-2.18 1.607zm2.194 7.478c-2.153 0-3.589-1.107-3.705-2.81h1.23c.144 1.06 1.129 1.703 2.544 1.703c1.34 0 2.31-.705 2.31-1.675c0-.827-.547-1.374-1.914-1.675L8.046 8.5H1v-1h14v1h-3.504c.468.437.675.994.675 1.697c0 1.826-1.436 2.967-3.644 2.967"/></svg>
         </button>
         <div className="w-px h-5 bg-gray-200 dark:bg-gray-700" />
-        {/* Heading */}
-        <button className="btn-icon" onClick={() => prefixLines('# ', 'Heading')} title="Heading">
-          <svg className="w-[18px] h-[18px] shrink-0" fill="currentColor" viewBox="0 0 16 16"><path d="M6 11a1 1 0 0 1 0 2H4a1 1 0 0 1 0-2V5a1 1 0 1 1 0-2h2a1 1 0 1 1 0 2v2h4V5a1 1 0 1 1 0-2h2a1 1 0 0 1 0 2v6a1 1 0 0 1 0 2h-2a1 1 0 0 1 0-2V9H6z"/></svg>
-        </button>
+        <div className="relative" ref={headingRef}>
+          <button className="btn-icon" onClick={() => setHeadingOpen(v => !v)} title="Heading">
+            <svg className="w-[18px] h-[18px] shrink-0" fill="currentColor" viewBox="0 0 16 16"><path d="M6 11a1 1 0 0 1 0 2H4a1 1 0 0 1 0-2V5a1 1 0 1 1 0-2h2a1 1 0 1 1 0 2v2h4V5a1 1 0 1 1 0-2h2a1 1 0 0 1 0 2v6a1 1 0 0 1 0 2h-2a1 1 0 0 1 0-2V9H6z"/></svg>
+          </button>
+          {headingOpen && (() => {
+            const el = editorRef.current;
+            const full = el ? getText(el) : '';
+            const sel = el ? getSel(el) : { start: 0, end: 0 };
+            const ls = full.lastIndexOf('\n', sel.start - 1) + 1;
+            const cl = full.substring(ls, full.indexOf('\n', sel.start) === -1 ? full.length : full.indexOf('\n', sel.start));
+            const hMatch = cl.match(/^(#{1,6})\s/);
+            return (
+            <div className="absolute top-full left-0 mt-0.5 bg-white dark:bg-[#28323e] border border-gray-200 dark:border-gray-600 rounded-md shadow-xl z-40 py-0.5 w-36">
+              {[1,2,3,4,5,6].map(n => (
+                <button key={n} className="w-full text-left px-3 py-1 text-xs hover:bg-gray-100 dark:hover:bg-white/10 font-mono" onClick={() => { setHeadingOpen(false); toggleHeading(n); }}>
+                  <span className="text-gray-400">{'#'.repeat(n)}</span> <span className="font-medium">H{n}</span>
+                </button>
+              ))}
+              {hMatch && (
+                <>
+                  <div className="border-t border-gray-200 dark:border-gray-600" />
+                  <button className="w-full text-left px-3 py-1 text-xs hover:bg-gray-100 dark:hover:bg-white/10 text-gray-400 flex items-center gap-1.5" onClick={() => { setHeadingOpen(false); toggleHeading(hMatch[1].length); }}>
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    Clear heading
+                  </button>
+                </>
+              )}
+            </div>
+            );
+          })()}
+        </div>
         {/* Link */}
-        <button className="btn-icon" onClick={() => wrapSelection('[', '](url)', 'link text')} title="Insert link">
+        <button className="btn-icon" onClick={() => toggleWrap('[', '](url)', 'link text')} title="Insert link">
           <svg className="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244"/></svg>
         </button>
         {/* Image */}
-        <button className="btn-icon" onClick={() => wrapSelection('![', '](image-url)', 'alt text')} title="Insert image">
+        <button className="btn-icon" onClick={() => toggleWrap('![', '](image-url)', 'alt text')} title="Insert image">
           {/* <svg className="w-[18px] h-[18px] shrink-0" fill="currentColor" viewBox="0 0 256 256"><g><path d="M224 56v122.06l-39.72-39.72a8 8 0 0 0-11.31 0L147.31 164l-49.65-49.66a8 8 0 0 0-11.32 0L32 168.69V56a8 8 0 0 1 8-8h176a8 8 0 0 1 8 8" opacity=".2"/><path d="M216 40H40a16 16 0 0 0-16 16v144a16 16 0 0 0 16 16h176a16 16 0 0 0 16-16V56a16 16 0 0 0-16-16m0 16v102.75l-26.07-26.06a16 16 0 0 0-22.63 0l-20 20l-44-44a16 16 0 0 0-22.62 0L40 149.37V56ZM40 172l52-52l80 80H40Zm176 28h-21.37l-36-36l20-20L216 181.38zm-72-100a12 12 0 1 1 12 12a12 12 0 0 1-12-12"/></g></svg> */}
           <svg className="w-[18px] h-[18px] shrink-0" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5"><path d="M15 8h.01M3 6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z"/><path d="m3 16l5-5c.928-.893 2.072-.893 3 0l5 5"/><path d="m14 14l1-1c.928-.893 2.072-.893 3 0l3 3"/></g></svg>
         </button>
         <div className="w-px h-5 bg-gray-200 dark:bg-gray-700" />
         {/* Inline code */}
-        <button className="btn-icon" onClick={() => wrapSelection('`', '`', 'code')} title="Inline code">
+        <button className="btn-icon" onClick={() => toggleWrap('`', '`', 'code')} title="Inline code">
           <svg className="w-[18px] h-[18px] shrink-0" fill="currentColor" viewBox="0 0 16 16"><path d="M2.414 8.036L4.89 10.51a.5.5 0 0 1-.707.708L1.354 8.389a.5.5 0 0 1 0-.707l2.828-2.828a.5.5 0 1 1 .707.707zm8.768 2.474l2.475-2.474l-2.475-2.475a.5.5 0 0 1 .707-.707l2.829 2.828a.5.5 0 0 1 0 .707l-2.829 2.829a.5.5 0 1 1-.707-.708M8.559 2.506a.5.5 0 0 1 .981.19L7.441 13.494a.5.5 0 0 1-.981-.19z"/></svg>
         </button>
         {/* Code block */}
@@ -572,16 +694,16 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
           <svg className="w-[18px] h-[18px] shrink-0" fill="currentColor" viewBox="0 0 256 256"><path d="m58.34 101.66l-32-32a8 8 0 0 1 0-11.32l32-32a8 8 0 0 1 11.32 11.32L43.31 64l26.35 26.34a8 8 0 0 1-11.32 11.32m40 0a8 8 0 0 0 11.32 0l32-32a8 8 0 0 0 0-11.32l-32-32a8 8 0 0 0-11.32 11.32L124.69 64L98.34 90.34a8 8 0 0 0 0 11.32M200 40h-24a8 8 0 0 0 0 16h24v144H56v-64a8 8 0 0 0-16 0v64a16 16 0 0 0 16 16h144a16 16 0 0 0 16-16V56a16 16 0 0 0-16-16"/></svg>
         </button>
         {/* Blockquote */}
-        <button className="btn-icon" onClick={() => prefixLines('> ', 'blockquote')} title="Blockquote">
+        <button className="btn-icon" onClick={() => toggleLinePrefix('> ', 'blockquote')} title="Blockquote">
           <svg className="w-[18px] h-[18px] shrink-0" fill="currentColor" viewBox="0 0 16 16"><path d="M6.848 2.47a1 1 0 0 1-.318 1.378A7.3 7.3 0 0 0 3.75 7.01A3 3 0 1 1 1 10v-.027a4 4 0 0 1 .01-.232c.009-.15.027-.36.062-.618c.07-.513.207-1.22.484-2.014c.552-1.59 1.67-3.555 3.914-4.957a1 1 0 0 1 1.378.318m7 0a1 1 0 0 1-.318 1.378a7.3 7.3 0 0 0-2.78 3.162A3 3 0 1 1 8 10v-.027a4 4 0 0 1 .01-.232c.009-.15.027-.36.062-.618c.07-.513.207-1.22.484-2.014c.552-1.59 1.67-3.555 3.914-4.957a1 1 0 0 1 1.378.318"/></svg>
         </button>
         <div className="w-px h-5 bg-gray-200 dark:bg-gray-700" />
         {/* List */}
-        <button className="btn-icon" onClick={() => prefixLines('- ', 'list item')} title="Unordered list">
+        <button className="btn-icon" onClick={() => toggleLinePrefix('- ', 'list item')} title="Unordered list">
           <svg className="w-[18px] h-[18px] shrink-0" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 4h8a.5.5 0 1 1 0 1h-8a.5.5 0 0 1 0-1m0 4h8a.5.5 0 1 1 0 1h-8a.5.5 0 0 1 0-1m0 4h8a.5.5 0 1 1 0 1h-8a.5.5 0 1 1 0-1m-3-7a.5.5 0 1 1 0-1a.5.5 0 0 1 0 1m0 4a.5.5 0 1 1 0-1a.5.5 0 0 1 0 1m0 4a.5.5 0 1 1 0-1a.5.5 0 0 1 0 1"/></svg>
         </button>
         {/* Checkbox */}
-        <button className="btn-icon" onClick={() => prefixLines('- [ ] ', 'task')} title="Task list">
+        <button className="btn-icon" onClick={() => toggleLinePrefix('- [ ] ', 'task')} title="Task list">
           <svg className="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M10.25 4.5h11m-14-1.446L4.357 5.946L2.75 4.34m7.5 7.66h11m-14-1.446l-2.893 2.892L2.75 11.84m7.5 7.66h11m-14-1.446l-2.893 2.892L2.75 19.34"/></svg>
         </button>
         {/* Table */}
