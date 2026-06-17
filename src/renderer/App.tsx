@@ -9,6 +9,7 @@ import ConfirmModal from './components/ConfirmModal';
 import SearchBar from './components/SearchBar';
 import WelcomeScreen from './components/WelcomeScreen';
 import StatusBar from './components/StatusBar';
+import SettingsModal from './components/SettingsModal';
 
 const App: React.FC = () => {
   const {
@@ -38,6 +39,8 @@ const App: React.FC = () => {
     previewPalette,
     setPreviewPalette,
     recentFiles,
+    wordWrap,
+    setWordWrap,
   } = useStore();
 
   const editorRef = useRef<HTMLTextAreaElement>(null);
@@ -51,10 +54,10 @@ const App: React.FC = () => {
   const [pendingDropPath, setPendingDropPath] = useState<string | null>(null);
   const [dirtyModalOpen, setDirtyModalOpen] = useState(false);
   const [reloadModalOpen, setReloadModalOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const pendingOpenAction = useRef<(() => void) | null>(null);
   const pendingFilePath = useRef<string | null>(null);
   const [syncScroll, setSyncScroll] = useState<'off' | 'position' | 'content'>('off');
-  const [wordWrap, setWordWrap] = useState(true);
   const fontMenuRef = useRef<HTMLDivElement>(null);
   const paletteMenuRef = useRef<HTMLDivElement>(null);
   const tocButtonRef = useRef<HTMLButtonElement>(null);
@@ -756,6 +759,7 @@ const App: React.FC = () => {
         onToggleDistractionFree={() => setDistractionFree(v => !v)}
         paletteBg={PALETTE_OPTIONS.find(o => o.value === previewPalette)?.bg || '#ffffff'}
         paletteBgDark={PALETTE_OPTIONS.find(o => o.value === previewPalette)?.bgDark || '#1a222b'}
+        onSettings={() => setSettingsOpen(true)}
       />
 
       <div className={`flex flex-1 overflow-hidden ${distractionFree ? '' : ''}`}>
@@ -891,7 +895,7 @@ const App: React.FC = () => {
                       onEditorScroll={handleEditorScroll}
                       onToggleSync={viewMode === 'edit' ? undefined : () => setSyncScroll(v => v === 'off' ? 'content' : v === 'content' ? 'position' : 'off')}
                       wordWrap={wordWrap}
-                      onToggleWordWrap={() => setWordWrap(v => !v)}
+                      onToggleWordWrap={() => setWordWrap(!wordWrap)}
                       onFlushRef={(fn) => { flushEditorRef.current = fn; }}
                       onSave={handleSave}
                     />
@@ -957,6 +961,12 @@ const App: React.FC = () => {
         cancelLabel="Cancel"
         onConfirm={handleReloadConfirm}
         onCancel={() => setReloadModalOpen(false)}
+      />
+
+      {/* Settings modal */}
+      <SettingsModal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
       />
     </div>
   );

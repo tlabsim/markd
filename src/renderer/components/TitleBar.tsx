@@ -19,9 +19,10 @@ interface TitleBarProps {
   paletteBgDark?: string;
   distractionFree?: boolean;
   onToggleDistractionFree?: () => void;
+  onSettings?: () => void;
 }
 
-const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, isMaximized, onOpenFile, onOpenFolder, onNewFile, onSaveFile, onSaveFileAs, onCloseFile, onOpenRecentFile, recentFiles, paletteBg, paletteBgDark, distractionFree, onToggleDistractionFree }) => {
+const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, isMaximized, onOpenFile, onOpenFolder, onNewFile, onSaveFile, onSaveFileAs, onCloseFile, onOpenRecentFile, recentFiles, paletteBg, paletteBgDark, distractionFree, onToggleDistractionFree, onSettings }) => {
   const { currentFile, isModified, theme, setTheme, toggleSidebar } = useStore();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -145,6 +146,8 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
               'Ctrl+Shift+F',
               onToggleDistractionFree
             )}
+            <div className="border-t border-gray-200 dark:border-gray-600 my-1" />
+            {onSettings && menuItem('Settings…', null, onSettings)}
           </div>
         )}
       </div>

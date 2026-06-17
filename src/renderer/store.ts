@@ -33,6 +33,12 @@ interface EditorState {
   // Recent files
   recentFiles: string[];
 
+  // Editor preferences
+  wordWrap: boolean;
+  tabSize: number;
+  syntaxHighlight: boolean;
+  autoSave: boolean;
+
   // Actions
   setCurrentFile: (name: string | null) => void;
   setCurrentFilePath: (path: string | null) => void;
@@ -56,6 +62,10 @@ interface EditorState {
   addRecentFile: (path: string) => void;
   removeRecentFile: (path: string) => void;
   clearRecentFiles: () => void;
+  setWordWrap: (wrap: boolean) => void;
+  setTabSize: (size: number) => void;
+  setSyntaxHighlight: (on: boolean) => void;
+  setAutoSave: (on: boolean) => void;
   zoomIn: () => void;
   zoomOut: () => void;
 }
@@ -100,6 +110,10 @@ export const useStore = create<EditorState>()(
       zoomLevel: 100,
       previewPalette: 'default',
       recentFiles: [],
+      wordWrap: true,
+      tabSize: 4,
+      syntaxHighlight: false,
+      autoSave: false,
 
       setCurrentFile: (name) => set({ currentFile: name }),
       setCurrentFilePath: (path) => set({ currentFilePath: path }),
@@ -140,6 +154,10 @@ export const useStore = create<EditorState>()(
       removeRecentFile: (filePath) =>
         set((state) => ({ recentFiles: state.recentFiles.filter((p) => p !== filePath) })),
       clearRecentFiles: () => set({ recentFiles: [] }),
+      setWordWrap: (wrap) => set({ wordWrap: wrap }),
+      setTabSize: (size) => set({ tabSize: size }),
+      setSyntaxHighlight: (on) => set({ syntaxHighlight: on }),
+      setAutoSave: (on) => set({ autoSave: on }),
       zoomIn: () => set((s) => ({ zoomLevel: Math.min(200, s.zoomLevel + 10) })),
       zoomOut: () => set((s) => ({ zoomLevel: Math.max(50, s.zoomLevel - 10) })),
     }),
@@ -151,6 +169,10 @@ export const useStore = create<EditorState>()(
         zoomLevel: state.zoomLevel,
         previewPalette: state.previewPalette,
         recentFiles: state.recentFiles,
+        wordWrap: state.wordWrap,
+        tabSize: state.tabSize,
+        syntaxHighlight: state.syntaxHighlight,
+        autoSave: state.autoSave,
       }),
     }
   )
