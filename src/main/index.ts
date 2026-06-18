@@ -7,6 +7,15 @@ let currentFilePath: string | null = null;
 
 const isDev = !app.isPackaged;
 
+// Required on Windows for proper taskbar grouping, notifications, and file association display name
+app.setAppUserModelId('com.markd.app');
+// Also set the process name that appears in Task Manager (works in packaged builds)
+if (!isDev && process.platform === 'win32') {
+  try {
+    app.setName('Markd');
+  } catch { /* best effort */ }
+}
+
 // ---- Settings file (JSON in user data) ----
 const settingsPath = path.join(app.getPath('userData'), 'settings.json');
 

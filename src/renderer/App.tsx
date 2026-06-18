@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useRef, useState } from 'react';
+import React, { useEffect, useCallback, useRef, useState, useLayoutEffect } from 'react';
 import { useStore, FONT_OPTIONS } from './store';
 import { PALETTE_OPTIONS } from './palettes';
 import TitleBar from './components/TitleBar';
@@ -382,26 +382,29 @@ const App: React.FC = () => {
   }, []);
 
   // Startup: load file from query params (double-click open)
-  useEffect(() => {
+  // useLayoutEffect runs before paint — no sidebar flash in distraction-free mode
+  useLayoutEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const filePath = params.get('file');
     const df = params.get('distractionFree') === '1';
 
     if (df) {
       setDistractionFree(true);
-      // Collapse sidebar directly (don't toggle)
       useStore.setState({ isSidebarOpen: false });
     }
 
     if (filePath) {
+      // Set file name instantly so the UI reflects it immediately
+      const name = filePath.split(/[/\\]/).pop() || null;
+      setCurrentFile(name);
+      setCurrentFilePath(filePath);
+      setViewMode('view');
+      // Load content asynchronously
       (async () => {
         const result = await window.markd?.getFileContent(filePath);
         if (result?.success && result.content !== undefined) {
-          setCurrentFile(filePath.split(/[/\\]/).pop() || null);
-          setCurrentFilePath(filePath);
           setOriginalContent(result.content);
           useStore.getState().addRecentFile(filePath);
-          setViewMode('view'); // distraction-free opens in preview mode
         }
       })();
     }

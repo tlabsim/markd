@@ -321,7 +321,7 @@ const AsyncImage: React.FC<{ src: string; alt: string; className?: string }> = (
             >
               {fileContent}
             </ReactMarkdown>
-          ) : (
+          ) : currentFilePath ? null : (
             <div className="flex items-center justify-center h-64 text-gray-500">
               <p>No content</p>
             </div>

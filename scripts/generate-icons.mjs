@@ -21,8 +21,12 @@ for (const size of sizes) {
 await icon.clone().resize(256, 256).png().toFile(join(resourcesDir, 'icon.png'));
 console.log('Generated icon.png');
 
-const png256 = await icon.clone().resize(256, 256).png().toBuffer();
-const icoBuf = await toIco([png256]);
+// ICO needs multiple sizes for Windows to properly display it
+const icoSizes = [16, 24, 32, 48, 64, 128, 256];
+const icoPngs = await Promise.all(
+  icoSizes.map((s) => icon.clone().resize(s, s).png().toBuffer())
+);
+const icoBuf = await toIco(icoPngs);
 writeFileSync(join(resourcesDir, 'markd.ico'), icoBuf);
 writeFileSync(join(resourcesDir, 'icon.ico'), icoBuf);
-console.log('Generated markd.ico and icon.ico');
+console.log('Generated markd.ico and icon.ico (multi-resolution)');

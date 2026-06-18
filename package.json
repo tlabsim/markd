@@ -2,6 +2,10 @@
   "name": "markd",
   "version": "1.0.0",
   "description": "A beautiful, feature-rich desktop markdown viewer and editor",
+  "author": {
+    "name": "Iftekhar Mahmud Towhid",
+    "url": "https://github.com/tlabsim"
+  },
   "main": "dist/main/main/index.js",
   "scripts": {
     "dev": "npm run build && concurrently \"npm run dev:renderer\" \"npm run dev:electron\"",
@@ -75,7 +79,8 @@
       "target": [
         "nsis"
       ],
-      "icon": "resources/markd.png"
+      "icon": "resources/markd.ico",
+      "artifactName": "Markd-${version}.${ext}"
     },
     "linux": {
       "target": [
