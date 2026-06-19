@@ -184,7 +184,7 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
       {/* Right: Window controls */}
       <div className="flex items-center gap-1 z-10">
         <button
-          className="titlebar-button w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+          className="titlebar-button w-8 h-8 flex items-center justify-center rounded hover:bg-gray-700/10 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
           title="Toggle theme (Ctrl+Shift+D)"
         >
@@ -198,7 +198,7 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
         {onToggleDistractionFree && !isMaximized && (
           <>
             <button
-              className={`titlebar-button w-8 h-8 flex items-center justify-center rounded transition-colors hover:bg-gray-100 dark:hover:bg-white/10 ${
+              className={`titlebar-button w-8 h-8 flex items-center justify-center rounded transition-colors hover:bg-gray-700/10 dark:hover:bg-white/10 ${
                 distractionFree
                   ? 'text-blue-700 dark:text-blue-400'
                   : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
@@ -213,7 +213,7 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
 
         {distractionFree && onEditDocument && !isMaximized && (
           <button
-            className="titlebar-button w-auto px-3 h-[18px] flex items-center justify-center rounded text-[11px] font-semibold bg-slate-700/10 hover:bg-blue-700 hover:text-white dark:bg-white/10  dark:hover:bg-blue-400 text-slate-500 dark:text-gray-300 dark:hover:text-white transition-colors duration-150"
+            className="titlebar-button w-auto px-3 h-[18px] flex items-center justify-center rounded text-[12px] font-semibold bg-slate-700/10 hover:bg-blue-700 hover:text-white dark:bg-white/10  dark:hover:bg-blue-400 text-slate-500 dark:text-gray-300 dark:hover:text-white transition-colors duration-150"
             onClick={onEditDocument}
             title="Edit document — exit distraction-free and open in split view"
           >
@@ -223,7 +223,7 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
 
         <div className="w-px h-4 bg-gray-300 dark:bg-gray-700 mx-1" />
         <button
-          className="titlebar-button w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+          className="titlebar-button w-8 h-8 flex items-center justify-center rounded hover:bg-gray-700/10 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
           onClick={onMinimize}
           title="Minimize"
         >
@@ -232,14 +232,29 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
           </svg>
         </button>
         <button
-          className="titlebar-button w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+          className="titlebar-button w-8 h-8 flex items-center justify-center rounded hover:bg-gray-700/10 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
           onClick={onMaximize}
           title={isMaximized ? 'Restore' : 'Maximize'}
         >
-          <svg className={`w-[18px] h-[18px] transition-transform ${isMaximized ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+          {/* <svg className={`w-[18px] h-[18px] transition-transform ${isMaximized ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 3h-6m6 0l-9 9m9-9v6" />
             <path strokeLinecap="round" d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6" />
-          </svg>
+          </svg> */}
+          {isMaximized ? (
+            <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24">
+              <g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}>
+                <path d="M3 17a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1zm1-5V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6"/>
+                <path d="M15 13h-4V9m0 4l5-5"/>
+              </g>
+            </svg>
+          ) : (
+            <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24">
+              <g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}>
+                <path d="M3 17a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1zm1-5V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6"/>
+                <path d="M12 8h4v4m0-4l-5 5"/>
+              </g>
+            </svg>
+          )}
         </button>
         <button
           className="titlebar-button w-8 h-8 flex items-center justify-center rounded hover:bg-red-500/80 text-gray-500 dark:text-gray-400 hover:text-white transition-colors ml-0.5"

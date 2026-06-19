@@ -125,6 +125,21 @@ const App: React.FC = () => {
     setCurrentFile(name);
     setCurrentFilePath(filePath);
     setOriginalContent(content);
+    // Restore scroll position if available (any file re-open)
+    if (filePath && state.rememberScrollPosition) {
+      const saved = state.scrollPositions[filePath];
+      if (saved && saved > 300) {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            if (viewerScrollRef.current) {
+              viewerScrollRef.current.scrollTop = saved;
+              setWelcomeBackFile(name);
+              setTimeout(() => setWelcomeBackFile(null), 5000);
+            }
+          });
+        });
+      }
+    }
     // Force-sync the editor (uncontrolled textarea needs explicit update)
     if (editorScrollRef.current instanceof HTMLTextAreaElement) {
       editorScrollRef.current.value = content;
@@ -212,6 +227,11 @@ const App: React.FC = () => {
 
   const handleCloseFile = useCallback(() => {
     openWithDirtyCheck(() => {
+      // Save scroll position before clearing
+      const state = useStore.getState();
+      if (state.currentFilePath && state.rememberScrollPosition && viewerScrollRef.current) {
+        state.setScrollPosition(state.currentFilePath, viewerScrollRef.current.scrollTop);
+      }
       setCurrentFile(null);
       setCurrentFilePath(null);
       setOriginalContent('');
@@ -431,24 +451,8 @@ const App: React.FC = () => {
       (async () => {
         const result = await window.markd?.getFileContent(filePath);
         if (result?.success && result.content !== undefined) {
-          setOriginalContent(result.content);
+          loadFileIntoEditor(name, filePath, result.content);
           useStore.getState().addRecentFile(filePath);
-          // Welcome back: only on startup, only if scrolled past threshold
-          const SL = useStore.getState();
-          if (SL.rememberScrollPosition) {
-            const saved = SL.scrollPositions[filePath];
-            if (saved && saved > 300) {
-              requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                  if (viewerScrollRef.current) {
-                    viewerScrollRef.current.scrollTop = saved;
-                    setWelcomeBackFile(name);
-                    setTimeout(() => setWelcomeBackFile(null), 5000);
-                  }
-                });
-              });
-            }
-          }
         }
       })();
     }
@@ -749,12 +753,11 @@ const App: React.FC = () => {
   const loadDroppedFile = useCallback(async (filePath: string) => {
     const result = await window.markd?.getFileContent(filePath);
     if (result?.success && result.content !== undefined) {
-      setCurrentFile(filePath.split(/[/\\]/).pop() || null);
-      setCurrentFilePath(filePath);
-      setOriginalContent(result.content);
+      const name = filePath.split(/[/\\]/).pop() || null;
+      loadFileIntoEditor(name, filePath, result.content);
       useStore.getState().addRecentFile(filePath);
     }
-  }, []);
+  }, [loadFileIntoEditor]);
 
   const handleConfirmReplace = useCallback(async () => {
     setConfirmOpen(false);
@@ -917,24 +920,27 @@ const App: React.FC = () => {
               {/* ---- View mode toggle group ---- */}
               <div className="flex rounded-md border border-slate-300 dark:border-gray-600 overflow-hidden mr-1 shrink-0">
                 <button
-                  className={`px-2.5 py-1 text-xs font-medium transition-colors border-r border-slate-300 dark:border-gray-600 ${viewMode === 'view' ? 'bg-slate-200 dark:bg-[#3a4552] text-slate-800 dark:text-gray-100' : 'text-slate-600 dark:text-gray-400 hover:bg-slate-100 dark:hover:bg-white/10'}`}
+                  className={`px-2.5 py-1 text-xs font-medium transition-colors border-r border-slate-300 dark:border-gray-600 ${viewMode === 'view' ? 'bg-slate-600/10 dark:bg-white/10 text-slate-800 dark:text-gray-100' : 'text-slate-600 dark:text-gray-400 hover:bg-slate-500/10 dark:hover:bg-slate-100/10'}`}
                   onClick={() => setViewMode('view')}
                   title="Preview mode"
                 >
-                  <svg className="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  {/* <svg className="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 13c3.6-8 14.4-8 18 0" />
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 17a3 3 0 1 1 0-6a3 3 0 0 1 0 6" />
-                  </svg>
+                  </svg> */}
+                  {/* <svg className="w-[18px] h-[18px] shrink-0" viewBox="0 0 1024 1024"><path fill="currentColor" d="m512 863.36l384-54.848v-638.72L525.568 222.72a96 96 0 0 1-27.136 0L128 169.792v638.72zM137.024 106.432l370.432 52.928a32 32 0 0 0 9.088 0l370.432-52.928A64 64 0 0 1 960 169.792v638.72a64 64 0 0 1-54.976 63.36l-388.48 55.488a32 32 0 0 1-9.088 0l-388.48-55.488A64 64 0 0 1 64 808.512v-638.72a64 64 0 0 1 73.024-63.36"/><path fill="currentColor" d="M480 192h64v704h-64z"/></svg> */}
+                  {/* <svg className="w-[18px] h-[18px] shrink-0" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M2.75 7.21a2 2 0 0 1 2-2H8.5a3.5 3.5 0 0 1 3.5 3.5v10.885l-1.015-.721a4 4 0 0 0-2.318-.74H4.75a2 2 0 0 1-2-2zm18.5 0a2 2 0 0 0-2-2H15.5a3.5 3.5 0 0 0-3.5 3.5v10.885l1.015-.721a4 4 0 0 1 2.317-.74h3.918a2 2 0 0 0 2-2z"/></svg> */}
+                  <svg className="w-[18px] h-[18px] shrink-0" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M5.333 3c2.46-.003 4.836.887 6.667 2.5V21a10.07 10.07 0 0 0-6.667-2.5c-1.562 0-2.343 0-2.688-.22a1.16 1.16 0 0 1-.424-.425C2 17.51 2 16.895 2 15.663v-9.26c0-1.428 0-2.141.549-2.72c.548-.579 1.11-.609 2.234-.668Q5.056 3 5.333 3m13.334 0A10.07 10.07 0 0 0 12 5.5V21a10.07 10.07 0 0 1 6.667-2.5c1.562 0 2.343 0 2.688-.22c.207-.133.291-.218.424-.425c.221-.345.221-.96.221-2.192v-9.26c0-1.428 0-2.141-.549-2.72s-1.11-.609-2.234-.668Q18.944 3 18.667 3"/></svg>
                 </button>
                 <button
-                  className={`px-2.5 py-1 text-xs font-medium transition-colors border-r border-slate-300 dark:border-gray-600 ${viewMode === 'edit' ? 'bg-slate-200 dark:bg-[#3a4552] text-slate-800 dark:text-gray-100' : 'text-slate-600 dark:text-gray-400 hover:bg-slate-100 dark:hover:bg-white/10'}`}
+                  className={`px-2.5 py-1 text-xs font-medium transition-colors border-r border-slate-300 dark:border-gray-600 ${viewMode === 'edit' ? 'bg-slate-600/10 dark:bg-white/10 text-slate-800 dark:text-gray-100' : 'text-slate-600 dark:text-gray-400 hover:bg-slate-500/10 dark:hover:bg-slate-100/10'}`}
                   onClick={() => setViewMode('edit')}
                   title="Edit mode"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-[18px] h-[18px] shrink-0" viewBox="0 0 24 24"><path fill="currentColor" d="M16.443 7.328a.75.75 0 0 1 1.059-.056l1.737 1.564c.737.663 1.347 1.212 1.767 1.71c.44.525.754 1.088.754 1.784c0 .695-.313 1.258-.754 1.782c-.42.499-1.03 1.049-1.767 1.711l-1.737 1.564a.75.75 0 1 1-1.004-1.115l1.697-1.527c.788-.709 1.319-1.19 1.663-1.598c.33-.393.402-.622.402-.817c0-.196-.072-.425-.402-.818c-.344-.409-.875-.889-1.663-1.598l-1.697-1.527a.75.75 0 0 1-.056-1.06m-8.94 1.06a.75.75 0 0 0-1.004-1.115L4.761 8.836c-.737.663-1.347 1.212-1.767 1.71c-.44.525-.754 1.088-.754 1.784c0 .695.313 1.258.754 1.782c.42.499 1.03 1.049 1.767 1.711l1.737 1.564a.75.75 0 1 0 1.004-1.115l-1.697-1.527c-.788-.709-1.319-1.19-1.663-1.598c-.33-.393-.402-.622-.402-.817c0-.196.072-.425.402-.818c.344-.409.875-.889 1.663-1.598z"/><path fill="currentColor" d="M14.182 4.276a.75.75 0 0 1 .53.918l-3.974 14.83a.75.75 0 1 1-1.449-.389l3.974-14.83a.75.75 0 0 1 .919-.53" opacity=".5"/></svg>
                 </button>
                 <button
-                  className={`px-2.5 py-1 text-xs font-medium transition-colors ${viewMode === 'split' ? 'bg-slate-200 dark:bg-[#3a4552] text-slate-800 dark:text-gray-100' : 'text-slate-600 dark:text-gray-400 hover:bg-slate-100 dark:hover:bg-white/10'}`}
+                  className={`px-2.5 py-1 text-xs font-medium transition-colors ${viewMode === 'split' ? 'bg-slate-600/10 dark:bg-white/10 text-slate-800 dark:text-gray-100' : 'text-slate-600 dark:text-gray-400 hover:bg-slate-500/10 dark:hover:bg-slate-100/10'}`}
                   onClick={() => setViewMode('split')}
                   title="Split mode"
                 >
@@ -943,13 +949,13 @@ const App: React.FC = () => {
                   </svg>
                 </button>
               </div>
-              <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-1 shrink-0" />
+              <div className="w-px h-5 bg-gray-600/10 dark:bg-gray-700 mx-1 shrink-0" />
               {/* Font selector */}
               <FontSelector />
-              <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 shrink-0" />
+              <div className="w-px h-5 bg-gray-600/10 dark:bg-gray-700 shrink-0" />
               {/* Palette selector */}
               <PaletteSelector />
-              <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 shrink-0" />
+              <div className="w-px h-5 bg-gray-600/10 dark:bg-gray-700 shrink-0" />
               {/* Zoom controls */}
               <button className="btn-icon" onClick={zoomOut} title="Zoom out">
                 <svg className="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>

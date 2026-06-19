@@ -44,8 +44,8 @@ const TreeNode: React.FC<{
           ${isActive
             ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
             : isDir
-              ? 'text-gray-700 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800/50'
-              : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800/50'
+              ? 'text-gray-700 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-700/10 dark:hover:bg-gray-800/50'
+              : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-700/10 dark:hover:bg-gray-800/50'
           }`}
         style={{ paddingLeft: `${8 + depth * 24}px` }}
         onClick={handleClick}
@@ -207,7 +207,7 @@ const Sidebar: React.FC<{
               <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44" />
             </svg>
             <p className="text-xs text-gray-500 mb-3">No folder open</p>
-            <button className="text-xs text-blue-400 hover:text-blue-300 mb-4" onClick={handleOpenFolder}>
+            <button className="text-xs text-blue-500 hover:text-blue-600 dark:hover:text-blue-300 mb-4" onClick={handleOpenFolder}>
               Open a folder
             </button>
 
@@ -225,7 +225,7 @@ const Sidebar: React.FC<{
                     return (
                       <button
                         key={filePath}
-                        className="w-full text-left px-2 py-1 rounded text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 truncate transition-colors"
+                        className="w-full text-left px-2 py-1 rounded text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-700/10 dark:hover:bg-white/10 truncate transition-colors"
                         onClick={() => onOpenPath?.(filePath)}
                         title={filePath}
                       >
@@ -242,7 +242,7 @@ const Sidebar: React.FC<{
             </div>
           </div>
         ) : (
-          <div className="space-y-px">
+          <div className="space-y-px pr-1">
             {rootChildren.map((entry) => (
               <TreeNode key={entry.path} entry={entry} depth={0} onToggle={() => {}} onOpenFile={onOpenPath} />
             ))}
