@@ -272,13 +272,39 @@ const AsyncImage: React.FC<{ src: string; alt: string; className?: string }> = (
       const langClass = codeChild?.props?.className || '';
       const langMatch = langClass.match(/language-(\w+)/);
       const lang = langMatch ? langMatch[1] : null;
+      const codeText = typeof codeChild?.props?.children === 'string'
+        ? codeChild.props.children
+        : (codeChild?.props?.children?.[0] || '');
+      const [copied, setCopied] = useState(false);
+      const copyCode = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation();
+        navigator.clipboard.writeText(codeText).then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        });
+      }, [codeText]);
       return (
-        <div className="code-block my-6 rounded-lg border p-0">
+        <div className="code-block my-6 rounded-lg border p-0 relative group/cb">
           {lang && (
             <div className="flex px-4 -mt-2.5">
               <span className="code-block-lang text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md font-mono">{lang}</span>
             </div>
           )}
+          <button
+            className="code-block-btn absolute top-2 right-2 opacity-0 group-hover/cb:opacity-100 transition-opacity p-1.5 rounded-md z-10"
+            onClick={copyCode}
+            title="Copy code"
+          >
+            {copied ? (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 13l4 4L19 7" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 9h.6c1.33 0 2.4 1.07 2.4 2.4v7.2c0 1.33-1.07 2.4-2.4 2.4h-7.2C10.07 21 9 19.93 9 18.6V18M5.4 3h7.2A2.4 2.4 0 0 1 15 5.4v7.2a2.4 2.4 0 0 1-2.4 2.4H5.4A2.4 2.4 0 0 1 3 12.6V5.4A2.4 2.4 0 0 1 5.4 3" />
+              </svg>
+            )}
+          </button>
           <pre className="overflow-x-auto m-0 px-4 py-4 !bg-transparent" {...props}>{children}</pre>
         </div>
       );
