@@ -58,7 +58,7 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
   );
 
   return (
-    <div className={`titlebar flex items-center justify-between px-3 border-b transition-colors duration-300 select-none
+    <div className={`titlebar flex items-center justify-between px-3 border-b transition-colors duration-300 select-none relative
       ${distractionFree
         ? 'absolute top-0 left-0 right-0 z-50 backdrop-blur-xl border-transparent'
         : 'bg-white dark:bg-[#222c36] border-gray-200 dark:border-gray-700/50'
@@ -71,7 +71,7 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
       }}
     >
       {/* Left: Brand + Menu */}
-      <div className="flex items-center gap-2 relative" ref={menuRef}>
+      <div className="flex items-center gap-2 relative z-10" ref={menuRef}>
         <button
           className="titlebar-button w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
           onClick={() => setMenuOpen(!menuOpen)}
@@ -160,26 +160,26 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
         )}
       </div>
 
-      {/* Center: File title + save state */}
-      <div className="flex-1 text-center flex items-center justify-center gap-2">
+      {/* Center: File title + save state — absolutely centered */}
+      <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2 pointer-events-none">
         {saveState === 'saving' && (
-          <span className="text-[10px] px-2 py-0.5 rounded bg-slate-700/10 dark:bg-white/10 text-slate-500 dark:text-gray-300">Saving…</span>
+          <span className="text-[10px] px-2 py-0.5 rounded bg-slate-700/10 dark:bg-white/10 text-slate-500 dark:text-gray-300 pointer-events-auto">Saving…</span>
         )}
         {saveState === 'saved' && (
-          <span className="text-[10px] flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-600/90 dark:bg-emerald-500/90 text-white">
+          <span className="text-[10px] flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-600/90 dark:bg-emerald-500/90 text-white pointer-events-auto">
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
               <path d="M5 13l4 4L19 7" />
             </svg>
             Saved
           </span>
         )}
-        <span className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-md inline-block">
+        <span className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[37vw] inline-block">
           {title}
         </span>
       </div>
 
       {/* Right: Window controls */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 z-10">
         <button
           className="titlebar-button w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
