@@ -17,6 +17,6 @@
     "noFallthroughCasesInSwitch": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/renderer"],
+  "include": ["src/renderer", "src/preload"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

@@ -19,10 +19,11 @@ interface TitleBarProps {
   paletteBgDark?: string;
   distractionFree?: boolean;
   onToggleDistractionFree?: () => void;
+  onEditDocument?: () => void;
   onSettings?: () => void;
 }
 
-const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, isMaximized, onOpenFile, onOpenFolder, onNewFile, onSaveFile, onSaveFileAs, onCloseFile, onOpenRecentFile, recentFiles, paletteBg, paletteBgDark, distractionFree, onToggleDistractionFree, onSettings }) => {
+const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, isMaximized, onOpenFile, onOpenFolder, onNewFile, onSaveFile, onSaveFileAs, onCloseFile, onOpenRecentFile, recentFiles, paletteBg, paletteBgDark, distractionFree, onToggleDistractionFree, onEditDocument, onSettings }) => {
   const { currentFile, isModified, theme, setTheme, toggleSidebar } = useStore();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -47,11 +48,11 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
 
   const menuItem = (label: string, shortcut: string | null, action: () => void) => (
     <button
-      className="w-full flex items-center justify-between px-3 py-1.5 text-xs text-left hover:bg-blue-600 hover:text-white rounded-sm transition-colors"
+      className="w-full flex items-center justify-between px-3 py-1.5 text-xs text-left hover:bg-blue-600 hover:text-white rounded-sm transition-colors group"
       onClick={() => { action(); closeMenu(); }}
     >
       <span>{label}</span>
-      {shortcut && <span className="ml-8 text-gray-500 hover:text-gray-300 text-[10px]">{shortcut}</span>}
+      {shortcut && <span className="ml-8 text-gray-400 dark:text-gray-500 group-hover:text-white/70 text-[10px]">{shortcut}</span>}
     </button>
   );
 
@@ -94,8 +95,14 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
             {menuItem('Open File...', 'Ctrl+O', onOpenFile)}
             {menuItem('Open Folder...', 'Ctrl+Shift+O', onOpenFolder)}
             <div className="border-t border-gray-200 dark:border-gray-600 my-1" />
-            {menuItem('Save', 'Ctrl+S', onSaveFile)}
-            {menuItem('Save As...', 'Ctrl+Shift+S', onSaveFileAs)}
+            {distractionFree ? (
+              onEditDocument && menuItem('Edit Document', null, onEditDocument)
+            ) : (
+              <>
+                {menuItem('Save', 'Ctrl+S', onSaveFile)}
+                {menuItem('Save As...', 'Ctrl+Shift+S', onSaveFileAs)}
+              </>
+            )}
             {currentFile && onCloseFile && menuItem('Close File', 'Ctrl+W', onCloseFile)}
             <div className="border-t border-gray-200 dark:border-gray-600 my-1" />
             {/* Recent Files — CSS-driven submenu */}
@@ -187,6 +194,16 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
               <svg className="w-[18px] h-[18px]" viewBox="0 0 28 28"><path fill="currentColor" d="M3 6a3 3 0 0 1 3-3h3.5a1 1 0 1 1 0 2H6a1 1 0 0 0-1 1v3.5a1 1 0 1 1-2 0zm14.5-2a1 1 0 0 1 1-1H22a3 3 0 0 1 3 3v3.5a1 1 0 1 1-2 0V6a1 1 0 0 0-1-1h-3.5a1 1 0 0 1-1-1M4 17.5a1 1 0 0 1 1 1V22a1 1 0 0 0 1 1h3.5a1 1 0 1 1 0 2H6a3 3 0 0 1-3-3v-3.5a1 1 0 0 1 1-1m20 0a1 1 0 0 1 1 1V22a3 3 0 0 1-3 3h-3.5a1 1 0 1 1 0-2H22a1 1 0 0 0 1-1v-3.5a1 1 0 0 1 1-1"/></svg>
             </button>
           </>
+        )}
+
+        {distractionFree && onEditDocument && !isMaximized && (
+          <button
+            className="titlebar-button w-auto px-3 h-[18px] flex items-center justify-center rounded text-[11px] font-semibold bg-slate-700/10 hover:bg-blue-700 hover:text-white dark:bg-white/10  dark:hover:bg-blue-400 text-slate-500 dark:text-gray-300 dark:hover:text-white transition-colors duration-150"
+            onClick={onEditDocument}
+            title="Edit document — exit distraction-free and open in split view"
+          >
+            Edit
+          </button>
         )}
 
         <div className="w-px h-4 bg-gray-300 dark:bg-gray-700 mx-1" />

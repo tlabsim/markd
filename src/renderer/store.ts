@@ -38,6 +38,9 @@ interface EditorState {
   tabSize: number;
   syntaxHighlight: boolean;
   autoSave: boolean;
+  rememberScrollPosition: boolean;
+  /** Maps file path → last scrollTop */
+  scrollPositions: Record<string, number>;
 
   // Actions
   setCurrentFile: (name: string | null) => void;
@@ -66,6 +69,8 @@ interface EditorState {
   setTabSize: (size: number) => void;
   setSyntaxHighlight: (on: boolean) => void;
   setAutoSave: (on: boolean) => void;
+  setRememberScrollPosition: (on: boolean) => void;
+  setScrollPosition: (filePath: string, scrollTop: number) => void;
   zoomIn: () => void;
   zoomOut: () => void;
 }
@@ -114,6 +119,8 @@ export const useStore = create<EditorState>()(
       tabSize: 4,
       syntaxHighlight: false,
       autoSave: false,
+      rememberScrollPosition: true,
+      scrollPositions: {},
 
       setCurrentFile: (name) => set({ currentFile: name }),
       setCurrentFilePath: (path) => set({ currentFilePath: path }),
@@ -158,6 +165,9 @@ export const useStore = create<EditorState>()(
       setTabSize: (size) => set({ tabSize: size }),
       setSyntaxHighlight: (on) => set({ syntaxHighlight: on }),
       setAutoSave: (on) => set({ autoSave: on }),
+      setRememberScrollPosition: (on) => set({ rememberScrollPosition: on }),
+      setScrollPosition: (filePath, scrollTop) =>
+        set((s) => ({ scrollPositions: { ...s.scrollPositions, [filePath]: scrollTop } })),
       zoomIn: () => set((s) => ({ zoomLevel: Math.min(200, s.zoomLevel + 10) })),
       zoomOut: () => set((s) => ({ zoomLevel: Math.max(50, s.zoomLevel - 10) })),
     }),
@@ -173,6 +183,8 @@ export const useStore = create<EditorState>()(
         tabSize: state.tabSize,
         syntaxHighlight: state.syntaxHighlight,
         autoSave: state.autoSave,
+        rememberScrollPosition: state.rememberScrollPosition,
+        scrollPositions: state.scrollPositions,
       }),
     }
   )

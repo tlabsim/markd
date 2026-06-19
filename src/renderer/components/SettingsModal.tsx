@@ -168,6 +168,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
     setSyntaxHighlight,
     autoSave,
     setAutoSave,
+    rememberScrollPosition,
+    setRememberScrollPosition,
   } = useStore();
 
   if (!open) return null;
@@ -299,6 +301,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
                 <ToggleSwitch
                   checked={autoSave}
                   onChange={() => setAutoSave(!autoSave)}
+                />
+              </SettingRow>
+
+              <SettingRow label="Remember Scroll Position">
+                <ToggleSwitch
+                  checked={rememberScrollPosition}
+                  onChange={() => setRememberScrollPosition(!rememberScrollPosition)}
                 />
               </SettingRow>
 

@@ -56,6 +56,7 @@ const App: React.FC = () => {
   const [reloadModalOpen, setReloadModalOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<'settings' | 'shortcuts' | 'about'>('settings');
+  const [welcomeBackFile, setWelcomeBackFile] = useState<string | null>(null);
   const pendingOpenAction = useRef<(() => void) | null>(null);
   const pendingFilePath = useRef<string | null>(null);
   const [syncScroll, setSyncScroll] = useState<'off' | 'position' | 'content'>('off');
@@ -114,9 +115,30 @@ const App: React.FC = () => {
 
   // Helper: load file content into both store and editor (textarea/contentEditable)
   const loadFileIntoEditor = useCallback((name: string | null, filePath: string | null, content: string) => {
+    const state = useStore.getState();
+    // Save current scroll position before switching files
+    if (state.currentFilePath && state.rememberScrollPosition && viewerScrollRef.current) {
+      state.setScrollPosition(state.currentFilePath, viewerScrollRef.current.scrollTop);
+    }
     setCurrentFile(name);
     setCurrentFilePath(filePath);
     setOriginalContent(content); // sets both originalContent + fileContent in store
+    // Restore scroll position after render
+    if (filePath && state.rememberScrollPosition) {
+      const saved = state.scrollPositions[filePath];
+      if (saved && saved > 0) {
+        // Defer scroll restoration until DOM is ready
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            if (viewerScrollRef.current) {
+              viewerScrollRef.current.scrollTop = saved;
+              setWelcomeBackFile(name);
+              setTimeout(() => setWelcomeBackFile(null), 5000);
+            }
+          });
+        });
+      }
+    }
     // Force-sync the editor (uncontrolled textarea needs explicit update)
     if (editorScrollRef.current instanceof HTMLTextAreaElement) {
       editorScrollRef.current.value = content;
@@ -180,7 +202,7 @@ const App: React.FC = () => {
   const handleSaveAs = useCallback(async () => {
     flushEditorRef.current?.();
     const content = useStore.getState().fileContent;
-    const result = await window.markd?.saveFileAs(content);
+    const result = await window.markd?.saveFileAs(content, currentFilePath || undefined);
     if (result?.success) {
       setCurrentFile(result.filePath ? result.filePath.split(/[/\\]/).pop() || null : null);
       setCurrentFilePath(result.filePath || null);
@@ -205,6 +227,21 @@ const App: React.FC = () => {
       useStore.setState({ fileContent: '' });
     });
   }, [openWithDirtyCheck]);
+
+  const handleEditDocument = useCallback(() => {
+    setDistractionFree(false);
+    setViewMode('split');
+  }, []);
+
+  const handleToggleDF = useCallback(() => {
+    setDistractionFree(v => {
+      if (!v && viewMode === 'split') {
+        // Enabling DF from split → switch to preview first
+        setViewMode('view');
+      }
+      return !v;
+    });
+  }, [viewMode]);
 
   const handleOpenRecentFile = useCallback((filePath: string) => {
     if (filePath === currentFilePath) {
@@ -489,7 +526,7 @@ const App: React.FC = () => {
           case 'f':
             if (!isMaximized) {
               e.preventDefault();
-              setDistractionFree(v => !v);
+              handleToggleDF();
             }
             break;
         }
@@ -792,7 +829,8 @@ const App: React.FC = () => {
         onOpenRecentFile={handleOpenRecentFile}
         recentFiles={recentFiles}
         distractionFree={distractionFree}
-        onToggleDistractionFree={() => setDistractionFree(v => !v)}
+        onToggleDistractionFree={handleToggleDF}
+        onEditDocument={handleEditDocument}
         paletteBg={PALETTE_OPTIONS.find(o => o.value === previewPalette)?.bg || '#ffffff'}
         paletteBgDark={PALETTE_OPTIONS.find(o => o.value === previewPalette)?.bgDark || '#1a222b'}
         onSettings={() => { setSettingsTab('settings'); setSettingsOpen(true); }}
@@ -965,6 +1003,24 @@ const App: React.FC = () => {
 
           {/* Status Bar */}
           {currentFile && !distractionFree && <StatusBar />}
+
+          {/* Welcome back toast */}
+          {welcomeBackFile && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-2 rounded-lg bg-white dark:bg-[#2a3642] border border-gray-200 dark:border-gray-600 shadow-lg text-[13px]">
+              <span className="text-gray-700 dark:text-gray-200">
+                👋 Welcome back! Picked up where you left off in <strong>{welcomeBackFile}</strong>
+              </span>
+              <button
+                className="text-[11px] text-blue-500 dark:text-blue-400 hover:underline shrink-0"
+                onClick={() => {
+                  if (viewerScrollRef.current) viewerScrollRef.current.scrollTop = 0;
+                  setWelcomeBackFile(null);
+                }}
+              >
+                Go to top
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

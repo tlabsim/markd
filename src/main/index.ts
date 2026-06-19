@@ -383,10 +383,10 @@ ipcMain.handle('save-file', async (event, content: string) => {
   return await saveFile(win, content);
 });
 
-ipcMain.handle('save-file-as', async (event, content: string) => {
+ipcMain.handle('save-file-as', async (event, content: string, currentPath?: string) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   if (!win) return { success: false, error: 'No window' };
-  return await saveFileAs(win, content);
+  return await saveFileAs(win, content, currentPath);
 });
 
 ipcMain.handle('get-file-content', async (_event, filePath: string) => {
@@ -532,9 +532,13 @@ async function saveFile(senderWindow: BrowserWindow, content?: string): Promise<
   }
 }
 
-async function saveFileAs(senderWindow: BrowserWindow, content?: string): Promise<{ success: boolean; filePath?: string; error?: string }> {
+async function saveFileAs(senderWindow: BrowserWindow, content?: string, currentPath?: string): Promise<{ success: boolean; filePath?: string; error?: string }> {
+  const defaultPath = currentPath
+    ? path.join(path.dirname(currentPath), path.basename(currentPath))
+    : undefined;
   const result = await dialog.showSaveDialog(senderWindow, {
     title: 'Save Markdown File',
+    defaultPath,
     filters: [
       { name: 'Markdown Files', extensions: ['md', 'markdown'] },
       { name: 'All Files', extensions: ['*'] },
@@ -542,6 +546,20 @@ async function saveFileAs(senderWindow: BrowserWindow, content?: string): Promis
   });
 
   if (result.canceled || !result.filePath) return { success: false, error: 'Cancelled' };
+
+  // If file exists, confirm overwrite
+  if (fs.existsSync(result.filePath)) {
+    const { response } = await dialog.showMessageBox(senderWindow, {
+      type: 'warning',
+      title: 'Confirm Overwrite',
+      message: `"${path.basename(result.filePath)}" already exists.`,
+      detail: 'Do you want to replace it?',
+      buttons: ['Replace', 'Cancel'],
+      defaultId: 1,
+      cancelId: 1,
+    });
+    if (response !== 0) return { success: false, error: 'Cancelled' };
+  }
 
   try {
     if (content !== undefined) {

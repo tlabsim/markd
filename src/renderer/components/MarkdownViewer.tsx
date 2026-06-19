@@ -279,7 +279,7 @@ const AsyncImage: React.FC<{ src: string; alt: string; className?: string }> = (
               <span className="code-block-lang text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md font-mono">{lang}</span>
             </div>
           )}
-          <pre className="overflow-x-auto m-0 px-4 py-4 bg-transparent" {...props}>{children}</pre>
+          <pre className="overflow-x-auto m-0 px-4 py-4 !bg-transparent" {...props}>{children}</pre>
         </div>
       );
     },
