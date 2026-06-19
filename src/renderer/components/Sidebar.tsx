@@ -90,7 +90,22 @@ const TreeNode: React.FC<{
   );
 };
 
-const Sidebar: React.FC<{ onOpenFile?: () => void; onOpenPath?: (path: string) => void }> = ({ onOpenFile, onOpenPath }) => {
+const Sidebar: React.FC<{
+  onOpenFile?: () => void;
+  onOpenPath?: (path: string) => void;
+  matchPalette?: boolean;
+  paletteBg?: string;
+  paletteBgDark?: string;
+}> = ({ onOpenFile, onOpenPath, matchPalette, paletteBg, paletteBgDark }) => {
+  const { theme } = useStore();
+  const paletteStyle = matchPalette ? {
+    backgroundColor: theme === 'dark' ? (paletteBgDark || '#1a222b') : (paletteBg || '#ffffff'),
+  } : undefined;
+  const paletteStyle85 = matchPalette ? {
+    backgroundColor: theme === 'dark'
+      ? `${paletteBgDark || '#1a222b'}d9` // ~85% opacity approximation
+      : `${paletteBg || '#ffffff'}d9`,
+  } : undefined;
   const {
     currentFolderPath,
     folderChildren,
@@ -128,7 +143,10 @@ const Sidebar: React.FC<{ onOpenFile?: () => void; onOpenPath?: (path: string) =
   return (
     <div className="flex flex-col h-full">
       {/* Sidebar Header */}
-      <div className="flex items-center justify-between pl-3 pr-1.5 h-10 border-b border-gray-200/60 dark:border-gray-700/50 bg-gray-50/85 dark:bg-[#222c36]/85 backdrop-blur-md">
+      <div
+        className="flex items-center justify-between pl-3 pr-1.5 h-10 border-b border-gray-200/60 dark:border-gray-700/50 bg-gray-50/85 dark:bg-[#222c36]/85 backdrop-blur-md"
+        style={paletteStyle85}
+      >
         <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
           Explorer
         </span>
@@ -164,7 +182,10 @@ const Sidebar: React.FC<{ onOpenFile?: () => void; onOpenPath?: (path: string) =
 
       {/* Folder path */}
       {currentFolderPath && (
-        <div className="px-3 py-1 border-b border-gray-200/60 dark:border-gray-700/50 bg-gray-50/85 dark:bg-[#222c36]/85 backdrop-blur-md">
+        <div
+          className="px-3 py-1 border-b border-gray-200/60 dark:border-gray-700/50 bg-gray-50/85 dark:bg-[#222c36]/85 backdrop-blur-md"
+          style={paletteStyle85}
+        >
           <p className="text-[10px] text-gray-500 truncate" title={currentFolderPath}>
             {currentFolderPath.split(/[/\\]/).pop()}
           </p>
@@ -172,7 +193,10 @@ const Sidebar: React.FC<{ onOpenFile?: () => void; onOpenPath?: (path: string) =
       )}
 
       {/* File tree */}
-      <div className="flex-1 overflow-y-auto py-1 bg-gray-50 dark:bg-[#222c36]">
+      <div
+        className="flex-1 overflow-y-auto py-1 bg-gray-50 dark:bg-[#222c36]"
+        style={paletteStyle}
+      >
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <div className="w-[18px] h-[18px] border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />

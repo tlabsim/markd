@@ -856,8 +856,15 @@ const App: React.FC = () => {
           className={`${
             isSidebarOpen && !distractionFree ? 'w-64' : 'w-0 -ml-px'
           } flex-shrink-0 border-r border-md-border dark:border-md-border-dark bg-md-surface dark:bg-md-surface-dark overflow-hidden flex flex-col transition-all duration-200`}
+          style={matchToolbarPalette ? {
+            backgroundColor: theme === 'dark'
+              ? (PALETTE_OPTIONS.find(o => o.value === previewPalette)?.bgDark || '#1a222b')
+              : (PALETTE_OPTIONS.find(o => o.value === previewPalette)?.bg || '#ffffff'),
+          } : undefined}
         >
-          {isSidebarOpen && <Sidebar onOpenFile={handleOpen} onOpenPath={(path) => {
+          {isSidebarOpen && <Sidebar
+            onOpenFile={handleOpen}
+            onOpenPath={(path) => {
             if (path === currentFilePath) {
               flushEditorRef.current?.();
               const content = useStore.getState().fileContent;
@@ -876,7 +883,11 @@ const App: React.FC = () => {
                 useStore.getState().addRecentFile(path);
               }
             });
-          }} />}
+          }}
+            matchPalette={matchToolbarPalette}
+            paletteBg={PALETTE_OPTIONS.find(o => o.value === previewPalette)?.bg}
+            paletteBgDark={PALETTE_OPTIONS.find(o => o.value === previewPalette)?.bgDark}
+          />}
         </div>
 
         {/* Main Content */}

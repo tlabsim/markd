@@ -263,7 +263,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
                 </div>
               </SettingRow>
 
-              <SettingRow label="Titlebar & Toolbar Match Palette">
+              <SettingRow label="Titlebar & Panels Match Palette">
                 <ToggleSwitch
                   checked={matchToolbarPalette}
                   onChange={() => setMatchToolbarPalette(!matchToolbarPalette)}
