@@ -43,7 +43,7 @@ const api = {
   openFile: (): Promise<FileResult | null> => ipcRenderer.invoke('open-file'),
   openFolder: (): Promise<{ success: boolean; path?: string; error?: string } | null> =>
     ipcRenderer.invoke('open-folder'),
-  saveFile: (content: string): Promise<FileResult> => ipcRenderer.invoke('save-file', content),
+  saveFile: (content: string, currentPath?: string): Promise<FileResult> => ipcRenderer.invoke('save-file', content, currentPath),
   saveFileAs: (content: string, currentPath?: string): Promise<FileResult> => ipcRenderer.invoke('save-file-as', content, currentPath),
   getFileContent: (filePath: string): Promise<FileResult> => ipcRenderer.invoke('get-file-content', filePath),
   readDirectory: (dirPath: string): Promise<DirectoryResult> => ipcRenderer.invoke('read-directory', dirPath),

@@ -186,7 +186,7 @@ const App: React.FC = () => {
   const handleSave = useCallback(async () => {
     flushEditorRef.current?.();
     const content = useStore.getState().fileContent;
-    const result = await window.markd?.saveFile(content);
+    const result = await window.markd?.saveFile(content, currentFilePath || undefined);
     if (result?.success) {
       setOriginalContent(content);
       if (result.filePath) {
@@ -209,7 +209,7 @@ const App: React.FC = () => {
       setOriginalContent(content);
       if (result.filePath) useStore.getState().addRecentFile(result.filePath);
     }
-  }, []);
+  }, [currentFilePath]);
 
   const handleNewFile = useCallback(() => {
     openWithDirtyCheck(() => {
@@ -767,7 +767,7 @@ const App: React.FC = () => {
     setDirtyModalOpen(false);
     flushEditorRef.current?.();
     const content = useStore.getState().fileContent;
-    const result = await window.markd?.saveFile(content);
+    const result = await window.markd?.saveFile(content, currentFilePath || undefined);
     if (result?.success) {
       setOriginalContent(content);
       if (result.filePath) useStore.getState().addRecentFile(result.filePath);

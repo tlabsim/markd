@@ -377,10 +377,10 @@ ipcMain.handle('open-folder', async (event) => {
   return await openFolder(win);
 });
 
-ipcMain.handle('save-file', async (event, content: string) => {
+ipcMain.handle('save-file', async (event, content: string, currentPath?: string) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   if (!win) return { success: false, error: 'No window' };
-  return await saveFile(win, content);
+  return await saveFile(win, content, currentPath);
 });
 
 ipcMain.handle('save-file-as', async (event, content: string, currentPath?: string) => {
@@ -517,28 +517,26 @@ async function openFolder(senderWindow: BrowserWindow): Promise<{ success: boole
   return { success: true, path: result.filePaths[0] };
 }
 
-async function saveFile(senderWindow: BrowserWindow, content?: string): Promise<{ success: boolean; filePath?: string; error?: string }> {
-  if (!currentFilePath) {
-    return await saveFileAs(senderWindow, content);
+async function saveFile(senderWindow: BrowserWindow, content?: string, currentPath?: string): Promise<{ success: boolean; filePath?: string; error?: string }> {
+  const filePath = currentPath || currentFilePath;
+  if (!filePath) {
+    return await saveFileAs(senderWindow, content, currentPath);
   }
 
   try {
     if (content !== undefined) {
-      fs.writeFileSync(currentFilePath, content, 'utf-8');
+      fs.writeFileSync(filePath, content, 'utf-8');
     }
-    return { success: true, filePath: currentFilePath };
+    return { success: true, filePath };
   } catch (err: any) {
     return { success: false, error: err.message };
   }
 }
 
 async function saveFileAs(senderWindow: BrowserWindow, content?: string, currentPath?: string): Promise<{ success: boolean; filePath?: string; error?: string }> {
-  const defaultPath = currentPath
-    ? path.join(path.dirname(currentPath), path.basename(currentPath))
-    : undefined;
   const result = await dialog.showSaveDialog(senderWindow, {
     title: 'Save Markdown File',
-    defaultPath,
+    defaultPath: currentPath || undefined,
     filters: [
       { name: 'Markdown Files', extensions: ['md', 'markdown'] },
       { name: 'All Files', extensions: ['*'] },
