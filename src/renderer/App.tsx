@@ -123,23 +123,7 @@ const App: React.FC = () => {
     }
     setCurrentFile(name);
     setCurrentFilePath(filePath);
-    setOriginalContent(content); // sets both originalContent + fileContent in store
-    // Restore scroll position after render
-    if (filePath && state.rememberScrollPosition) {
-      const saved = state.scrollPositions[filePath];
-      if (saved && saved > 0) {
-        // Defer scroll restoration until DOM is ready
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            if (viewerScrollRef.current) {
-              viewerScrollRef.current.scrollTop = saved;
-              setWelcomeBackFile(name);
-              setTimeout(() => setWelcomeBackFile(null), 5000);
-            }
-          });
-        });
-      }
-    }
+    setOriginalContent(content);
     // Force-sync the editor (uncontrolled textarea needs explicit update)
     if (editorScrollRef.current instanceof HTMLTextAreaElement) {
       editorScrollRef.current.value = content;
@@ -448,6 +432,22 @@ const App: React.FC = () => {
         if (result?.success && result.content !== undefined) {
           setOriginalContent(result.content);
           useStore.getState().addRecentFile(filePath);
+          // Welcome back: only on startup, only if scrolled past threshold
+          const SL = useStore.getState();
+          if (SL.rememberScrollPosition) {
+            const saved = SL.scrollPositions[filePath];
+            if (saved && saved > 300) {
+              requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                  if (viewerScrollRef.current) {
+                    viewerScrollRef.current.scrollTop = saved;
+                    setWelcomeBackFile(name);
+                    setTimeout(() => setWelcomeBackFile(null), 5000);
+                  }
+                });
+              });
+            }
+          }
         }
       })();
     }
@@ -1000,10 +1000,27 @@ const App: React.FC = () => {
                 {(viewMode === 'view' || viewMode === 'split') && (
                   <div
                     data-panel="viewer"
-                    className="overflow-hidden"
+                    className="overflow-hidden relative"
                     style={viewMode === 'split' ? { flex: 1 } : { flex: 1 }}
                   >
                     <MarkdownViewer showToc={showToc} onToggleToc={() => setShowToc(false)} syncScroll={syncScroll} onScrollRef={(el) => { viewerScrollRef.current = el; }} onViewerScroll={handleViewerScroll} />
+                    {/* Welcome back toast — positioned relative to preview panel */}
+                    {welcomeBackFile && (
+                      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-2 rounded-lg bg-white dark:bg-[#2a3642] border border-gray-200 dark:border-gray-600 shadow-lg text-[13px]">
+                        <span className="text-gray-700 dark:text-gray-200">
+                          👋 Welcome back! Picked up where you left off in <strong>{welcomeBackFile}</strong>
+                        </span>
+                        <button
+                          className="text-[11px] text-blue-500 dark:text-blue-400 hover:underline shrink-0"
+                          onClick={() => {
+                            if (viewerScrollRef.current) viewerScrollRef.current.scrollTop = 0;
+                            setWelcomeBackFile(null);
+                          }}
+                        >
+                          Go to top
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </>
@@ -1013,24 +1030,6 @@ const App: React.FC = () => {
 
           {/* Status Bar */}
           {currentFile && !distractionFree && <StatusBar />}
-
-          {/* Welcome back toast */}
-          {welcomeBackFile && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-2 rounded-lg bg-white dark:bg-[#2a3642] border border-gray-200 dark:border-gray-600 shadow-lg text-[13px]">
-              <span className="text-gray-700 dark:text-gray-200">
-                👋 Welcome back! Picked up where you left off in <strong>{welcomeBackFile}</strong>
-              </span>
-              <button
-                className="text-[11px] text-blue-500 dark:text-blue-400 hover:underline shrink-0"
-                onClick={() => {
-                  if (viewerScrollRef.current) viewerScrollRef.current.scrollTop = 0;
-                  setWelcomeBackFile(null);
-                }}
-              >
-                Go to top
-              </button>
-            </div>
-          )}
         </div>
       </div>
 
