@@ -170,6 +170,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
     setAutoSave,
     rememberScrollPosition,
     setRememberScrollPosition,
+    matchToolbarPalette,
+    setMatchToolbarPalette,
   } = useStore();
 
   if (!open) return null;
@@ -259,6 +261,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
                     onClick={() => setZoomLevel(100)}
                   >Reset</button>
                 </div>
+              </SettingRow>
+
+              <SettingRow label="Titlebar & Toolbar Match Palette">
+                <ToggleSwitch
+                  checked={matchToolbarPalette}
+                  onChange={() => setMatchToolbarPalette(!matchToolbarPalette)}
+                />
               </SettingRow>
 
               {/* Editor */}

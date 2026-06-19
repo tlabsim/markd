@@ -22,9 +22,10 @@ interface TitleBarProps {
   onEditDocument?: () => void;
   onSettings?: () => void;
   saveState?: 'idle' | 'saving' | 'saved';
+  matchToolbarPalette?: boolean;
 }
 
-const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, isMaximized, onOpenFile, onOpenFolder, onNewFile, onSaveFile, onSaveFileAs, onCloseFile, onOpenRecentFile, recentFiles, paletteBg, paletteBgDark, distractionFree, onToggleDistractionFree, onEditDocument, onSettings, saveState }) => {
+const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, isMaximized, onOpenFile, onOpenFolder, onNewFile, onSaveFile, onSaveFileAs, onCloseFile, onOpenRecentFile, recentFiles, paletteBg, paletteBgDark, distractionFree, onToggleDistractionFree, onEditDocument, onSettings, saveState, matchToolbarPalette }) => {
   const { currentFile, isModified, theme, setTheme, toggleSidebar } = useStore();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -61,11 +62,13 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
     <div className={`titlebar flex items-center justify-between px-3 border-b transition-colors duration-300 select-none relative
       ${distractionFree
         ? 'absolute top-0 left-0 right-0 z-50 backdrop-blur-xl border-transparent'
-        : 'bg-white dark:bg-[#222c36] border-gray-200 dark:border-gray-700/50'
+        : `bg-white dark:bg-[#222c36] ${matchToolbarPalette ? 'border-gray-300/40 dark:border-gray-600/40' : 'border-gray-200 dark:border-gray-700/50'}`
       }`}
       style={{
         height: 40,
         ...(distractionFree ? {
+          backgroundColor: theme === 'dark' ? (paletteBgDark || '#1a222b') : (paletteBg || '#ffffff'),
+        } : matchToolbarPalette ? {
           backgroundColor: theme === 'dark' ? (paletteBgDark || '#1a222b') : (paletteBg || '#ffffff'),
         } : {}),
       }}

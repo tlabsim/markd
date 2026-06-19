@@ -41,6 +41,7 @@ interface EditorState {
   rememberScrollPosition: boolean;
   /** Maps file path → last scrollTop */
   scrollPositions: Record<string, number>;
+  matchToolbarPalette: boolean;
 
   // Actions
   setCurrentFile: (name: string | null) => void;
@@ -71,6 +72,7 @@ interface EditorState {
   setAutoSave: (on: boolean) => void;
   setRememberScrollPosition: (on: boolean) => void;
   setScrollPosition: (filePath: string, scrollTop: number) => void;
+  setMatchToolbarPalette: (on: boolean) => void;
   zoomIn: () => void;
   zoomOut: () => void;
 }
@@ -121,6 +123,7 @@ export const useStore = create<EditorState>()(
       autoSave: false,
       rememberScrollPosition: true,
       scrollPositions: {},
+      matchToolbarPalette: false,
 
       setCurrentFile: (name) => set({ currentFile: name }),
       setCurrentFilePath: (path) => set({ currentFilePath: path }),
@@ -168,6 +171,7 @@ export const useStore = create<EditorState>()(
       setRememberScrollPosition: (on) => set({ rememberScrollPosition: on }),
       setScrollPosition: (filePath, scrollTop) =>
         set((s) => ({ scrollPositions: { ...s.scrollPositions, [filePath]: scrollTop } })),
+      setMatchToolbarPalette: (on) => set({ matchToolbarPalette: on }),
       zoomIn: () => set((s) => ({ zoomLevel: Math.min(200, s.zoomLevel + 10) })),
       zoomOut: () => set((s) => ({ zoomLevel: Math.max(50, s.zoomLevel - 10) })),
     }),
@@ -185,6 +189,7 @@ export const useStore = create<EditorState>()(
         autoSave: state.autoSave,
         rememberScrollPosition: state.rememberScrollPosition,
         scrollPositions: state.scrollPositions,
+        matchToolbarPalette: state.matchToolbarPalette,
       }),
     }
   )

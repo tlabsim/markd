@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
 import { useStore } from '../store';
 
-const StatusBar: React.FC = () => {
-  const { fileContent, currentFile, viewMode, setViewMode } = useStore();
+const StatusBar: React.FC<{ matchPalette?: boolean; paletteBg?: string; paletteBgDark?: string }> = ({ matchPalette, paletteBg, paletteBgDark }) => {
+  const { fileContent, currentFile, viewMode, setViewMode, theme } = useStore();
 
   const stats = useMemo(() => {
     if (!fileContent) return { lines: 0, words: 0, chars: 0 };
@@ -16,7 +16,20 @@ const StatusBar: React.FC = () => {
   const fileType = currentFile?.endsWith('.md') ? 'Markdown' : currentFile?.endsWith('.markdown') ? 'Markdown' : 'Text';
 
   return (
-    <div className="flex items-center justify-between px-3 py-0.5 text-[11px] text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-[#1c2733] border-t border-gray-200 dark:border-gray-700/50" style={{ paddingBottom: 6, paddingTop: 4 }}>
+    <div
+      className={`flex items-center justify-between px-3 py-0.5 text-[11px] text-gray-500 dark:text-gray-400 ${
+        matchPalette
+          ? 'border-t border-gray-300/40 dark:border-gray-600/40'
+          : 'border-t border-gray-200 dark:border-gray-700/50'
+      } bg-gray-100 dark:bg-[#1c2733]`}
+      style={{
+        paddingBottom: 6,
+        paddingTop: 4,
+        ...(matchPalette ? {
+          backgroundColor: theme === 'dark' ? (paletteBgDark || '#1a222b') : (paletteBg || '#ffffff'),
+        } : {}),
+      }}
+    >
       <div className="flex items-center gap-3">
         <span>{fileType}</span>
         <span className="w-px h-3 bg-gray-300 dark:bg-gray-600" />

@@ -41,6 +41,7 @@ const App: React.FC = () => {
     recentFiles,
     wordWrap,
     setWordWrap,
+    matchToolbarPalette,
   } = useStore();
 
   const editorRef = useRef<HTMLTextAreaElement>(null);
@@ -846,13 +847,14 @@ const App: React.FC = () => {
         paletteBgDark={PALETTE_OPTIONS.find(o => o.value === previewPalette)?.bgDark || '#1a222b'}
         onSettings={() => { setSettingsTab('settings'); setSettingsOpen(true); }}
         saveState={saveState}
+        matchToolbarPalette={matchToolbarPalette}
       />
 
       <div className={`flex flex-1 overflow-hidden ${distractionFree ? '' : ''}`}>
         {/* Sidebar */}
         <div
           className={`${
-            isSidebarOpen && !distractionFree ? 'w-64' : 'w-0'
+            isSidebarOpen && !distractionFree ? 'w-64' : 'w-0 -ml-px'
           } flex-shrink-0 border-r border-md-border dark:border-md-border-dark bg-md-surface dark:bg-md-surface-dark overflow-hidden flex flex-col transition-all duration-200`}
         >
           {isSidebarOpen && <Sidebar onOpenFile={handleOpen} onOpenPath={(path) => {
@@ -881,7 +883,18 @@ const App: React.FC = () => {
         <div className="flex-1 flex flex-col overflow-hidden relative">
           {/* Toolbar */}
           {currentFile && !distractionFree && (
-            <div className="flex items-center gap-0.5 px-2 h-10 border-b border-gray-200/60 dark:border-gray-700/60 bg-white/85 dark:bg-[#222c36]/85 relative z-10">
+            <div
+              className={`flex items-center gap-0.5 px-2 h-10 border-b relative z-10 ${
+                matchToolbarPalette
+                  ? 'border-gray-300/40 dark:border-gray-600/40'
+                  : 'border-gray-200/60 dark:border-gray-700/60'
+              } bg-white/85 dark:bg-[#222c36]/85`}
+              style={matchToolbarPalette ? {
+                backgroundColor: theme === 'dark'
+                  ? (PALETTE_OPTIONS.find(o => o.value === previewPalette)?.bgDark || '#1a222b')
+                  : (PALETTE_OPTIONS.find(o => o.value === previewPalette)?.bg || '#ffffff'),
+              } : undefined}
+            >
               {/* Sidebar toggle — always left-aligned */}
               {!isSidebarOpen && (
                 <button className="btn-icon shrink-0" onClick={toggleSidebar} title="Open sidebar (Ctrl+B)">
@@ -1029,7 +1042,13 @@ const App: React.FC = () => {
           </div>
 
           {/* Status Bar */}
-          {currentFile && !distractionFree && <StatusBar />}
+          {currentFile && !distractionFree && (
+            <StatusBar
+              matchPalette={matchToolbarPalette}
+              paletteBg={PALETTE_OPTIONS.find(o => o.value === previewPalette)?.bg}
+              paletteBgDark={PALETTE_OPTIONS.find(o => o.value === previewPalette)?.bgDark}
+            />
+          )}
         </div>
       </div>
 
