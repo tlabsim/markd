@@ -21,9 +21,10 @@ interface TitleBarProps {
   onToggleDistractionFree?: () => void;
   onEditDocument?: () => void;
   onSettings?: () => void;
+  saveState?: 'idle' | 'saving' | 'saved';
 }
 
-const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, isMaximized, onOpenFile, onOpenFolder, onNewFile, onSaveFile, onSaveFileAs, onCloseFile, onOpenRecentFile, recentFiles, paletteBg, paletteBgDark, distractionFree, onToggleDistractionFree, onEditDocument, onSettings }) => {
+const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, isMaximized, onOpenFile, onOpenFolder, onNewFile, onSaveFile, onSaveFileAs, onCloseFile, onOpenRecentFile, recentFiles, paletteBg, paletteBgDark, distractionFree, onToggleDistractionFree, onEditDocument, onSettings, saveState }) => {
   const { currentFile, isModified, theme, setTheme, toggleSidebar } = useStore();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -159,8 +160,19 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
         )}
       </div>
 
-      {/* Center: File title */}
-      <div className="flex-1 text-center">
+      {/* Center: File title + save state */}
+      <div className="flex-1 text-center flex items-center justify-center gap-2">
+        {saveState === 'saving' && (
+          <span className="text-[10px] px-2 py-0.5 rounded bg-slate-700/10 dark:bg-white/10 text-slate-500 dark:text-gray-300">Saving…</span>
+        )}
+        {saveState === 'saved' && (
+          <span className="text-[10px] flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-600/90 dark:bg-emerald-500/90 text-white">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 13l4 4L19 7" />
+            </svg>
+            Saved
+          </span>
+        )}
         <span className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-md inline-block">
           {title}
         </span>

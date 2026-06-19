@@ -57,6 +57,7 @@ const App: React.FC = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<'settings' | 'shortcuts' | 'about'>('settings');
   const [welcomeBackFile, setWelcomeBackFile] = useState<string | null>(null);
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const pendingOpenAction = useRef<(() => void) | null>(null);
   const pendingFilePath = useRef<string | null>(null);
   const [syncScroll, setSyncScroll] = useState<'off' | 'position' | 'content'>('off');
@@ -186,6 +187,7 @@ const App: React.FC = () => {
   const handleSave = useCallback(async () => {
     flushEditorRef.current?.();
     const content = useStore.getState().fileContent;
+    setSaveState('saving');
     const result = await window.markd?.saveFile(content, currentFilePath || undefined);
     if (result?.success) {
       setOriginalContent(content);
@@ -196,6 +198,10 @@ const App: React.FC = () => {
           setCurrentFile(result.filePath.split(/[/\\]/).pop() || null);
         }
       }
+      setSaveState('saved');
+      setTimeout(() => setSaveState('idle'), 3000);
+    } else {
+      setSaveState('idle');
     }
   }, [currentFilePath]);
 
@@ -767,10 +773,15 @@ const App: React.FC = () => {
     setDirtyModalOpen(false);
     flushEditorRef.current?.();
     const content = useStore.getState().fileContent;
+    setSaveState('saving');
     const result = await window.markd?.saveFile(content, currentFilePath || undefined);
     if (result?.success) {
       setOriginalContent(content);
       if (result.filePath) useStore.getState().addRecentFile(result.filePath);
+      setSaveState('saved');
+      setTimeout(() => setSaveState('idle'), 3000);
+    } else {
+      setSaveState('idle');
     }
     pendingOpenAction.current?.();
     pendingOpenAction.current = null;
@@ -834,6 +845,7 @@ const App: React.FC = () => {
         paletteBg={PALETTE_OPTIONS.find(o => o.value === previewPalette)?.bg || '#ffffff'}
         paletteBgDark={PALETTE_OPTIONS.find(o => o.value === previewPalette)?.bgDark || '#1a222b'}
         onSettings={() => { setSettingsTab('settings'); setSettingsOpen(true); }}
+        saveState={saveState}
       />
 
       <div className={`flex flex-1 overflow-hidden ${distractionFree ? '' : ''}`}>
