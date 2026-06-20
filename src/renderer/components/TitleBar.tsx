@@ -176,10 +176,10 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
       {/* Center: File title + save state — absolutely centered */}
       <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2 pointer-events-none">
         {saveState === 'saving' && (
-          <span className="text-[10px] px-2 py-0.5 rounded bg-slate-700/10 dark:bg-white/10 text-slate-500 dark:text-gray-300 pointer-events-auto">Saving…</span>
+          <span className="text-[12px] px-2 py-0.5 rounded bg-slate-700/10 dark:bg-white/10 text-slate-500 dark:text-gray-300 pointer-events-auto">Saving…</span>
         )}
         {saveState === 'saved' && (
-          <span className="text-[10px] flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-600/90 dark:bg-emerald-500/90 text-white pointer-events-auto">
+          <span className="text-[12px] flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-600/90 dark:bg-emerald-500/90 text-white pointer-events-auto">
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
               <path d="M5 13l4 4L19 7" />
             </svg>

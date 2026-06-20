@@ -91,6 +91,13 @@ textarea,
     @apply btn-ghost p-1.5 px-2;
   }
 
+  .btn-icon.selected {
+    @apply bg-gray-700/15 dark:bg-white/10 text-gray-600 dark:text-gray-300;
+  }
+  .btn-icon.selected svg {
+    @apply text-gray-600 dark:text-gray-300;
+  }
+
   .panel {
     @apply bg-md-surface dark:bg-md-surface-dark rounded-lg border border-md-border dark:border-md-border-dark;
   }
@@ -100,6 +107,11 @@ textarea,
       rounded-md focus:outline-none focus:ring-2 focus:ring-md-accent dark:focus:ring-md-accent-dark
       text-md-text dark:text-md-text-dark placeholder-md-muted dark:placeholder-md-muted-dark;
   }
+}
+
+/* Splitter hover matches palette when setting enabled */
+html[data-match-palette] .splitter:hover {
+  background-color: var(--splitter-hover) !important;
 }
 
 /* Markdown Content Styles */

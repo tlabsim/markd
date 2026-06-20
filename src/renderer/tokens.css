@@ -337,7 +337,7 @@ html[data-palette="cool"].dark {
 
 /* ---- Chrome border overrides when "Match Palette" is on ---- */
 html[data-match-palette] .titlebar {
-  border-color: var(--pal-border) !important;
+  border-color: var(--pal-border);
 }
 html[data-match-palette] [class*="border-b"] {
   border-color: var(--pal-border);

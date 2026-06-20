@@ -774,7 +774,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
         {/* Word wrap toggle */}
         {onToggleWordWrap && (
           <button
-            className={`btn-icon ${wordWrap ? 'bg-blue-500/10 text-blue-500' : ''}`}
+            className={`btn-icon ${wordWrap ? 'selected' : ''}`}
             onClick={onToggleWordWrap}
             title={wordWrap ? 'Disable word wrap' : 'Enable word wrap'}
           >
@@ -785,11 +785,11 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
         )}
         {/* Syntax highlight toggle */}
         <button
-          className={`btn-icon ${syntaxHighlight ? 'bg-blue-500/10 text-blue-500' : ''}`}
+          className={`btn-icon ${syntaxHighlight ? 'selected' : ''}`}
           onClick={() => setSyntaxHighlight(v => !v)}
           title={syntaxHighlight ? 'Disable syntax highlighting' : 'Enable syntax highlighting'}
         >
-          <svg className="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
+          <svg className="w-[18px] h-[18px] shrink-0 " fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
             <path strokeLinecap="round" strokeLinejoin="round" d="M9.53 16.122a3 3 0 0 0-5.78 1.128a2.25 2.25 0 0 1-2.4 2.245a4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128m0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42" />
           </svg>
         </button>
@@ -797,7 +797,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
         {/* Sync scroll toggle */}
         {syncScroll !== undefined && (
           <button
-            className={`btn-icon flex items-center gap-1 ${syncScroll !== 'off' ? 'bg-blue-500/10 text-blue-500' : ''}`}
+            className={`btn-icon flex items-center gap-1 ${syncScroll !== 'off' ? 'selected' : ''}`}
             onClick={onToggleSync}
             title={`Sync scroll: ${syncScroll === 'off' ? 'Off' : syncScroll === 'content' ? 'Content (H)' : 'Position (P)'}`}
           >

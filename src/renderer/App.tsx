@@ -1073,12 +1073,15 @@ const App: React.FC = () => {
                 )}
                 {viewMode === 'split' && (
                   <div
-                    className="w-1.5 flex-shrink-0 bg-[#e5e7eb] dark:bg-[#222c36] hover:bg-blue-400 dark:hover:bg-blue-500 cursor-col-resize transition-colors active:bg-blue-500 border-l border-r border-gray-200 dark:border-gray-700/20"
+                    className="splitter w-1.5 flex-shrink-0 bg-[#e5e7eb] dark:bg-[#222c36] hover:bg-blue-400 dark:hover:bg-blue-500 cursor-col-resize transition-colors active:bg-blue-500 border-l border-r border-gray-200 dark:border-gray-700/20"
                     onMouseDown={startDrag}
-                    style={matchToolbarPalette ? {
-                      backgroundColor: 'var(--pal-panel-bg)',
-                      borderColor: 'var(--pal-border-soft)',
-                    } : undefined}
+                    style={{
+                      backgroundColor: matchToolbarPalette ? 'var(--pal-panel-bg)' : undefined,
+                      borderColor: matchToolbarPalette ? 'var(--pal-border-soft)' : undefined,
+                      ['--splitter-hover' as string]: matchToolbarPalette
+                        ? 'color-mix(in srgb, var(--pal-muted) 15%, transparent)'
+                        : 'transparent',
+                    }}
                   >
                     <div className="w-full h-full" />
                   </div>
