@@ -342,3 +342,150 @@ html[data-match-palette] .splitter:hover {
 .animate-slide-in-right {
   animation: slide-in-right 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* ---- Footnotes ---- */
+.footnotes {
+  margin-top: 2.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--pal-border-soft, #e5e7eb);
+  font-size: 0.85em;
+  color: var(--pal-muted, #6b7280);
+}
+.footnotes-sep {
+  display: none;
+}
+.footnote-item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+.footnote-num {
+  font-weight: 600;
+  min-width: 1.5rem;
+}
+.footnote-backref {
+  text-decoration: none;
+  opacity: 0.5;
+  font-size: 0.85em;
+}
+.footnote-backref:hover { opacity: 1; }
+.footnote-ref a {
+  text-decoration: none;
+  font-weight: 600;
+  color: var(--pal-accent, #2563eb);
+  padding: 0 0.15rem;
+}
+.footnote-ref a:hover { text-decoration: underline; }
+
+/* ---- Heading anchor links ---- */
+.heading-anchor {
+  scroll-margin-top: 2rem;
+}
+h1, h2, h3, h4, h5, h6 {
+  scroll-margin-top: 1rem;
+}
+
+/* ---- Diff code blocks ---- */
+.diff-block pre code .hljs-addition,
+.diff-block .hljs-addition {
+  color: #116329;
+  background-color: #dafbe1;
+}
+.dark .diff-block pre code .hljs-addition,
+.dark .diff-block .hljs-addition {
+  color: #7ee787;
+  background-color: rgba(87, 171, 90, 0.15);
+}
+.diff-block pre code .hljs-deletion,
+.diff-block .hljs-deletion {
+  color: #b91c1c;
+  background-color: #ffeef0;
+}
+.dark .diff-block pre code .hljs-deletion,
+.dark .diff-block .hljs-deletion {
+  color: #ffa198;
+  background-color: rgba(248, 81, 73, 0.15);
+}
+
+/* ---- Admonition / Callout blocks ---- */
+.admonition {
+  border-left-width: 4px;
+}
+.admonition-note {
+  border-color: #3b82f6;
+  background: #eff6ff;
+}
+.dark .admonition-note { background: rgba(59, 130, 246, 0.08); }
+.admonition-tip, .admonition-info {
+  border-color: #10b981;
+  background: #ecfdf5;
+}
+.dark .admonition-tip, .dark .admonition-info { background: rgba(16, 185, 129, 0.08); }
+.admonition-warning, .admonition-caution {
+  border-color: #f59e0b;
+  background: #fffbeb;
+}
+.dark .admonition-warning, .dark .admonition-caution { background: rgba(245, 158, 11, 0.08); }
+.admonition-danger, .admonition-important {
+  border-color: #ef4444;
+  background: #fef2f2;
+}
+.dark .admonition-danger, .dark .admonition-important { background: rgba(239, 68, 68, 0.08); }
+
+/* ---- <mark> highlight ---- */
+mark {
+  background: #fef08a;
+  color: inherit;
+  padding: 0.1rem 0.2rem;
+  border-radius: 0.2rem;
+}
+.dark mark {
+  background: rgba(250, 204, 21, 0.3);
+}
+
+/* ---- Definition lists ---- */
+.markdown-body dl {
+  margin: 1rem 0;
+}
+.markdown-body dt {
+  font-weight: 600;
+  margin-top: 0.75rem;
+}
+.markdown-body dd {
+  margin-left: 1.5rem;
+  margin-bottom: 0.25rem;
+  color: var(--pal-muted, #4b5563);
+}
+
+/* ---- Print styles ---- */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .titlebar, .sidebar, .statusbar,
+  .btn-icon, .code-block-btn, .heading-anchor,
+  [class*="scrollbar"], .back-to-top,
+  .admonition {
+    display: none !important;
+  }
+  .markdown-body {
+    max-width: 100% !important;
+    padding: 0 !important;
+    color: black !important;
+    background: white !important;
+  }
+  .markdown-body * {
+    color: black !important;
+    background: transparent !important;
+  }
+  .markdown-body pre {
+    border: 1px solid #ccc !important;
+    white-space: pre-wrap !important;
+  }
+  .markdown-body a { color: #2563eb !important; }
+  .markdown-body img { max-width: 100% !important; page-break-inside: avoid; }
+  h1, h2, h3, h4, h5, h6 { page-break-after: avoid; }
+  pre, blockquote, table { page-break-inside: avoid; }
+}

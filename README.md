@@ -20,15 +20,24 @@
 ## Features
 
 - **Live Preview** — side-by-side editor and rendered HTML preview with synchronized scrolling
-- **Syntax Highlighting** — toggleable syntax highlighting in the editor for Markdown, code fences, and inline code
+- **Syntax Highlighting** — toggleable syntax highlighting in the editor and viewer
 - **Smart Editing** — automatic list continuation, task list toggling, bracket wrapping, and tab/shift-tab indentation
 - **Search & Replace** — regex and case-sensitive search with replace and replace-all
 - **Palette System** — multiple color palettes (Default, Sepia, High Contrast, Cool) with light/dark mode
-- **Distraction-Free Mode** — fullscreen writing mode with centered preview
-- **File Management** — sidebar with file tree, recent files, and folder browsing
-- **GitHub-Flavored Markdown** — tables, task lists, strikethrough, footnotes, emoji, and syntax-highlighted code blocks
+- **Distraction-Free Mode** — fullscreen preview mode
+- **File Management** — sidebar with file tree, recent files, reload from disk, and folder browsing
+- **GitHub-Flavored Markdown** — tables, task lists, strikethrough, footnotes, definition lists, emoji, and syntax-highlighted code blocks
 - **Math Support** — LaTeX math rendering via KaTeX
-- **Export** — copy rendered HTML or export the preview
+- **Mermaid Diagrams** — rendered inline from ` ```mermaid` code blocks
+- **Smart Typography** — curly quotes, em-dashes, and ellipses
+- **Subscript & Superscript** — `H~2~O` and `x^2^`
+- **Wiki Links** — `[[page]]` syntax
+- **`==highlight==`** — marked text highlighting
+- **Admonitions** — `:::note`, `:::warning`, `:::danger` callout blocks
+- **Heading Anchors** — hover-to-copy heading links
+- **Diff Highlighting** — ` ```diff` with green/red lines
+- **Back to Top** — floating scroll-to-top button
+- **Print Styles** — clean print output
 
 ## Tech Stack
 
