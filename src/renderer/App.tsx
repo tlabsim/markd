@@ -69,6 +69,7 @@ const App: React.FC = () => {
   const [settingsTab, setSettingsTab] = useState<'settings' | 'shortcuts' | 'about'>('settings');
   const [welcomeBackFile, setWelcomeBackFile] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [searchShowReplace, setSearchShowReplace] = useState(false);
   const pendingOpenAction = useRef<(() => void) | null>(null);
   const pendingFilePath = useRef<string | null>(null);
   const [syncScroll, setSyncScroll] = useState<'off' | 'position' | 'content'>('off');
@@ -492,6 +493,12 @@ const App: React.FC = () => {
             break;
           case 'f':
             e.preventDefault();
+            setSearchShowReplace(false);
+            setSearchOpen(true);
+            break;
+          case 'h':
+            e.preventDefault();
+            setSearchShowReplace(true);
             setSearchOpen(true);
             break;
           case 't':
@@ -670,7 +677,7 @@ const App: React.FC = () => {
         onClick={openMenu}
         title="Change preview color palette"
       >
-        <svg className="w-[18px] h-[18px] shrink-0" fill="currentColor" viewBox="0 0 16 16">
+        <svg className="w-[18px] h-[18px] shrink-0" fill="currentColor" viewBox="0 0 17 16">
           <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8"/>
           <path d="M8 1a7 7 0 0 0 0 14V1z" opacity=".3"/>
         </svg>
@@ -892,6 +899,7 @@ const App: React.FC = () => {
         onSaveFile={handleSave}
         onSaveFileAs={handleSaveAs}
         onCloseFile={handleCloseFile}
+        onReloadFile={() => { flushEditorRef.current?.(); const content = useStore.getState().fileContent; const original = useStore.getState().originalContent; if (content !== original) { pendingFilePath.current = currentFilePath; setReloadModalOpen(true); } else { pendingFilePath.current = currentFilePath; handleReloadConfirm(); } }}
         onOpenRecentFile={handleOpenRecentFile}
         recentFiles={recentFiles}
         distractionFree={distractionFree}
@@ -1035,13 +1043,18 @@ const App: React.FC = () => {
 
           {/* Content Area */}
           <div ref={contentRef} className="flex-1 overflow-hidden flex flex-col relative">
-            {/* Search bar — centered floating overlay */}
+            {/* Search bar — contextual position per mode */}
             {isSearchOpen && (
-              <div className="absolute top-3 left-1/2 -translate-x-1/2 z-50 w-full max-w-xl">
+              <div className={`${viewMode === 'view'
+                ? 'absolute top-3 left-1/2 -translate-x-1/2 z-50 w-full max-w-xl'
+                : 'w-full'
+              }`}>
                 <SearchBar
                   editorRef={editorScrollRef as React.RefObject<HTMLTextAreaElement | HTMLDivElement | null>}
                   viewerRef={viewerScrollRef as React.RefObject<HTMLDivElement | null>}
                   viewMode={viewMode}
+                  position={viewMode === 'view' ? 'viewer-center' : 'editor-top'}
+                  showReplaceInitially={searchShowReplace}
                 />
               </div>
             )}

@@ -69,6 +69,12 @@ textarea,
 [contentEditable="true"] {
   cursor: auto;
 }
+[contentEditable="true"]::-webkit-scrollbar,
+[contentEditable="true"]::-webkit-scrollbar-track,
+[contentEditable="true"]::-webkit-scrollbar-thumb,
+[contentEditable="true"]::-webkit-scrollbar-corner {
+  cursor: default;
+}
 @layer components {
   .titlebar {
     @apply flex items-center h-10 bg-md-surface dark:bg-md-surface-dark px-4 select-none;
