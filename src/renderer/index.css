@@ -489,3 +489,30 @@ mark {
   h1, h2, h3, h4, h5, h6 { page-break-after: avoid; }
   pre, blockquote, table { page-break-inside: avoid; }
 }
+
+/* Back to top button animations */
+@keyframes btt-in {
+  from { transform: translateY(12px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+@keyframes btt-out {
+  from { transform: translateY(0);    opacity: 1; }
+  to   { transform: translateY(12px); opacity: 0; }
+}
+.animate-btt-in {
+  animation: btt-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.animate-btt-out {
+  animation: btt-out 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* Recent file strikethrough animation */
+@keyframes strikethrough {
+  0%   { text-decoration-color: transparent; text-decoration-thickness: 0px; }
+  30%  { text-decoration-color: currentColor; text-decoration-thickness: 1px; }
+  100% { text-decoration-color: currentColor; text-decoration-thickness: 1px; text-decoration-line: line-through; }
+}
+.animate-strikethrough {
+  animation: strikethrough 0.5s ease-out forwards;
+  text-decoration-line: line-through;
+}

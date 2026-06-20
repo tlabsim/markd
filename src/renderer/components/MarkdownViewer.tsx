@@ -288,21 +288,53 @@ const MermaidBlock: React.FC<{ code: string }> = ({ code }) => {
 
 // ---- Back to top button ----
 const BackToTop: React.FC<{ containerRef: React.RefObject<HTMLDivElement | null> }> = ({ containerRef }) => {
-  const [visible, setVisible] = useState(false);
+  const [phase, setPhase] = useState<'idle' | 'entering' | 'visible' | 'exiting'>('idle');
+  const timerRef = useRef<number>(0);
+
   useEffect(() => {
     const el = containerRef.current; if (!el) return;
-    const onScroll = () => setVisible(el.scrollTop > 400);
+    const onScroll = () => {
+      const over = el.scrollTop > 400;
+      setPhase(prev => {
+        if (over && (prev === 'idle' || prev === 'exiting')) return 'entering';
+        if (!over && (prev === 'visible' || prev === 'entering')) return 'exiting';
+        return prev;
+      });
+    };
     el.addEventListener('scroll', onScroll, { passive: true });
     return () => el.removeEventListener('scroll', onScroll);
   }, [containerRef]);
-  if (!visible) return null;
+
+  useEffect(() => {
+    if (phase === 'entering') {
+      timerRef.current = window.setTimeout(() => setPhase('visible'), 250);
+    } else if (phase === 'exiting') {
+      timerRef.current = window.setTimeout(() => setPhase('idle'), 250);
+    }
+    return () => clearTimeout(timerRef.current);
+  }, [phase]);
+
+  if (phase === 'idle') return null;
+
   return (
     <button
-      className="fixed bottom-6 right-6 z-20 w-10 h-10 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg transition-all flex items-center justify-center"
+      className={`absolute bottom-4 right-4 z-20 w-6 h-6 rounded-md flex items-center justify-center hover:scale-110 ${
+        phase === 'entering' ? 'animate-btt-in' : phase === 'exiting' ? 'animate-btt-out' : ''
+      }`}
+      style={{
+        backgroundColor: 'color-mix(in srgb, var(--pal-editor-toolbar-bg) 85%, transparent)',
+        color: 'var(--pal-muted)',
+        backdropFilter: 'blur(4px)',
+        filter: 'brightness(1.05)',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+      }}
       onClick={() => containerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })}
       title="Back to top"
+      aria-label="Back to top"
     >
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="m18 15l-6-6-6 6" /></svg>
+      <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 21V3m0 0l8.5 8.5M12 3l-8.5 8.5" />
+      </svg>
     </button>
   );
 };

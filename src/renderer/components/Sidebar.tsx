@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useStore } from '../store';
 import { FileEntry } from '../types';
 
@@ -112,6 +112,64 @@ const Sidebar: React.FC<{
   const [loading, setLoading] = useState(false);
   const rootChildren = currentFolderPath ? (folderChildren[currentFolderPath] || []) : [];
 
+  // ---- Dead recent-file detection with animated removal ----
+  const { removeRecentFile } = useStore();
+  const [deadFiles, setDeadFiles] = useState<Record<string, 'striking' | 'removing'>>({});
+  const deadTimers = useRef<Record<string, number>>({});
+
+  const markDead = useCallback((fp: string) => {
+    if (deadFiles[fp]) return;
+    setDeadFiles(d => ({ ...d, [fp]: 'striking' }));
+    deadTimers.current[fp] = window.setTimeout(() => {
+      setDeadFiles(d => ({ ...d, [fp]: 'removing' }));
+      deadTimers.current[fp + '_rm'] = window.setTimeout(() => {
+        removeRecentFile(fp);
+      }, 300);
+    }, 600);
+  }, [deadFiles, removeRecentFile]);
+
+  const handleRecentClick = useCallback(async (filePath: string) => {
+    const r = await window.markd?.getFileContent(filePath);
+    if (r?.success) {
+      onOpenPath?.(filePath);
+    } else {
+      markDead(filePath);
+    }
+  }, [onOpenPath, markDead]);
+
+  useEffect(() => {
+    if (recentFiles.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      for (const fp of recentFiles) {
+        if (cancelled) return;
+        if (deadFiles[fp]) continue;
+        try {
+          const r = await window.markd?.getFileContent(fp);
+          if (!r?.success) markDead(fp);
+        } catch {
+          markDead(fp);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+      // Cancel all pending dead-file timers and reset state for any
+      // files still in the list (they may have been restored/re-opened)
+      for (const key of Object.keys(deadTimers.current)) {
+        clearTimeout(deadTimers.current[key]);
+        delete deadTimers.current[key];
+      }
+      setDeadFiles(prev => {
+        const next: Record<string, 'striking' | 'removing'> = {};
+        for (const [fp, state] of Object.entries(prev)) {
+          if (!recentFiles.includes(fp)) next[fp] = state;
+        }
+        return next;
+      });
+    };
+  }, [recentFiles]); // eslint-disable-line
+
   const openFolderAtPath = useCallback(async (dirPath: string) => {
     setLoading(true);
     setCurrentFolderPath(dirPath);
@@ -192,7 +250,7 @@ const Sidebar: React.FC<{
       >
         {loading ? (
           <div className="flex items-center justify-center py-8">
-            <div className="w-[18px] h-[18px] border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            <div className="w-5 h-5 border-2 border-transparent rounded-full animate-spin" style={{ borderTopColor: '#3b82f6' }} />
           </div>
         ) : rootChildren.length === 0 ? (
           <div className="text-center py-6 px-4">
@@ -215,18 +273,21 @@ const Sidebar: React.FC<{
                 <div className="space-y-px">
                   {recentFiles.slice(0, 6).map((filePath) => {
                     const name = filePath.split(/[/\\]/).pop() || filePath;
+                    const df = deadFiles[filePath];
+                    if (df === 'removing') return null;
+                    const isDead = df === 'striking';
                     return (
                       <button
                         key={filePath}
-                        className="w-full flex items-center gap-2 text-left px-2 py-1.5 rounded text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-700/10 dark:hover:bg-white/10 transition-colors"
-                        onClick={() => onOpenPath?.(filePath)}
-                        title={filePath}
+                        className={`w-full flex items-center gap-2 text-left px-2 py-1.5 rounded text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-700/10 dark:hover:bg-white/10 transition-colors ${isDead ? 'pointer-events-none opacity-50' : ''}`}
+                        onClick={() => handleRecentClick(filePath)}
+                        title={isDead ? `${filePath} (file missing)` : filePath}
                       >
-                        <svg className="w-[16px] h-[16px] text-blue-500 dark:text-blue-400 flex-shrink-0" fill="currentColor" viewBox="0 0 16 16">
+                        <svg className={`w-[16px] h-[16px] flex-shrink-0 ${isDead ? 'text-red-400 dark:text-red-500' : 'text-blue-500 dark:text-blue-400'}`} fill="currentColor" viewBox="0 0 16 16">
                           <path d="M5 7.29L7 5h1v6H7V6.71L5 9L3 6.71V11H2V5h1zM11.5 11L9 8h2V5h1v3h2z" />
                           <path fillRule="evenodd" d="M12.8 3c1.12 0 1.68 0 2.11.218c.376.192.682.498.874.874c.218.428.218.988.218 2.11v3.6c0 1.12 0 1.68-.218 2.11l-.077.138a2 2 0 0 1-.797.736l-.168.071c-.41.146-.96.146-1.94.146h-9.6L2.46 13c-.542-.008-.906-.039-1.2-.144l-.168-.07a2 2 0 0 1-.797-.737l-.077-.138C0 11.483 0 10.923 0 9.801v-3.6c0-1.12 0-1.68.218-2.11c.192-.376.498-.682.874-.874c.32-.163.716-.205 1.37-.215L3.204 3h9.6zM3.2 4c-.577 0-.949.001-1.23.024c-.272.023-.372.06-.422.085a1 1 0 0 0-.437.437c-.025.05-.063.15-.085.422c-.023.283-.024.656-.024 1.23v3.6c0 .577 0 .95.024 1.23c.022.272.06.372.085.422a1 1 0 0 0 .437.436c.05.026.15.063.422.085c.283.024.656.025 1.23.025h9.6c.577 0 .949-.001 1.23-.025c.272-.022.372-.06.422-.085a1 1 0 0 0 .436-.436c.025-.049.063-.15.085-.422c.023-.283.024-.656.024-1.23v-3.6c0-.577 0-.949-.024-1.23c-.022-.272-.06-.372-.085-.422a1 1 0 0 0-.436-.437c-.05-.025-.15-.062-.422-.085A17 17 0 0 0 12.8 4z" clipRule="evenodd" />
                         </svg>
-                        <span className="truncate">{name}</span>
+                        <span className={`truncate ${isDead ? 'animate-strikethrough' : ''}`}>{name}</span>
                       </button>
                     );
                   })}
