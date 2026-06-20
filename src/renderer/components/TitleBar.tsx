@@ -138,12 +138,12 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
                       return (
                         <button
                           key={filePath}
-                          className="w-full flex flex-col items-start px-3 py-1 text-xs text-left hover:bg-blue-600 hover:text-white rounded-sm transition-colors"
+                          className="w-full flex flex-col items-start px-3 py-1 text-xs text-left hover:bg-blue-600 rounded-sm transition-colors group/file"
                           onClick={() => { onOpenRecentFile?.(filePath); closeMenu(); }}
                           title={filePath}
                         >
-                          <span className="truncate w-full" style={matchToolbarPalette ? { color: 'var(--pal-text)' } : undefined}>{name}</span>
-                          <span className="text-[10px] truncate w-full" style={{ color: matchToolbarPalette ? 'var(--pal-muted)' : undefined }}>{dir}</span>
+                          <span className="truncate w-full group-hover/file:!text-white" style={matchToolbarPalette ? { color: 'var(--pal-text)' } : undefined}>{name}</span>
+                          <span className="text-[10px] truncate w-full group-hover/file:!text-white/70" style={{ color: matchToolbarPalette ? 'var(--pal-muted)' : undefined }}>{dir}</span>
                         </button>
                       );
                     })
