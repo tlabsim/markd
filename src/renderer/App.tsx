@@ -128,7 +128,7 @@ const App: React.FC = () => {
     // Restore scroll position if available (any file re-open)
     if (filePath && state.rememberScrollPosition) {
       const saved = state.scrollPositions[filePath];
-      if (saved && saved > 300) {
+      if (saved && saved > 800) {
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
             if (viewerScrollRef.current) {
@@ -824,6 +824,18 @@ const App: React.FC = () => {
     return () => window.removeEventListener('markd:open-shortcuts', handler);
   }, []);
 
+  // Save scroll position when app or tab closes
+  useEffect(() => {
+    const save = () => {
+      const s = useStore.getState();
+      if (s.currentFilePath && s.rememberScrollPosition && viewerScrollRef.current) {
+        s.setScrollPosition(s.currentFilePath, viewerScrollRef.current.scrollTop);
+      }
+    };
+    window.addEventListener('beforeunload', save);
+    return () => window.removeEventListener('beforeunload', save);
+  }, []);
+
   return (
     <div
       className={`h-screen flex flex-col overflow-hidden ${distractionFree ? 'relative' : ''}`}
@@ -1034,19 +1046,19 @@ const App: React.FC = () => {
                     style={viewMode === 'split' ? { flex: 1 } : { flex: 1 }}
                   >
                     <MarkdownViewer showToc={showToc} onToggleToc={() => setShowToc(false)} syncScroll={syncScroll} onScrollRef={(el) => { viewerScrollRef.current = el; }} onViewerScroll={handleViewerScroll} />
-                    {/* Welcome back toast — positioned relative to preview panel */}
+                    {/* Welcome back toast — minimal, right-side, translucent */}
                     {welcomeBackFile && (
-                      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-2 rounded-lg bg-white dark:bg-[#2a3642] border border-gray-200 dark:border-gray-600 shadow-lg text-[13px]">
-                        <span className="text-gray-700 dark:text-gray-200">
-                          👋 Welcome back! Picked up where you left off in <strong>{welcomeBackFile}</strong>
-                        </span>
+                      <div className="absolute bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl bg-white/75 dark:bg-black/75 backdrop-blur-sm text-[13px] text-emerald-600 dark:text-emerald-400 shadow-lg animate-slide-in-right">
+                        <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5"><path d="M20.5 15.8V8.2a1.91 1.91 0 0 0-.944-1.645l-6.612-3.8a1.88 1.88 0 0 0-1.888 0l-6.612 3.8A1.9 1.9 0 0 0 3.5 8.2v7.602a1.91 1.91 0 0 0 .944 1.644l6.612 3.8a1.88 1.88 0 0 0 1.888 0l6.612-3.8A1.9 1.9 0 0 0 20.5 15.8"/><path d="m8.667 12.633l1.505 1.721a1 1 0 0 0 1.564-.073L15.333 9.3"/></g></svg>
+                        <span>Picked up where you left off</span>
                         <button
-                          className="text-[11px] text-blue-500 dark:text-blue-400 hover:underline shrink-0"
+                          className="flex items-center gap-1 text-[12px] text-blue-600 dark:text-blue-400 hover:underline shrink-0 ml-3 pl-3 border-l border-gray-200 dark:border-gray-600"
                           onClick={() => {
                             if (viewerScrollRef.current) viewerScrollRef.current.scrollTop = 0;
                             setWelcomeBackFile(null);
                           }}
                         >
+                          <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24"><path fill="currentColor" d="M4.75 3.5a.75.75 0 0 1 0-1.5h14.5a.75.75 0 0 1 0 1.5zm.47 9.47a.749.749 0 1 0 1.06 1.06l4.97-4.969V21.25a.75.75 0 0 0 1.5 0V9.061l4.97 4.969a.749.749 0 1 0 1.06-1.06l-6.25-6.25a.75.75 0 0 0-1.06 0z"/></svg>
                           Go to top
                         </button>
                       </div>
