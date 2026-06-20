@@ -162,10 +162,13 @@ interface MarkdownEditorProps {
   onToggleWordWrap?: () => void;
   onFlushRef?: (fn: () => void) => void;
   onSave?: () => void;
+  matchPalette?: boolean;
+  paletteBg?: string;
+  paletteBgDark?: string;
 }
 
-const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef, onEditorScroll, onToggleSync, wordWrap, onToggleWordWrap, onFlushRef, onSave }) => {
-  const { fileContent, setFileContent } = useStore();
+const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef, onEditorScroll, onToggleSync, wordWrap, onToggleWordWrap, onFlushRef, onSave, matchPalette, paletteBg, paletteBgDark }) => {
+  const { fileContent, setFileContent, theme } = useStore();
   const editorRef = useRef<EditorEl>(null);
   const lineNumbersRef = useRef<HTMLDivElement>(null);
   const [cursorPosition, setCursorPosition] = useState({ line: 1, col: 1 });
@@ -593,9 +596,20 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
   }, [handleRedo]);
 
   return (
-    <div className="h-full flex flex-col bg-white dark:bg-[#1c2733]">
-      {/* Editor toolbar */}
-      <div className="flex items-center gap-0.5 px-3 py-1.5 border-b border-gray-200/60 dark:border-gray-700/50 bg-gray-50/85 dark:bg-[#181e26]/85 backdrop-blur-md flex-wrap">
+    <div className="h-full flex flex-col bg-white dark:bg-[#1c2733]" style={matchPalette ? {
+      backgroundColor: theme === 'dark'
+        ? `${paletteBgDark || '#1a222b'}D9`
+        : `${paletteBg || '#ffffff'}F2`,
+    } : undefined}>
+      {/* Editor toolbar — darker than editor area */}
+      <div
+        className="flex items-center gap-0.5 px-3 py-1.5 border-b border-gray-200/60 dark:border-gray-700/50 bg-gray-50/85 dark:bg-[#181e26]/85 backdrop-blur-md flex-wrap"
+        style={matchPalette ? {
+          backgroundColor: theme === 'dark'
+            ? (paletteBgDark || '#1a222b')
+            : 'var(--pal-pre-bg)',
+        } : undefined}
+      >
         {/* Undo */}
         <button className="btn-icon" onClick={toolbarUndo} title="Undo (Ctrl+Z)">
           <svg className="w-[18px] h-[18px] shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="m4 10l-.707.707L2.586 10l.707-.707zm17 8a1 1 0 1 1-2 0zM8.293 15.707l-5-5l1.414-1.414l5 5zm-5-6.414l5-5l1.414 1.414l-5 5zM4 9h10v2H4zm17 7v2h-2v-2zm-7-7a7 7 0 0 1 7 7h-2a5 5 0 0 0-5-5z"/></svg>
@@ -794,7 +808,16 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
         <div
           ref={lineNumbersRef}
           className="select-none text-right px-3 py-3 text-sm leading-6 font-mono text-gray-400 dark:text-gray-600 bg-gray-50 dark:bg-[#141c24] border-r border-gray-200 dark:border-gray-700/50 overflow-hidden"
-          style={{ minWidth: '4rem', scrollbarWidth: 'none' }}
+          style={{
+            minWidth: '4rem',
+            scrollbarWidth: 'none',
+            ...(matchPalette ? {
+              backgroundColor: theme === 'dark'
+                ? (paletteBgDark || '#1a222b')
+                : 'var(--pal-pre-bg)',
+              color: 'var(--pal-muted)',
+            } : {}),
+          }}
         >
           {lines().map((num, idx) => (
             <div key={idx} style={{ height: '1.5rem', lineHeight: '1.5rem' }}>{num > 0 ? num : '\u00A0'}</div>

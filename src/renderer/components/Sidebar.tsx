@@ -84,7 +84,7 @@ const TreeNode: React.FC<{
         </div>
       )}
       {isDir && isExpanded && (!children || children.length === 0) && (
-        <div className="text-[10px] text-gray-400 dark:text-gray-600 py-1 italic" style={{ paddingLeft: `${32 + (depth + 1) * 24}px` }}>Empty folder</div>
+        <div className="text-[10px] py-1 italic" style={{ color: 'var(--pal-muted)', paddingLeft: `${32 + (depth + 1) * 24}px` }}>Empty folder</div>
       )}
     </>
   );
@@ -203,10 +203,10 @@ const Sidebar: React.FC<{
           </div>
         ) : rootChildren.length === 0 ? (
           <div className="text-center py-6 px-4">
-            <svg className="w-8 h-8 mx-auto text-gray-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+            <svg className="w-8 h-8 mx-auto mb-2 opacity-50" style={{ color: 'var(--pal-text)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44" />
             </svg>
-            <p className="text-xs text-gray-500 mb-3">No folder open</p>
+            <p className="text-xs mb-3" style={{ color: 'var(--pal-muted)' }}>No folder open</p>
             <button className="text-xs text-blue-500 hover:text-blue-600 dark:hover:text-blue-300 mb-4" onClick={handleOpenFolder}>
               Open a folder
             </button>
@@ -217,7 +217,7 @@ const Sidebar: React.FC<{
                 Recent
               </p>
               {recentFiles.length === 0 ? (
-                <p className="text-[11px] text-gray-400 dark:text-gray-600 italic px-1">No recent files</p>
+                <p className="text-[11px] italic px-1" style={{ color: 'var(--pal-muted)' }}>No recent files</p>
               ) : (
                 <div className="space-y-px">
                   {recentFiles.slice(0, 6).map((filePath) => {

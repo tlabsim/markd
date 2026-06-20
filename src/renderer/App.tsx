@@ -11,6 +11,136 @@ import WelcomeScreen from './components/WelcomeScreen';
 import StatusBar from './components/StatusBar';
 import SettingsModal from './components/SettingsModal';
 
+// ---- Palette token map (replaces CSS cascade with direct JS) ----
+type TokenMap = Record<string, string>;
+
+const TOKENS: Record<string, { light: TokenMap; dark: TokenMap }> = {
+  default: {
+    light: {
+      '--pal-bg': '#ffffff', '--pal-text': '#1f2328', '--pal-link': '#0969da',
+      '--pal-border': '#d0d7de', '--pal-muted': '#656d76',
+      '--pal-blockquote-border': '#d0d7de', '--pal-blockquote-text': '#656d76',
+      '--pal-code-bg': '#f6f8fa', '--pal-code-text': '#3d5a6b',
+      '--pal-pre-bg': '#f8f9fa', '--pal-pre-border': '#d0d7de',
+      '--pal-th-bg': '#f6f8fa', '--pal-th-border': '#d0d7de', '--pal-td-border': '#d0d7de',
+      '--pal-tr-even-bg': 'rgba(246,248,250,0.5)', '--pal-hr': '#d0d7de',
+      '--pal-h6-text': '#656d76', '--pal-selection': 'rgba(9,105,218,0.2)',
+      '--pal-heading-border': '#d0d7de',
+      '--pal-cb-bg': '#f8f9fa', '--pal-cb-border': '#d0d7de',
+      '--pal-cb-lang-bg': '#d0d7de', '--pal-cb-lang-text': '#656d76',
+      '--pal-cb-btn-bg': 'rgba(229,231,235,0.5)', '--pal-cb-btn-hover': '#e5e7eb', '--pal-cb-btn-text': '#6b7280',
+    },
+    dark: {
+      '--pal-bg': '#1a222b', '--pal-text': '#d0d7de', '--pal-link': '#58a6ff',
+      '--pal-border': 'hsl(212,12%,25%)', '--pal-muted': 'hsl(212,12%,55%)',
+      '--pal-blockquote-border': 'hsl(212,12%,25%)', '--pal-blockquote-text': 'hsl(212,12%,55%)',
+      '--pal-code-bg': '#1e2733', '--pal-code-text': '#9cccd8',
+      '--pal-pre-bg': '#181e26', '--pal-pre-border': 'hsl(212,12%,25%)',
+      '--pal-th-bg': '#1c2733', '--pal-th-border': 'hsl(212,12%,25%)', '--pal-td-border': 'hsl(212,12%,25%)',
+      '--pal-tr-even-bg': 'rgba(30,42,56,0.3)', '--pal-hr': 'hsl(212,12%,25%)',
+      '--pal-h6-text': 'hsl(212,12%,55%)', '--pal-selection': 'rgba(88,166,255,0.2)',
+      '--pal-heading-border': 'hsl(212,12%,25%)',
+      '--pal-cb-bg': '#181e26', '--pal-cb-border': 'hsl(212,12%,25%)',
+      '--pal-cb-lang-bg': 'hsl(212,12%,25%)', '--pal-cb-lang-text': 'hsl(212,12%,55%)',
+      '--pal-cb-btn-bg': 'rgba(55,65,81,0.6)', '--pal-cb-btn-hover': '#374151', '--pal-cb-btn-text': '#9ca3af',
+    },
+  },
+  sepia: {
+    light: {
+      '--pal-bg': '#f5f0e8', '--pal-text': '#4a3f35', '--pal-link': '#7a6040',
+      '--pal-border': '#d8ccb8', '--pal-muted': '#5c5044',
+      '--pal-blockquote-border': '#d0c4b0', '--pal-blockquote-text': '#5c5044',
+      '--pal-code-bg': '#e8e0d4', '--pal-code-text': '#6b5040',
+      '--pal-pre-bg': '#ede6da', '--pal-pre-border': '#d8ccb8',
+      '--pal-th-bg': '#ede6da', '--pal-th-border': '#d8ccb8', '--pal-td-border': '#d8ccb8',
+      '--pal-tr-even-bg': 'rgba(245,240,232,0.5)', '--pal-hr': '#d8ccb8',
+      '--pal-h6-text': '#8c7a68', '--pal-selection': 'rgba(122,96,64,0.28)',
+      '--pal-heading-border': '#d8ccb8',
+      '--pal-cb-bg': '#ede6da', '--pal-cb-border': '#d8ccb8',
+      '--pal-cb-lang-bg': '#d8ccb8', '--pal-cb-lang-text': '#5c5044',
+      '--pal-cb-btn-bg': 'rgba(216,204,184,0.5)', '--pal-cb-btn-hover': '#d8ccb8', '--pal-cb-btn-text': '#5c5044',
+    },
+    dark: {
+      '--pal-bg': '#26211a', '--pal-text': '#e8dcc8', '--pal-link': '#d4b88c',
+      '--pal-border': '#4a4030', '--pal-muted': '#c8b8a8',
+      '--pal-blockquote-border': '#4a4035', '--pal-blockquote-text': '#c8b8a8',
+      '--pal-code-bg': 'rgba(58,48,40,0.6)', '--pal-code-text': '#d4b88c',
+      '--pal-pre-bg': 'rgba(42,36,28,0.6)', '--pal-pre-border': '#4a4030',
+      '--pal-th-bg': 'rgba(42,36,28,0.5)', '--pal-th-border': '#4a4030', '--pal-td-border': '#4a4030',
+      '--pal-tr-even-bg': 'rgba(42,36,28,0.3)', '--pal-hr': '#4a4030',
+      '--pal-h6-text': '#b0a090', '--pal-selection': 'rgba(196,168,124,0.28)',
+      '--pal-heading-border': '#4a4030',
+      '--pal-cb-bg': 'rgba(42,36,28,0.6)', '--pal-cb-border': '#4a4030',
+      '--pal-cb-lang-bg': '#4a4030', '--pal-cb-lang-text': '#c8b8a8',
+      '--pal-cb-btn-bg': 'rgba(74,64,48,0.6)', '--pal-cb-btn-hover': '#4a4030', '--pal-cb-btn-text': '#c8b8a8',
+    },
+  },
+  contrast: {
+    light: {
+      '--pal-bg': '#ffffff', '--pal-text': '#030712', '--pal-link': '#1e40af',
+      '--pal-border': '#9ca3af', '--pal-muted': '#1f2937',
+      '--pal-blockquote-border': '#1f2937', '--pal-blockquote-text': '#1f2937',
+      '--pal-code-bg': '#e5e7eb', '--pal-code-text': '#030712',
+      '--pal-pre-bg': '#f3f4f6', '--pal-pre-border': '#9ca3af',
+      '--pal-th-bg': '#f3f4f6', '--pal-th-border': '#9ca3af', '--pal-td-border': '#9ca3af',
+      '--pal-tr-even-bg': 'rgba(243,244,246,0.5)', '--pal-hr': '#9ca3af',
+      '--pal-h6-text': '#4b5563', '--pal-selection': 'rgba(100,100,100,0.3)',
+      '--pal-heading-border': '#9ca3af',
+      '--pal-cb-bg': '#f3f4f6', '--pal-cb-border': '#9ca3af',
+      '--pal-cb-lang-bg': '#9ca3af', '--pal-cb-lang-text': '#ffffff',
+      '--pal-cb-btn-bg': 'rgba(156,163,175,0.5)', '--pal-cb-btn-hover': '#9ca3af', '--pal-cb-btn-text': '#ffffff',
+    },
+    dark: {
+      '--pal-bg': '#0a0a0a', '--pal-text': '#f9fafb', '--pal-link': '#93c5fd',
+      '--pal-border': '#4b5563', '--pal-muted': '#d1d5db',
+      '--pal-blockquote-border': '#d1d5db', '--pal-blockquote-text': '#d1d5db',
+      '--pal-code-bg': '#374151', '--pal-code-text': '#f9fafb',
+      '--pal-pre-bg': '#1f2937', '--pal-pre-border': '#4b5563',
+      '--pal-th-bg': '#374151', '--pal-th-border': '#4b5563', '--pal-td-border': '#4b5563',
+      '--pal-tr-even-bg': 'rgba(31,41,55,0.3)', '--pal-hr': '#4b5563',
+      '--pal-h6-text': '#9ca3af', '--pal-selection': 'rgba(200,200,200,0.3)',
+      '--pal-heading-border': '#4b5563',
+      '--pal-cb-bg': '#1f2937', '--pal-cb-border': '#4b5563',
+      '--pal-cb-lang-bg': '#4b5563', '--pal-cb-lang-text': '#f9fafb',
+      '--pal-cb-btn-bg': 'rgba(75,85,99,0.6)', '--pal-cb-btn-hover': '#4b5563', '--pal-cb-btn-text': '#f9fafb',
+    },
+  },
+  cool: {
+    light: {
+      '--pal-bg': '#f0f4f8', '--pal-text': '#1e293b', '--pal-link': '#2563eb',
+      '--pal-border': '#cbd5e1', '--pal-muted': '#475569',
+      '--pal-blockquote-border': '#93c5fd', '--pal-blockquote-text': '#475569',
+      '--pal-code-bg': '#eff6ff', '--pal-code-text': '#1d4ed8',
+      '--pal-pre-bg': '#f8fafc', '--pal-pre-border': '#cbd5e1',
+      '--pal-th-bg': '#f8fafc', '--pal-th-border': '#cbd5e1', '--pal-td-border': '#cbd5e1',
+      '--pal-tr-even-bg': 'rgba(248,250,252,0.5)', '--pal-hr': '#cbd5e1',
+      '--pal-h6-text': '#64748b', '--pal-selection': 'rgba(37,99,235,0.22)',
+      '--pal-heading-border': '#cbd5e1',
+      '--pal-cb-bg': '#f8fafc', '--pal-cb-border': '#cbd5e1',
+      '--pal-cb-lang-bg': '#cbd5e1', '--pal-cb-lang-text': '#64748b',
+      '--pal-cb-btn-bg': 'rgba(203,213,225,0.5)', '--pal-cb-btn-hover': '#cbd5e1', '--pal-cb-btn-text': '#64748b',
+    },
+    dark: {
+      '--pal-bg': '#121a28', '--pal-text': '#e2e8f0', '--pal-link': '#93c5fd',
+      '--pal-border': '#334155', '--pal-muted': '#94a3b8',
+      '--pal-blockquote-border': '#1d4ed8', '--pal-blockquote-text': '#94a3b8',
+      '--pal-code-bg': 'rgba(30,58,138,0.3)', '--pal-code-text': '#bfdbfe',
+      '--pal-pre-bg': 'rgba(30,41,59,0.5)', '--pal-pre-border': '#334155',
+      '--pal-th-bg': 'rgba(30,41,59,0.4)', '--pal-th-border': '#334155', '--pal-td-border': '#334155',
+      '--pal-tr-even-bg': 'rgba(30,41,59,0.2)', '--pal-hr': '#334155',
+      '--pal-h6-text': '#94a3b8', '--pal-selection': 'rgba(96,165,250,0.22)',
+      '--pal-heading-border': '#334155',
+      '--pal-cb-bg': 'rgba(30,41,59,0.5)', '--pal-cb-border': '#334155',
+      '--pal-cb-lang-bg': '#334155', '--pal-cb-lang-text': '#94a3b8',
+      '--pal-cb-btn-bg': 'rgba(51,65,85,0.6)', '--pal-cb-btn-hover': '#334155', '--pal-cb-btn-text': '#94a3b8',
+    },
+  },
+};
+
+function getPaletteTokens(palette: string, dark: boolean): TokenMap {
+  return TOKENS[palette]?.[dark ? 'dark' : 'light'] || TOKENS.default.light;
+}
+
 const App: React.FC = () => {
   const {
     currentFile,
@@ -814,6 +944,37 @@ const App: React.FC = () => {
     }
   }, [loadFileIntoEditor]);
 
+  // Set data-palette + dark class + CSS custom properties on <html>
+  useEffect(() => {
+    const html = document.documentElement;
+
+    // Dark class for Tailwind
+    html.classList.toggle('dark', theme === 'dark');
+
+    // data-palette attribute
+    if (previewPalette !== 'default') {
+      html.setAttribute('data-palette', previewPalette);
+    } else {
+      html.removeAttribute('data-palette');
+    }
+
+    // Set CSS custom properties directly (no cascade issues)
+    const isDark = theme === 'dark';
+    const tokens = getPaletteTokens(previewPalette, isDark);
+    for (const [key, value] of Object.entries(tokens)) {
+      html.style.setProperty(key, value);
+    }
+  }, [theme, previewPalette]);
+
+  // Sync match-palette attribute for CSS-driven border overrides
+  useEffect(() => {
+    if (matchToolbarPalette) {
+      document.documentElement.setAttribute('data-match-palette', '');
+    } else {
+      document.documentElement.removeAttribute('data-match-palette');
+    }
+  }, [matchToolbarPalette]);
+
   // Listen for custom event from StatusBar to open shortcuts
   useEffect(() => {
     const handler = () => {
@@ -875,6 +1036,7 @@ const App: React.FC = () => {
             backgroundColor: theme === 'dark'
               ? (PALETTE_OPTIONS.find(o => o.value === previewPalette)?.bgDark || '#1a222b')
               : (PALETTE_OPTIONS.find(o => o.value === previewPalette)?.bg || '#ffffff'),
+            borderColor: 'var(--pal-border)',
           } : undefined}
         >
           {isSidebarOpen && <Sidebar
@@ -919,6 +1081,7 @@ const App: React.FC = () => {
                 backgroundColor: theme === 'dark'
                   ? (PALETTE_OPTIONS.find(o => o.value === previewPalette)?.bgDark || '#1a222b')
                   : (PALETTE_OPTIONS.find(o => o.value === previewPalette)?.bg || '#ffffff'),
+                borderColor: 'var(--pal-border)',
               } : undefined}
             >
               {/* Sidebar toggle — always left-aligned */}
@@ -1028,6 +1191,9 @@ const App: React.FC = () => {
                       onToggleWordWrap={() => setWordWrap(!wordWrap)}
                       onFlushRef={(fn) => { flushEditorRef.current = fn; }}
                       onSave={handleSave}
+                      matchPalette={matchToolbarPalette}
+                      paletteBg={PALETTE_OPTIONS.find(o => o.value === previewPalette)?.bg}
+                      paletteBgDark={PALETTE_OPTIONS.find(o => o.value === previewPalette)?.bgDark}
                     />
                   </div>
                 )}

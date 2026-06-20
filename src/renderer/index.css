@@ -1,3 +1,6 @@
+@import './tokens.css';
+@import './palettes.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -42,6 +45,21 @@
     @apply bg-gray-500/60;
   }
 }
+
+/* Wider scrollbar on hover near right edge — no layout shift */
+.scrollbar-expand::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+.scrollbar-expand::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  transition: border-width 0.2s ease;
+}
+.scrollbar-expand.scrollbar-hover::-webkit-scrollbar-thumb {
+  border-width: 0;
+}
+
 /* Fix scrollbar cursor on editor elements */
 textarea,
 [contentEditable="true"] {

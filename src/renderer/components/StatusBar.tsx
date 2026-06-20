@@ -27,6 +27,7 @@ const StatusBar: React.FC<{ matchPalette?: boolean; paletteBg?: string; paletteB
         paddingTop: 4,
         ...(matchPalette ? {
           backgroundColor: theme === 'dark' ? (paletteBgDark || '#1a222b') : (paletteBg || '#ffffff'),
+          borderColor: 'var(--pal-border)',
         } : {}),
       }}
     >
@@ -49,34 +50,37 @@ const StatusBar: React.FC<{ matchPalette?: boolean; paletteBg?: string; paletteB
           <span className="px-1.5 py-0.5 text-gray-400 dark:text-gray-500 bg-white dark:bg-[#1c2733] border-l border-gray-300/50 dark:border-gray-600/50">Ctrl+/</span>
         </button>
         <span className="w-px h-3 bg-gray-300 dark:bg-gray-600" />
-        <div className="inline-flex items-center text-[10px] rounded-md overflow-hidden border border-gray-300/50 dark:border-gray-600/50">
+        <div className="inline-flex items-center text-[10px] rounded-md overflow-hidden border border-slate-300 dark:border-gray-600">
           <button
-            className={`px-2 py-0.5 transition-colors border-r border-gray-300/50 dark:border-gray-600/50 ${
+            className={`px-2 py-0.5 font-medium transition-colors border-r border-slate-300 dark:border-gray-600 ${
               viewMode === 'view'
-                ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
-                : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200/50 dark:hover:bg-gray-700/30'
+                ? 'bg-slate-600/10 dark:bg-white/10 text-slate-800 dark:text-gray-100'
+                : 'text-slate-600 dark:text-gray-400 hover:bg-slate-500/10 dark:hover:bg-slate-100/10'
             }`}
             onClick={() => setViewMode('view')}
+            title="Preview mode"
           >
             Preview
           </button>
           <button
-            className={`px-2 py-0.5 transition-colors border-r border-gray-300/50 dark:border-gray-600/50 ${
+            className={`px-2 py-0.5 font-medium transition-colors border-r border-slate-300 dark:border-gray-600 ${
               viewMode === 'edit'
-                ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
-                : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200/50 dark:hover:bg-gray-700/30'
+                ? 'bg-slate-600/10 dark:bg-white/10 text-slate-800 dark:text-gray-100'
+                : 'text-slate-600 dark:text-gray-400 hover:bg-slate-500/10 dark:hover:bg-slate-100/10'
             }`}
             onClick={() => setViewMode('edit')}
+            title="Edit mode"
           >
             Edit
           </button>
           <button
-            className={`px-2 py-0.5 transition-colors ${
+            className={`px-2 py-0.5 font-medium transition-colors ${
               viewMode === 'split'
-                ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
-                : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200/50 dark:hover:bg-gray-700/30'
+                ? 'bg-slate-600/10 dark:bg-white/10 text-slate-800 dark:text-gray-100'
+                : 'text-slate-600 dark:text-gray-400 hover:bg-slate-500/10 dark:hover:bg-slate-100/10'
             }`}
             onClick={() => setViewMode('split')}
+            title="Split mode"
           >
             Split
           </button>

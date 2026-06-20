@@ -61,6 +61,23 @@ interface MarkdownViewerProps {
 const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, syncScroll, onScrollRef, onViewerScroll }) => {
   const { fileContent, currentFilePath, fontFamily, zoomLevel, previewPalette, zoomIn, zoomOut } = useStore();
   const contentRef = useRef<HTMLDivElement>(null);
+  const scrollbarWideRef = useRef(false);
+
+  // Track mouse proximity to right edge for wider scrollbar — direct DOM, no re-renders
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    const el = contentRef.current;
+    if (!el) return;
+    const near = e.clientX > el.getBoundingClientRect().right - 30;
+    if (near !== scrollbarWideRef.current) {
+      scrollbarWideRef.current = near;
+      el.classList.toggle('scrollbar-hover', near);
+    }
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    scrollbarWideRef.current = false;
+    contentRef.current?.classList.remove('scrollbar-hover');
+  }, []);
 
   // Scroll to top when file changes
   useEffect(() => {
@@ -329,7 +346,10 @@ const AsyncImage: React.FC<{ src: string; alt: string; className?: string }> = (
       {/* Content */}
       <div
         ref={contentRef}
-        className={`flex-1 overflow-y-auto p-6 lg:p-8 xl:p-10 bg-white dark:bg-[#1a222b] ${previewPalette !== 'default' ? `preview-${previewPalette}` : ''}`}
+        className={`flex-1 overflow-y-auto p-6 lg:p-8 xl:p-10 scrollbar-expand ${previewPalette !== 'default' ? `preview-${previewPalette}` : ''}`}
+        style={previewPalette === 'default' ? { background: 'var(--pal-bg)' } : undefined}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
       >
         <div
           className="max-w-4xl mx-auto markdown-body"

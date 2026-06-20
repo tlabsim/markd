@@ -59,17 +59,18 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
   );
 
   return (
-    <div className={`titlebar flex items-center justify-between px-3 border-b transition-colors duration-300 select-none relative
+    <div className={`titlebar flex items-center justify-between px-3 transition-colors duration-300 select-none relative
       ${distractionFree
-        ? 'absolute top-0 left-0 right-0 z-50 backdrop-blur-xl border-transparent'
-        : `bg-white dark:bg-[#222c36] ${matchToolbarPalette ? 'border-gray-300/40 dark:border-gray-600/40' : 'border-gray-200 dark:border-gray-700/50'}`
+        ? 'absolute top-0 left-0 right-0 z-50'
+        : `bg-white dark:bg-[#222c36] border-b ${matchToolbarPalette ? 'border-gray-300/40 dark:border-gray-600/40' : 'border-gray-200 dark:border-gray-700/50'}`
       }`}
       style={{
         height: 40,
         ...(distractionFree ? {
-          backgroundColor: theme === 'dark' ? (paletteBgDark || '#1a222b') : (paletteBg || '#ffffff'),
+          backgroundColor: 'var(--pal-bg)',
         } : matchToolbarPalette ? {
           backgroundColor: theme === 'dark' ? (paletteBgDark || '#1a222b') : (paletteBg || '#ffffff'),
+          borderColor: 'var(--pal-border)',
         } : {}),
       }}
     >
