@@ -133,8 +133,8 @@ const App: React.FC = () => {
           requestAnimationFrame(() => {
             if (viewerScrollRef.current) {
               viewerScrollRef.current.scrollTop = saved;
-              setWelcomeBackFile(name);
-              setTimeout(() => setWelcomeBackFile(null), 5000);
+              setTimeout(() => setWelcomeBackFile(name), 500);
+              setTimeout(() => setWelcomeBackFile(null), 5500);
             }
           });
         });
