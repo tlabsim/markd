@@ -21,8 +21,10 @@ export interface DirectoryResult {
 export interface MarkdAPI {
   openFile: () => Promise<FileResult | null>;
   openFolder: () => Promise<{ success: boolean; path?: string; error?: string } | null>;
-  saveFile: (content: string) => Promise<FileResult>;
-  saveFileAs: (content: string) => Promise<FileResult>;
+  saveFile: (content: string, currentPath?: string) => Promise<FileResult>;
+  saveFileAs: (content: string, currentPath?: string) => Promise<FileResult>;
+  getSetting: (key: string) => Promise<unknown>;
+  setSetting: (key: string, value: unknown) => Promise<void>;
   getFileContent: (filePath: string) => Promise<FileResult>;
   readDirectory: (dirPath: string) => Promise<DirectoryResult>;
   getAppPath: () => Promise<string>;

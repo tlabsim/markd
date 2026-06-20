@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStore, FONT_OPTIONS } from '../store';
 import { PALETTE_OPTIONS } from '../palettes';
+import { ThemeMode } from '../types';
 import markdLogo from '../assets/markd.svg';
 
 type Tab = 'settings' | 'shortcuts' | 'about';
@@ -224,7 +225,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
                     { label: 'Light', value: 'light' },
                   ]}
                   value={theme}
-                  onChange={setTheme}
+                  onChange={(v) => setTheme(v as ThemeMode)}
                 />
               </SettingRow>
 
