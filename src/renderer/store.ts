@@ -42,6 +42,7 @@ interface EditorState {
   /** Maps file path → last scrollTop */
   scrollPositions: Record<string, number>;
   matchToolbarPalette: boolean;
+  showHeadingAnchors: boolean;
 
   // Actions
   setCurrentFile: (name: string | null) => void;
@@ -73,6 +74,7 @@ interface EditorState {
   setRememberScrollPosition: (on: boolean) => void;
   setScrollPosition: (filePath: string, scrollTop: number) => void;
   setMatchToolbarPalette: (on: boolean) => void;
+  setShowHeadingAnchors: (on: boolean) => void;
   zoomIn: () => void;
   zoomOut: () => void;
 }
@@ -124,6 +126,7 @@ export const useStore = create<EditorState>()(
       rememberScrollPosition: true,
       scrollPositions: {},
       matchToolbarPalette: false,
+      showHeadingAnchors: true,
 
       setCurrentFile: (name) => set({ currentFile: name }),
       setCurrentFilePath: (path) => set({ currentFilePath: path }),
@@ -172,6 +175,7 @@ export const useStore = create<EditorState>()(
       setScrollPosition: (filePath, scrollTop) =>
         set((s) => ({ scrollPositions: { ...s.scrollPositions, [filePath]: scrollTop } })),
       setMatchToolbarPalette: (on) => set({ matchToolbarPalette: on }),
+      setShowHeadingAnchors: (on) => set({ showHeadingAnchors: on }),
       zoomIn: () => set((s) => ({ zoomLevel: Math.min(200, s.zoomLevel + 10) })),
       zoomOut: () => set((s) => ({ zoomLevel: Math.max(50, s.zoomLevel - 10) })),
     }),
@@ -190,6 +194,7 @@ export const useStore = create<EditorState>()(
         rememberScrollPosition: state.rememberScrollPosition,
         scrollPositions: state.scrollPositions,
         matchToolbarPalette: state.matchToolbarPalette,
+        showHeadingAnchors: state.showHeadingAnchors,
       }),
     }
   )

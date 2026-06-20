@@ -182,6 +182,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
     setRememberScrollPosition,
     matchToolbarPalette,
     setMatchToolbarPalette,
+    showHeadingAnchors,
+    setShowHeadingAnchors,
   } = useStore();
 
   if (!open) return null;
@@ -299,6 +301,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
                 <ToggleSwitch
                   checked={syntaxHighlight}
                   onChange={() => setSyntaxHighlight(!syntaxHighlight)}
+                />
+              </SettingRow>
+
+              <SettingRow label="Heading Anchor Links">
+                <ToggleSwitch
+                  checked={showHeadingAnchors}
+                  onChange={() => setShowHeadingAnchors(!showHeadingAnchors)}
                 />
               </SettingRow>
 

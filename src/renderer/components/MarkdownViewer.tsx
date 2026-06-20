@@ -340,7 +340,7 @@ const BackToTop: React.FC<{ containerRef: React.RefObject<HTMLDivElement | null>
 };
 
 const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, syncScroll, onScrollRef, onViewerScroll }) => {
-  const { fileContent, currentFilePath, fontFamily, zoomLevel, previewPalette, zoomIn, zoomOut, matchToolbarPalette } = useStore();
+  const { fileContent, currentFilePath, fontFamily, zoomLevel, previewPalette, zoomIn, zoomOut, matchToolbarPalette, showHeadingAnchors } = useStore();
   const contentRef = useRef<HTMLDivElement>(null);
   const scrollbarWideRef = useRef(false);
 
@@ -407,24 +407,34 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, s
     text.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').trim(), []);
 
   // Build heading with anchor link
-  const makeHeading = useCallback((Tag: 'h1'|'h2'|'h3'|'h4'|'h5'|'h6') =>
-    ({ children, ...props }: any) => {
+  const makeHeading = useCallback((Tag: 'h1'|'h2'|'h3'|'h4'|'h5'|'h6') => {
+    const HeadingAnchor: React.FC<{ id: string; text: string }> = ({ id, text }) => {
+      const handleClick = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        navigator.clipboard.writeText(`#${id}`);
+      }, [id]);
+      return (
+        <a href={`#${id}`}
+          onClick={handleClick}
+          className="heading-anchor absolute -left-6 top-0 bottom-0 flex items-center opacity-0 group-hover/heading:opacity-100 transition-opacity text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 no-underline"
+          aria-label={`Copy link to ${text}`}>
+          <svg className="w-5 h-5 mb-1 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9.621 7.5H7.25a4.5 4.5 0 0 0-4.5 4.5v0a4.5 4.5 0 0 0 4.5 4.5h2.371m4.758-9h2.371a4.5 4.5 0 0 1 4.5 4.5v0a4.5 4.5 0 0 1-4.5 4.5h-2.371M7.243 12h9.514" />
+          </svg>
+        </a>
+      );
+    };
+    return ({ children, ...props }: any) => {
       const text = String(children).replace(/<[^>]*>/g, '');
       const id = slugify(text);
       return (
         <Tag id={id} className="group/heading relative" {...props}>
           {children}
-          <a href={`#${id}`}
-            className="heading-anchor absolute -left-6 top-1/2 -translate-y-1/2 opacity-0 group-hover/heading:opacity-100 transition-opacity text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 no-underline"
-            aria-label={`Link to ${text}`}>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-            </svg>
-          </a>
+          {showHeadingAnchors && <HeadingAnchor id={id} text={text} />}
         </Tag>
       );
-    }, [slugify]);
+    };
+  }, [slugify, showHeadingAnchors]);
 
   const components = useMemo(() => ({
     h1: makeHeading('h1'), h2: makeHeading('h2'), h3: makeHeading('h3'),
