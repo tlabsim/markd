@@ -44,8 +44,8 @@ const TreeNode: React.FC<{
           ${isActive
             ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
             : isDir
-              ? 'text-gray-700 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-700/10 dark:hover:bg-gray-800/50'
-              : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-700/10 dark:hover:bg-gray-800/50'
+              ? 'text-gray-700 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-700/10 dark:hover:bg-gray-200/10'
+              : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-700/10 dark:hover:bg-gray-200/10'
           }`}
         style={{ paddingLeft: `${8 + depth * 24}px` }}
         onClick={handleClick}
@@ -97,15 +97,8 @@ const Sidebar: React.FC<{
   paletteBg?: string;
   paletteBgDark?: string;
 }> = ({ onOpenFile, onOpenPath, matchPalette, paletteBg, paletteBgDark }) => {
-  const { theme } = useStore();
-  const paletteStyle = matchPalette ? {
-    backgroundColor: theme === 'dark' ? (paletteBgDark || '#1a222b') : (paletteBg || '#ffffff'),
-  } : undefined;
-  const paletteStyle85 = matchPalette ? {
-    backgroundColor: theme === 'dark'
-      ? `${paletteBgDark || '#1a222b'}d9` // ~85% opacity approximation
-      : `${paletteBg || '#ffffff'}d9`,
-  } : undefined;
+  const paletteStyle = matchPalette ? { backgroundColor: 'var(--pal-panel-bg)' } : undefined;
+  const paletteStyle85 = matchPalette ? { backgroundColor: 'color-mix(in srgb, var(--pal-panel-bg) 85%, transparent)' } : undefined;
   const {
     currentFolderPath,
     folderChildren,
@@ -225,15 +218,15 @@ const Sidebar: React.FC<{
                     return (
                       <button
                         key={filePath}
-                        className="w-full text-left px-2 py-1 rounded text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-700/10 dark:hover:bg-white/10 truncate transition-colors"
+                        className="w-full flex items-center gap-2 text-left px-2 py-1.5 rounded text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-700/10 dark:hover:bg-white/10 transition-colors"
                         onClick={() => onOpenPath?.(filePath)}
                         title={filePath}
                       >
-                        <svg className="w-[16px] h-[16px] inline-block mr-1.5 text-blue-500 dark:text-blue-400 flex-shrink-0" fill="currentColor" viewBox="0 0 16 16">
+                        <svg className="w-[16px] h-[16px] text-blue-500 dark:text-blue-400 flex-shrink-0" fill="currentColor" viewBox="0 0 16 16">
                           <path d="M5 7.29L7 5h1v6H7V6.71L5 9L3 6.71V11H2V5h1zM11.5 11L9 8h2V5h1v3h2z" />
                           <path fillRule="evenodd" d="M12.8 3c1.12 0 1.68 0 2.11.218c.376.192.682.498.874.874c.218.428.218.988.218 2.11v3.6c0 1.12 0 1.68-.218 2.11l-.077.138a2 2 0 0 1-.797.736l-.168.071c-.41.146-.96.146-1.94.146h-9.6L2.46 13c-.542-.008-.906-.039-1.2-.144l-.168-.07a2 2 0 0 1-.797-.737l-.077-.138C0 11.483 0 10.923 0 9.801v-3.6c0-1.12 0-1.68.218-2.11c.192-.376.498-.682.874-.874c.32-.163.716-.205 1.37-.215L3.204 3h9.6zM3.2 4c-.577 0-.949.001-1.23.024c-.272.023-.372.06-.422.085a1 1 0 0 0-.437.437c-.025.05-.063.15-.085.422c-.023.283-.024.656-.024 1.23v3.6c0 .577 0 .95.024 1.23c.022.272.06.372.085.422a1 1 0 0 0 .437.436c.05.026.15.063.422.085c.283.024.656.025 1.23.025h9.6c.577 0 .949-.001 1.23-.025c.272-.022.372-.06.422-.085a1 1 0 0 0 .436-.436c.025-.049.063-.15.085-.422c.023-.283.024-.656.024-1.23v-3.6c0-.577 0-.949-.024-1.23c-.022-.272-.06-.372-.085-.422a1 1 0 0 0-.436-.437c-.05-.025-.15-.062-.422-.085A17 17 0 0 0 12.8 4z" clipRule="evenodd" />
                         </svg>
-                        {name}
+                        <span className="truncate">{name}</span>
                       </button>
                     );
                   })}

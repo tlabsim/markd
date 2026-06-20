@@ -50,11 +50,11 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
 
   const menuItem = (label: string, shortcut: string | null, action: () => void) => (
     <button
-      className="w-full flex items-center justify-between px-3 py-1.5 text-xs text-left hover:bg-blue-600 hover:text-white rounded-sm transition-colors group"
+      className="w-full flex items-center justify-between px-3 py-1.5 text-xs text-left !text-black dark:!text-gray-100 hover:bg-blue-600 hover:text-white rounded-sm transition-colors group"
       onClick={() => { action(); closeMenu(); }}
     >
       <span>{label}</span>
-      {shortcut && <span className="ml-8 text-gray-400 dark:text-gray-500 group-hover:text-white/70 text-[10px]">{shortcut}</span>}
+      {shortcut && <span className="ml-8 text-gray-500 dark:text-gray-500 group-hover:text-white/70 text-[10px]">{shortcut}</span>}
     </button>
   );
 
@@ -67,9 +67,9 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
       style={{
         height: 40,
         ...(distractionFree ? {
-          backgroundColor: 'var(--pal-bg)',
+          backgroundColor: 'var(--pal-viewer-bg)',
         } : matchToolbarPalette ? {
-          backgroundColor: theme === 'dark' ? (paletteBgDark || '#1a222b') : (paletteBg || '#ffffff'),
+          backgroundColor: 'var(--pal-panel-bg)',
           borderColor: 'var(--pal-border)',
         } : {}),
       }}
@@ -92,9 +92,15 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
 
         {/* Context Menu */}
         {menuOpen && (
-          <div className="absolute top-full left-0 mt-1 w-56 bg-white dark:bg-[#28323e] border border-gray-200 dark:border-gray-600 rounded-md shadow-2xl z-50 py-1">
+          <div
+            className="absolute top-full left-0 mt-1 w-56 bg-white dark:bg-[#28323e] border border-gray-200 dark:border-gray-600 rounded-md shadow-2xl z-50 py-1"
+            style={{
+              ...(matchToolbarPalette ? { backgroundColor: 'var(--pal-panel-bg)', borderColor: 'var(--pal-border)' } : {}),
+              filter: 'brightness(1.04) saturate(1.08)',
+            }}
+          >
             <div className="px-2 pb-1 mb-1 border-b border-gray-200 dark:border-gray-600">
-              <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">File</span>
+              <span className="text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">File</span>
             </div>
             {menuItem('New File', 'Ctrl+N', onNewFile)}
             {menuItem('Open File...', 'Ctrl+O', onOpenFile)}
@@ -121,7 +127,10 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
                 </svg>
               </button>
               {/* Submenu flyout — CSS hover, no gap */}
-              <div className="absolute left-full top-0 w-52 bg-white dark:bg-[#28323e] border border-gray-200 dark:border-gray-600 rounded-md shadow-2xl py-1 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity duration-75 -translate-y-2">
+              <div
+                className="absolute left-full top-0 w-52 bg-white dark:bg-[#28323e] border border-gray-200 dark:border-gray-600 rounded-md shadow-2xl py-1 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity duration-75 -translate-y-2"
+                style={matchToolbarPalette ? { backgroundColor: 'var(--pal-panel-bg)', borderColor: 'var(--pal-border)' } : undefined}
+              >
                 {recentFiles && recentFiles.length > 0 ? (
                   recentFiles.slice(0, 10).map((filePath) => {
                       const name = filePath.split(/[/\\]/).pop() || filePath;
@@ -133,8 +142,8 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
                           onClick={() => { onOpenRecentFile?.(filePath); closeMenu(); }}
                           title={filePath}
                         >
-                          <span className="truncate w-full">{name}</span>
-                          <span className="text-[10px] text-gray-400 truncate w-full">{dir}</span>
+                          <span className="truncate w-full" style={matchToolbarPalette ? { color: 'var(--pal-text)' } : undefined}>{name}</span>
+                          <span className="text-[10px] truncate w-full" style={{ color: matchToolbarPalette ? 'var(--pal-muted)' : undefined }}>{dir}</span>
                         </button>
                       );
                     })
@@ -145,7 +154,7 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
             </div>
             <div className="border-t border-gray-200 dark:border-gray-600 my-1" />
             <div className="px-2 pb-1 mb-1 border-b border-gray-200 dark:border-gray-600">
-              <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">View</span>
+              <span className="text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">View</span>
             </div>
             {!distractionFree && menuItem('Toggle Sidebar', 'Ctrl+B', () => toggleSidebar())}
             {menuItem(
@@ -153,7 +162,7 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
               'Ctrl+Shift+D',
               () => setTheme(theme === 'dark' ? 'light' : 'dark')
             )}
-            {onToggleDistractionFree && !isMaximized && menuItem(
+            {onToggleDistractionFree && !isMaximized && currentFile && menuItem(
               distractionFree ? 'Exit Distraction-Free' : 'Distraction-Free Mode',
               'Ctrl+Shift+F',
               onToggleDistractionFree
@@ -196,7 +205,7 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
           )}
         </button>
 
-        {onToggleDistractionFree && !isMaximized && (
+        {onToggleDistractionFree && !isMaximized && currentFile && (
           <>
             <button
               className={`titlebar-button w-8 h-8 flex items-center justify-center rounded transition-colors hover:bg-gray-700/10 dark:hover:bg-white/10 ${
@@ -258,7 +267,7 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
           )}
         </button>
         <button
-          className="titlebar-button w-8 h-8 flex items-center justify-center rounded hover:bg-red-500/80 text-gray-500 dark:text-gray-400 hover:text-white transition-colors ml-0.5"
+          className="titlebar-button w-8 h-8 flex items-center justify-center rounded hover:bg-red-600 text-gray-500 dark:text-gray-400 hover:!text-white dark:hover:!text-white transition-colors ml-0.5"
           onClick={onClose}
           title="Close"
         >

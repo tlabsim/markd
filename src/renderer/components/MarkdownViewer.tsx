@@ -59,7 +59,7 @@ interface MarkdownViewerProps {
 }
 
 const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, syncScroll, onScrollRef, onViewerScroll }) => {
-  const { fileContent, currentFilePath, fontFamily, zoomLevel, previewPalette, zoomIn, zoomOut } = useStore();
+  const { fileContent, currentFilePath, fontFamily, zoomLevel, previewPalette, zoomIn, zoomOut, matchToolbarPalette } = useStore();
   const contentRef = useRef<HTMLDivElement>(null);
   const scrollbarWideRef = useRef(false);
 
@@ -347,7 +347,7 @@ const AsyncImage: React.FC<{ src: string; alt: string; className?: string }> = (
       <div
         ref={contentRef}
         className={`flex-1 overflow-y-auto p-6 lg:p-8 xl:p-10 scrollbar-expand ${previewPalette !== 'default' ? `preview-${previewPalette}` : ''}`}
-        style={previewPalette === 'default' ? { background: 'var(--pal-bg)' } : undefined}
+        style={{ background: 'var(--pal-viewer-bg)' }}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
       >
@@ -377,7 +377,7 @@ const AsyncImage: React.FC<{ src: string; alt: string; className?: string }> = (
 
       {/* Table of Contents panel — always mounted to preserve scroll position */}
       <div className={`absolute top-3 right-3 bottom-3 w-64 z-10 transition-opacity ${showToc ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
-        <TableOfContents content={fileContent} onClose={() => onToggleToc?.()} />
+        <TableOfContents content={fileContent} onClose={() => onToggleToc?.()} matchPalette={matchToolbarPalette} />
       </div>
     </div>
   );

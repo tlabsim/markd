@@ -16,7 +16,7 @@
 .preview-sepia,
 .preview-contrast,
 .preview-cool {
-  background: var(--pal-bg);
+  background: var(--pal-viewer-bg);
 }
 
 div.markdown-body[data-palette] { color: var(--pal-text); }

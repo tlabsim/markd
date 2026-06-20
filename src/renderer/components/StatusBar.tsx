@@ -26,7 +26,7 @@ const StatusBar: React.FC<{ matchPalette?: boolean; paletteBg?: string; paletteB
         paddingBottom: 6,
         paddingTop: 4,
         ...(matchPalette ? {
-          backgroundColor: theme === 'dark' ? (paletteBgDark || '#1a222b') : (paletteBg || '#ffffff'),
+          backgroundColor: 'var(--pal-panel-bg)',
           borderColor: 'var(--pal-border)',
         } : {}),
       }}
@@ -47,16 +47,21 @@ const StatusBar: React.FC<{ matchPalette?: boolean; paletteBg?: string; paletteB
           title="Keyboard Shortcuts (Ctrl+/)"
         >
           <span className="px-2 py-0.5 text-gray-500 dark:text-gray-400 bg-gray-200/50 dark:bg-gray-700/30">KB Shortcuts</span>
-          <span className="px-1.5 py-0.5 text-gray-400 dark:text-gray-500 bg-white dark:bg-[#1c2733] border-l border-gray-300/50 dark:border-gray-600/50">Ctrl+/</span>
+          <span className="px-1.5 py-0.5 text-gray-400 dark:text-gray-500 bg-white/80 dark:bg-gray-800/30 border-l border-gray-300/50 dark:border-gray-600/50">Ctrl+/</span>
         </button>
         <span className="w-px h-3 bg-gray-300 dark:bg-gray-600" />
         <div className="inline-flex items-center text-[10px] rounded-md overflow-hidden border border-slate-300 dark:border-gray-600">
           <button
             className={`px-2 py-0.5 font-medium transition-colors border-r border-slate-300 dark:border-gray-600 ${
               viewMode === 'view'
-                ? 'bg-slate-600/10 dark:bg-white/10 text-slate-800 dark:text-gray-100'
-                : 'text-slate-600 dark:text-gray-400 hover:bg-slate-500/10 dark:hover:bg-slate-100/10'
+                ? 'bg-gray-700/10 dark:bg-white/10'
+                : 'hover:bg-gray-700/10 dark:hover:bg-white/5'
             }`}
+            style={{
+              color: viewMode === 'view'
+                ? (matchPalette ? 'var(--pal-text)' : undefined)
+                : (matchPalette ? 'var(--pal-muted)' : undefined),
+            }}
             onClick={() => setViewMode('view')}
             title="Preview mode"
           >
@@ -65,9 +70,14 @@ const StatusBar: React.FC<{ matchPalette?: boolean; paletteBg?: string; paletteB
           <button
             className={`px-2 py-0.5 font-medium transition-colors border-r border-slate-300 dark:border-gray-600 ${
               viewMode === 'edit'
-                ? 'bg-slate-600/10 dark:bg-white/10 text-slate-800 dark:text-gray-100'
-                : 'text-slate-600 dark:text-gray-400 hover:bg-slate-500/10 dark:hover:bg-slate-100/10'
+                ? 'bg-gray-700/10 dark:bg-white/10'
+                : 'hover:bg-gray-700/10 dark:hover:bg-white/5'
             }`}
+            style={{
+              color: viewMode === 'edit'
+                ? (matchPalette ? 'var(--pal-text)' : undefined)
+                : (matchPalette ? 'var(--pal-muted)' : undefined),
+            }}
             onClick={() => setViewMode('edit')}
             title="Edit mode"
           >
@@ -76,9 +86,14 @@ const StatusBar: React.FC<{ matchPalette?: boolean; paletteBg?: string; paletteB
           <button
             className={`px-2 py-0.5 font-medium transition-colors ${
               viewMode === 'split'
-                ? 'bg-slate-600/10 dark:bg-white/10 text-slate-800 dark:text-gray-100'
-                : 'text-slate-600 dark:text-gray-400 hover:bg-slate-500/10 dark:hover:bg-slate-100/10'
+                ? 'bg-gray-700/10 dark:bg-white/10'
+                : 'hover:bg-gray-700/10 dark:hover:bg-white/5'
             }`}
+            style={{
+              color: viewMode === 'split'
+                ? (matchPalette ? 'var(--pal-text)' : undefined)
+                : (matchPalette ? 'var(--pal-muted)' : undefined),
+            }}
             onClick={() => setViewMode('split')}
             title="Split mode"
           >

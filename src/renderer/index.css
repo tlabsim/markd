@@ -1,4 +1,3 @@
-@import './tokens.css';
 @import './palettes.css';
 
 @tailwind base;
@@ -11,7 +10,8 @@
   }
 
   body {
-    @apply bg-md-bg dark:bg-md-bg-dark text-md-text dark:text-md-text-dark;
+    background-color: var(--pal-panel-bg);
+    @apply text-md-text dark:text-md-text-dark;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
     overflow: hidden;
     user-select: none;
@@ -30,19 +30,12 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-gray-400/50 rounded-full;
+    background-color: color-mix(in srgb, var(--pal-muted) 35%, transparent);
+    border-radius: 9999px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-gray-400/70;
-  }
-
-  .dark ::-webkit-scrollbar-thumb {
-    @apply bg-gray-500/40;
-  }
-
-  .dark ::-webkit-scrollbar-thumb:hover {
-    @apply bg-gray-500/60;
+    background-color: color-mix(in srgb, var(--pal-muted) 55%, transparent);
   }
 }
 
@@ -54,7 +47,11 @@
 .scrollbar-expand::-webkit-scrollbar-thumb {
   border: 3px solid transparent;
   background-clip: padding-box;
+  background-color: color-mix(in srgb, var(--pal-muted) 35%, transparent);
   transition: border-width 0.2s ease;
+}
+.scrollbar-expand::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--pal-muted) 55%, transparent);
 }
 .scrollbar-expand.scrollbar-hover::-webkit-scrollbar-thumb {
   border-width: 0;

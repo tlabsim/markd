@@ -13,13 +13,18 @@ html[data-match-palette] button[class*="border-r"] { border-color: var(--pal-bor
 html[data-match-palette] [class*="rounded-md"][class*="border"] { border-color: var(--pal-border); }
 html[data-match-palette] [class*="rounded-md"][class*="border"] button { border-color: var(--pal-border); }
 
-html[data-match-palette] [class*="flex items-center justify-between px-3"] { color: var(--pal-muted); opacity: 0.8; }
-html[data-match-palette] [class*="w-full text-left"] { color: var(--pal-text); }
+html[data-match-palette] [class*="flex items-center justify-between px-3"]:not(.titlebar):not([class*="py-1.5"]) { color: var(--pal-muted); opacity: 0.8; }
+html[data-match-palette] [class*="w-full text-left"]:not([class*="py-1.5"]) { color: var(--pal-text); }
 html[data-match-palette] [class*="text-gray-500"] { color: var(--pal-muted); }
 html[data-match-palette] .btn-icon svg { color: var(--pal-muted); }
 html[data-match-palette] [class*="px-2.5 py-1 text-xs"] { color: var(--pal-muted); }
 /* ---- Default (no palette) — Light ---- */
 :root {
+  --pal-viewer-bg: #ffffff;
+  --pal-editor-bg: rgb(247, 249, 251);
+  --pal-editor-toolbar-bg: #eceef1;
+  --pal-panel-bg: #f6f8fa;
+  --pal-border-soft: rgba(208, 215, 222, 0.5);
   --pal-bg: #ffffff;
   --pal-text: #1f2328;
   --pal-link: #0969da;
@@ -51,6 +56,11 @@ html[data-match-palette] [class*="px-2.5 py-1 text-xs"] { color: var(--pal-muted
 
 /* ---- Default — Dark ---- */
 .dark {
+  --pal-viewer-bg: #1a222b;
+  --pal-editor-bg: #1c2733;
+  --pal-editor-toolbar-bg: rgb(31, 36, 42);
+  --pal-panel-bg: #1c2733;
+  --pal-border-soft: hsla(212, 12%, 25%, 0.5);
   --pal-bg: #1a222b;
   --pal-text: #d0d7de;
   --pal-link: #58a6ff;
@@ -80,11 +90,46 @@ html[data-match-palette] [class*="px-2.5 py-1 text-xs"] { color: var(--pal-muted
 }
 
 /* ---- Sepia — Light ---- */
-html[data-palette="sepia"] {
+/* html[data-palette="sepia"] {
   --pal-bg: #f5f0e8;
   --pal-text: #4a3f35;
   --pal-link: #7a6040;
   --pal-border: #d8ccb8;
+  --pal-muted: #5c5044;
+  --pal-blockquote-border: #d0c4b0;
+  --pal-blockquote-text: #5c5044;
+  --pal-code-bg: #e8e0d4;
+  --pal-code-text: #6b5040;
+  --pal-pre-bg: #ede6da;
+  --pal-pre-border: #d8ccb8;
+  --pal-th-bg: #ede6da;
+  --pal-th-border: #d8ccb8;
+  --pal-td-border: #d8ccb8;
+  --pal-tr-even-bg: rgba(245, 240, 232, 0.5);
+  --pal-tr-even-bg-dark: rgba(42, 36, 28, 0.3);
+  --pal-hr: #d8ccb8;
+  --pal-h6-text: #8c7a68;
+  --pal-selection: rgba(122, 96, 64, 0.28);
+  --pal-heading-border: #d8ccb8;
+  --pal-cb-bg: #ede6da;
+  --pal-cb-border: #d8ccb8;
+  --pal-cb-lang-bg: #d8ccb8;
+  --pal-cb-lang-text: #5c5044;
+  --pal-cb-btn-bg: rgba(216, 204, 184, 0.5);
+  --pal-cb-btn-hover: #d8ccb8;
+  --pal-cb-btn-text: #5c5044;
+} */
+
+html[data-palette="sepia"] {
+  --pal-viewer-bg: #f6f2ef;
+  --pal-editor-bg: #ede9e2;
+  --pal-editor-toolbar-bg: #f1eee9;
+  --pal-panel-bg: #e8e3df;
+  --pal-border-soft: rgba(216, 204, 184, 0.5);
+  --pal-bg: #faf8f3;
+  --pal-text: #4a3f35;
+  --pal-link: #7a6040;
+  --pal-border: #ded7cc;
   --pal-muted: #5c5044;
   --pal-blockquote-border: #d0c4b0;
   --pal-blockquote-text: #5c5044;
@@ -113,6 +158,11 @@ html[data-palette="sepia"] {
 /* ---- Sepia — Dark ---- */
 html.dark[data-palette="sepia"],
 html[data-palette="sepia"].dark {
+  --pal-viewer-bg: #26211a;
+  --pal-editor-bg: #2a241c;
+  --pal-editor-toolbar-bg: rgba(42, 36, 28, 0.6);
+  --pal-panel-bg: #1f1b15;
+  --pal-border-soft: rgba(74, 64, 48, 0.5);
   --pal-bg: #26211a;
   --pal-text: #e8dcc8;
   --pal-link: #d4b88c;
@@ -143,6 +193,11 @@ html[data-palette="sepia"].dark {
 
 /* ---- High Contrast — Light ---- */
 html[data-palette="contrast"] {
+  --pal-viewer-bg: #ffffff;
+  --pal-editor-bg: #ffffff;
+  --pal-editor-toolbar-bg: #f3f4f6;
+  --pal-panel-bg: #f3f4f6;
+  --pal-border-soft: rgba(156, 163, 175, 0.5);
   --pal-bg: #ffffff;
   --pal-text: #030712;
   --pal-link: #1e40af;
@@ -175,6 +230,11 @@ html[data-palette="contrast"] {
 /* ---- High Contrast — Dark ---- */
 html.dark[data-palette="contrast"],
 html[data-palette="contrast"].dark {
+  --pal-viewer-bg: #0a0a0a;
+  --pal-editor-bg: #111;
+  --pal-editor-toolbar-bg: #17191c;
+  --pal-panel-bg: #111;
+  --pal-border-soft: rgba(75, 85, 99, 0.5);
   --pal-bg: #0a0a0a;
   --pal-text: #f9fafb;
   --pal-link: #93c5fd;
@@ -205,6 +265,11 @@ html[data-palette="contrast"].dark {
 
 /* ---- Cool Blue — Light ---- */
 html[data-palette="cool"] {
+  --pal-viewer-bg: #f0f4f8;
+  --pal-editor-bg: #f0f4f8;
+  --pal-editor-toolbar-bg: #f8fafc;
+  --pal-panel-bg: #f8fafc;
+  --pal-border-soft: rgba(203, 213, 225, 0.5);
   --pal-bg: #f0f4f8;
   --pal-text: #1e293b;
   --pal-link: #2563eb;
@@ -237,6 +302,11 @@ html[data-palette="cool"] {
 /* ---- Cool Blue — Dark ---- */
 html.dark[data-palette="cool"],
 html[data-palette="cool"].dark {
+  --pal-viewer-bg: #121a28;
+  --pal-editor-bg: #161f30;
+  --pal-editor-toolbar-bg: rgba(30, 41, 59, 0.5);
+  --pal-panel-bg: #0f1622;
+  --pal-border-soft: rgba(51, 65, 85, 0.5);
   --pal-bg: #121a28;
   --pal-text: #e2e8f0;
   --pal-link: #93c5fd;
@@ -297,7 +367,7 @@ html[data-match-palette] [class*="rounded-md"][class*="border"] button {
 }
 
 /* Footer text — slightly subdued */
-html[data-match-palette] [class*="flex items-center justify-between px-3"] {
+html[data-match-palette] [class*="flex items-center justify-between px-3"]:not(.titlebar):not([class*="py-1.5"]) {
   color: var(--pal-muted);
   opacity: 0.8;
 }
@@ -313,7 +383,7 @@ html[data-match-palette] [class*="font-semibold"][class*="text-xs"] {
 }
 
 /* Sidebar file tree items and header */
-html[data-match-palette] [class*="w-full text-left"] {
+html[data-match-palette] [class*="w-full text-left"]:not([class*="py-1.5"]) {
   color: var(--pal-text);
 }
 html[data-match-palette] [class*="text-gray-500"] {
@@ -328,19 +398,19 @@ html[data-match-palette] [class*="px-2.5 py-1 text-xs"] {
   color: var(--pal-muted);
 }
 
-/* Editor panel — lighter palette bg */
+/* Editor panel */
 html[data-match-palette] [data-panel="editor"],
 html[data-match-palette] [data-panel="editor"] > div {
-  background: var(--pal-code-bg) !important;
+  background: var(--pal-editor-bg);
 }
 html[data-match-palette] [data-panel="editor"] textarea,
 html[data-match-palette] [data-panel="editor"] [contenteditable] {
-  background: var(--pal-code-bg) !important;
-  color: var(--pal-text) !important;
+  background: transparent;
+  color: var(--pal-text);
 }
 
 /* Editor toolbar */
 html[data-match-palette] [class*="flex items-center gap-0.5 px-3 py-1.5 border-b"] {
-  background: var(--pal-code-bg);
+  background: var(--pal-editor-toolbar-bg);
   border-color: var(--pal-border);
 }

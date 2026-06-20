@@ -171,6 +171,23 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
   const { fileContent, setFileContent, theme } = useStore();
   const editorRef = useRef<EditorEl>(null);
   const lineNumbersRef = useRef<HTMLDivElement>(null);
+  const scrollbarWideRef = useRef(false);
+
+  // Wider scrollbar on hover near right edge — direct DOM, no re-renders
+  const handleEditorMouseMove = useCallback((e: React.MouseEvent) => {
+    const el = editorRef.current;
+    if (!el) return;
+    const near = e.clientX > el.getBoundingClientRect().right - 30;
+    if (near !== scrollbarWideRef.current) {
+      scrollbarWideRef.current = near;
+      el.classList.toggle('scrollbar-hover', near);
+    }
+  }, []);
+
+  const handleEditorMouseLeave = useCallback(() => {
+    scrollbarWideRef.current = false;
+    editorRef.current?.classList.remove('scrollbar-hover');
+  }, []);
   const [cursorPosition, setCursorPosition] = useState({ line: 1, col: 1 });
   const [lineCount, setLineCount] = useState(1);
   const [taWidth, setTaWidth] = useState(0);
@@ -596,18 +613,12 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
   }, [handleRedo]);
 
   return (
-    <div className="h-full flex flex-col bg-white dark:bg-[#1c2733]" style={matchPalette ? {
-      backgroundColor: theme === 'dark'
-        ? `${paletteBgDark || '#1a222b'}D9`
-        : `${paletteBg || '#ffffff'}F2`,
-    } : undefined}>
+    <div className="h-full flex flex-col bg-white dark:bg-[#1c2733]" style={matchPalette ? { background: 'var(--pal-editor-bg)' } : undefined}>
       {/* Editor toolbar — darker than editor area */}
       <div
         className="flex items-center gap-0.5 px-3 py-1.5 border-b border-gray-200/60 dark:border-gray-700/50 bg-gray-50/85 dark:bg-[#181e26]/85 backdrop-blur-md flex-wrap"
         style={matchPalette ? {
-          backgroundColor: theme === 'dark'
-            ? (paletteBgDark || '#1a222b')
-            : 'var(--pal-pre-bg)',
+          backgroundColor: 'var(--pal-editor-toolbar-bg)',
         } : undefined}
       >
         {/* Undo */}
@@ -803,7 +814,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
 
 
       {/* Textarea with line numbers */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden bg-transparent">
         {/* Line numbers */}
         <div
           ref={lineNumbersRef}
@@ -812,9 +823,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
             minWidth: '4rem',
             scrollbarWidth: 'none',
             ...(matchPalette ? {
-              backgroundColor: theme === 'dark'
-                ? (paletteBgDark || '#1a222b')
-                : 'var(--pal-pre-bg)',
+              backgroundColor: 'var(--pal-editor-toolbar-bg)',
               color: 'var(--pal-muted)',
             } : {}),
           }}
@@ -834,9 +843,11 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
             onClick={handleCursorUpdate}
             onScroll={handleScroll}
             spellCheck={false}
-            className={`flex-1 bg-transparent text-sm leading-6 font-mono p-3 resize-none outline-none text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-600 ${wordWrap ? 'wrap' : 'no-wrap'}`}
+            className={`flex-1 bg-transparent text-sm leading-6 font-mono p-3 resize-none outline-none text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-600 scrollbar-expand ${wordWrap ? 'wrap' : 'no-wrap'}`}
             placeholder="Start writing markdown..."
-            style={{ tabSize: 2, whiteSpace: wordWrap ? 'pre-wrap' : 'pre' }}
+            style={{ tabSize: 2, whiteSpace: wordWrap ? 'pre-wrap' : 'pre', background: 'transparent' }}
+            onMouseMove={handleEditorMouseMove}
+            onMouseLeave={handleEditorMouseLeave}
           />
         ) : (
           <div
@@ -848,8 +859,10 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
             onClick={handleCursorUpdate}
             onScroll={handleScroll}
             spellCheck={false}
-            className={`flex-1 text-sm leading-6 font-mono p-3 outline-none whitespace-pre-wrap break-words overflow-y-auto overflow-x-auto text-gray-800 dark:text-gray-200 bg-transparent ${wordWrap ? '' : 'whitespace-pre'}`}
-            style={{ tabSize: 2, whiteSpace: wordWrap ? 'pre-wrap' : 'pre' }}
+            className={`flex-1 text-sm leading-6 font-mono p-3 outline-none whitespace-pre-wrap break-words overflow-y-auto overflow-x-auto text-gray-800 dark:text-gray-200 bg-transparent scrollbar-expand ${wordWrap ? '' : 'whitespace-pre'}`}
+            style={{ tabSize: 2, whiteSpace: wordWrap ? 'pre-wrap' : 'pre', background: 'transparent' }}
+            onMouseMove={handleEditorMouseMove}
+            onMouseLeave={handleEditorMouseLeave}
           />
         )}
       </div>

@@ -14,6 +14,7 @@ interface TocNode {
 interface TableOfContentsProps {
   content: string;
   onClose: () => void;
+  matchPalette?: boolean;
 }
 
 // ---- Build tree from flat heading list ----
@@ -78,7 +79,7 @@ const TreeNode: React.FC<{
         {/* Chevron (parents only) */}
         {hasChildren && (
           <button
-            className="shrink-0 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-gray-400 dark:text-gray-500 flex items-center justify-center"
+            className="shrink-0 rounded hover:bg-gray-700/15 dark:hover:bg-white/10 transition-colors text-gray-400 dark:text-gray-500 flex items-center justify-center"
             style={{
               width: `${CHEVRON_SIZE}px`,
               height: `${CHEVRON_SIZE}px`,
@@ -99,7 +100,7 @@ const TreeNode: React.FC<{
 
         {/* Label */}
         <button
-          className={`text-xs text-left truncate py-0.5 pr-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors flex-1
+          className={`text-xs text-left truncate py-0.5 pr-2 rounded hover:bg-gray-700/10 dark:hover:bg-white/5 transition-colors flex-1
             ${item.level <= 2 ? 'font-semibold text-gray-700 dark:text-gray-200' : 'text-gray-500 dark:text-gray-400'}`}
           onClick={() => onScroll(item.id)}
           style={{ marginLeft: isRoot ? 0 : hasChildren ? 0 : `${CONNECTOR_LEAF + GAP}px` }}
@@ -129,7 +130,7 @@ const TreeNode: React.FC<{
   );
 };
 
-const TableOfContents: React.FC<TableOfContentsProps> = ({ content, onClose }) => {
+const TableOfContents: React.FC<TableOfContentsProps> = ({ content, onClose, matchPalette }) => {
   const tocRef = useRef<HTMLDivElement>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
@@ -221,6 +222,7 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ content, onClose }) =
     <div
       ref={tocRef}
       className="p-3 shadow-xl h-full overflow-y-auto rounded-lg border border-gray-200/50 dark:border-gray-700/50 bg-white/85 dark:bg-[#222c36]/85 backdrop-blur-md"
+      style={matchPalette ? { backgroundColor: 'color-mix(in srgb, var(--pal-panel-bg) 85%, transparent)', borderColor: 'var(--pal-border-soft)' } : undefined}
     >
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">

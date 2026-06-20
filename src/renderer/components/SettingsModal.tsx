@@ -89,7 +89,7 @@ const SegmentedControl: React.FC<{
         className={`px-2.5 py-1 transition-colors ${
           value === opt.value
             ? 'bg-blue-500 text-white'
-            : 'bg-white dark:bg-[#1e2730] text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+            : 'bg-gray-700/5 dark:bg-white/5 text-gray-600 dark:text-gray-300 hover:bg-gray-700/10 dark:hover:bg-white/10'
         }`}
       >
         {opt.label}
@@ -100,7 +100,7 @@ const SegmentedControl: React.FC<{
 
 // ----- Settings row -----
 const SettingRow: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
-  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700/50">
+  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700/10 dark:border-white/5">
     <span className="text-[13px] text-gray-700 dark:text-gray-200">{label}</span>
     {children}
   </div>
@@ -108,13 +108,17 @@ const SettingRow: React.FC<{ label: string; children: React.ReactNode }> = ({ la
 
 // ----- iOS-style tab bar -----
 const TabBar: React.FC<{ activeTab: Tab; onTab: (t: Tab) => void }> = ({ activeTab, onTab }) => {
+  const matchToolbarPalette = useStore(s => s.matchToolbarPalette);
   const tabs: { id: Tab; label: string }[] = [
     { id: 'settings', label: 'Settings' },
     { id: 'shortcuts', label: 'Keyboard Shortcuts' },
     { id: 'about', label: 'About' },
   ];
   return (
-    <div className="flex border-b border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-[#1a222b]">
+    <div
+      className="flex border-b border-gray-700/10 dark:border-white/5 bg-gray-50 dark:bg-[#1a222b]"
+      style={matchToolbarPalette ? { backgroundColor: 'var(--pal-editor-toolbar-bg)', borderColor: 'var(--pal-border)' } : undefined}
+    >
       {tabs.map((tab) => (
         <button
           key={tab.id}
@@ -184,12 +188,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
         onClick={onClose}
       />
       {/* Modal */}
-      <div className="relative w-[520px] max-w-[92vw] max-h-[85vh] bg-white dark:bg-[#252f3b] rounded-xl shadow-2xl border border-gray-200 dark:border-gray-600 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150">
+      <div
+        className="relative w-[520px] max-w-[92vw] max-h-[85vh] bg-white dark:bg-[#252f3b] rounded-xl shadow-2xl border border-gray-200 dark:border-gray-600 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150"
+        style={matchToolbarPalette ? { backgroundColor: 'var(--pal-panel-bg)', borderColor: 'var(--pal-border)' } : undefined}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-gray-600">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-700/10 dark:border-white/5">
           <h2 className="text-[14px] font-semibold text-gray-800 dark:text-gray-100">Settings</h2>
           <button
-            className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+            className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-gray-700/15 dark:hover:bg-white/10 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
             onClick={onClose}
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -204,7 +211,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
         {/* Content */}
         <div className="flex-1 overflow-y-auto pt-1">
           {tab === 'settings' && (
-            <div className="divide-y divide-gray-100 dark:divide-gray-700/30">
+            <div className="divide-y divide-gray-700/10 dark:divide-white/5">
               {/* Appearance */}
               <div className="px-4 py-2.5 text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
                 Appearance
@@ -223,7 +230,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
 
               <SettingRow label="Preview Palette">
                 <select
-                  className="text-[12px] rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#1e2730] text-gray-700 dark:text-gray-200 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="text-[12px] rounded-md border border-gray-300 dark:border-gray-600 bg-gray-700/5 dark:bg-white/5 text-gray-700 dark:text-gray-200 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   value={previewPalette}
                   onChange={(e) => setPreviewPalette(e.target.value)}
                 >
@@ -235,7 +242,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
 
               <SettingRow label="Font Family">
                 <select
-                  className="text-[12px] rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#1e2730] text-gray-700 dark:text-gray-200 px-2 py-1 max-w-[180px] truncate focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="text-[12px] rounded-md border border-gray-300 dark:border-gray-600 bg-gray-700/5 dark:bg-white/5 text-gray-700 dark:text-gray-200 px-2 py-1 max-w-[180px] truncate focus:outline-none focus:ring-1 focus:ring-blue-500"
                   value={fontFamily}
                   onChange={(e) => setFontFamily(e.target.value)}
                 >
@@ -248,12 +255,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
               <SettingRow label="Zoom Level">
                 <div className="flex items-center gap-1.5">
                   <button
-                    className="w-6 h-6 flex items-center justify-center rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                    className="w-6 h-6 flex items-center justify-center rounded text-xs bg-gray-700/10 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-700/20 dark:hover:bg-white/15"
                     onClick={() => setZoomLevel(Math.max(50, zoomLevel - 10))}
                   >−</button>
                   <span className="text-[12px] font-mono text-gray-600 dark:text-gray-300 w-10 text-center">{zoomLevel}%</span>
                   <button
-                    className="w-6 h-6 flex items-center justify-center rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                    className="w-6 h-6 flex items-center justify-center rounded text-xs bg-gray-700/10 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-700/20 dark:hover:bg-white/15"
                     onClick={() => setZoomLevel(Math.min(200, zoomLevel + 10))}
                   >+</button>
                   <button
@@ -346,14 +353,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
           )}
 
           {tab === 'shortcuts' && (
-            <div className="divide-y divide-gray-100 dark:divide-gray-700/30">
+            <div className="divide-y divide-gray-700/10 dark:divide-white/5">
               <div className="px-4 py-2.5 text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
                 All Keyboard Shortcuts
               </div>
               {SHORTCUTS.map((sc) => (
                 <div key={sc.key} className="flex items-center justify-between px-4 py-2.5">
                   <span className="text-[13px] text-gray-700 dark:text-gray-200">{sc.label}</span>
-                  <kbd className="inline-flex items-center gap-0.5 px-2 py-0.5 text-[11px] font-mono font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700/60 rounded-md border border-gray-200 dark:border-gray-600">
+                  <kbd className="inline-flex items-center gap-0.5 px-2 py-0.5 text-[11px] font-mono font-medium text-gray-500 dark:text-gray-400 bg-gray-700/10 dark:bg-white/10 rounded-md border border-gray-200 dark:border-gray-600">
                     {sc.key}
                   </kbd>
                 </div>
@@ -376,7 +383,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
               </div>
 
               {/* Author */}
-              <div className="bg-gray-50 dark:bg-[#1e2730] rounded-lg p-4">
+              <div className="bg-gray-700/5 dark:bg-white/5 rounded-lg p-4">
                 <div className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">
                   Author
                 </div>

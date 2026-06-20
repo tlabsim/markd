@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
+import './tokens.css';
 import 'highlight.js/styles/github.css';
 import 'katex/dist/katex.min.css';
 
