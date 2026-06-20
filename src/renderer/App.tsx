@@ -673,7 +673,7 @@ const App: React.FC = () => {
     <div className="relative" ref={paletteMenuRef}>
       <button
         ref={btnRef}
-        className="btn-icon text-xs gap-2 flex items-center"
+        className="btn-icon text-xs gap-1.5 flex items-center"
         onClick={openMenu}
         title="Change preview color palette"
       >
