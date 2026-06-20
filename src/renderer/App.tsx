@@ -949,13 +949,13 @@ const App: React.FC = () => {
                   </svg>
                 </button>
               </div>
-              <div className="w-px h-5 bg-gray-600/10 dark:bg-gray-700 mx-1 shrink-0" />
+              <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-1 shrink-0" />
               {/* Font selector */}
               <FontSelector />
-              <div className="w-px h-5 bg-gray-600/10 dark:bg-gray-700 shrink-0" />
+              <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 shrink-0" />
               {/* Palette selector */}
               <PaletteSelector />
-              <div className="w-px h-5 bg-gray-600/10 dark:bg-gray-700 shrink-0" />
+              <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 shrink-0" />
               {/* Zoom controls */}
               <button className="btn-icon" onClick={zoomOut} title="Zoom out">
                 <svg className="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>

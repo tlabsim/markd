@@ -152,7 +152,7 @@ const Sidebar: React.FC<{
         </span>
         <div className="flex items-center gap-1">
           <button
-            className="opacity-70 w-6 h-6 flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-gray-600/50 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
+            className="opacity-70 w-6 h-6 flex items-center justify-center rounded hover:bg-gray-700/10 dark:hover:bg-gray-200/10 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
             onClick={onOpenFile}
             title="Open file"
           >
@@ -160,7 +160,7 @@ const Sidebar: React.FC<{
             <svg className="w-[20px] h-[20px] shrink-0" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5"><path d="M12 16.5v-9M8.5 11L12 7.5l3.5 3.5"/><path d="M3 9.4c0-2.24 0-3.36.436-4.216a4 4 0 0 1 1.748-1.748C6.04 3 7.16 3 9.4 3h5.2c2.24 0 3.36 0 4.216.436a4 4 0 0 1 1.748 1.748C21 6.04 21 7.16 21 9.4v5.2c0 2.24 0 3.36-.436 4.216a4 4 0 0 1-1.748 1.748C17.96 21 16.84 21 14.6 21H9.4c-2.24 0-3.36 0-4.216-.436a4 4 0 0 1-1.748-1.748C3 17.96 3 16.84 3 14.6z"/></g></svg>
           </button>
           <button
-            className="opacity-70 w-6 h-6 flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-gray-600/50 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
+            className="opacity-70 w-6 h-6 flex items-center justify-center rounded hover:bg-gray-700/10 dark:hover:bg-gray-200/10 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
             onClick={handleOpenFolder}
             title="Open folder"
           >
@@ -171,7 +171,7 @@ const Sidebar: React.FC<{
             <svg className="w-[20px] h-[20px] shrink-0" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M11.661 7H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7m8.661 0a2 2 0 0 1-1.322-.5l-2.272-2A2 2 0 0 0 6.745 4H5a2 2 0 0 0-2 2v1m8.661 0H3"/></svg>
           </button>
           <button
-            className="opacity-70 w-6 h-6 flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-gray-600/50 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
+            className="opacity-70 w-6 h-6 flex items-center justify-center rounded hover:bg-gray-700/10 dark:hover:bg-gray-200/10 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
             onClick={toggleSidebar}
             title="Collapse sidebar"
           >

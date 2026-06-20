@@ -69,7 +69,7 @@ textarea,
   }
 
   .btn-ghost {
-    @apply btn text-md-muted dark:text-md-muted-dark hover:bg-gray-200/50 dark:hover:bg-gray-700/50;
+    @apply btn text-md-muted dark:text-md-muted-dark hover:bg-gray-700/10 dark:hover:bg-gray-200/10;
   }
 
   .btn-icon {
