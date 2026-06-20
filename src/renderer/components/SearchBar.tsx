@@ -8,7 +8,7 @@ interface SearchBarProps {
 }
 
 const SearchBar: React.FC<SearchBarProps> = ({ editorRef, viewerRef, viewMode }) => {
-  const { fileContent, searchQuery, setSearchQuery, isSearchOpen, setSearchOpen } = useStore();
+  const { fileContent, searchQuery, setSearchQuery, isSearchOpen, setSearchOpen, matchToolbarPalette } = useStore();
   const [matchPositions, setMatchPositions] = useState<number[]>([]);
   const [currentIdx, setCurrentIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -16,6 +16,11 @@ const SearchBar: React.FC<SearchBarProps> = ({ editorRef, viewerRef, viewMode })
   useEffect(() => {
     if (isSearchOpen && inputRef.current) inputRef.current.focus();
   }, [isSearchOpen]);
+
+  // Clear highlights when content changes (prevents DOM conflict with React)
+  useEffect(() => {
+    if (viewerRef?.current) clearHighlights(viewerRef.current);
+  }, [fileContent, viewerRef]);
 
   const buildMatches = useCallback((query: string) => {
     if (viewerRef?.current) clearHighlights(viewerRef.current);
@@ -33,7 +38,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ editorRef, viewerRef, viewMode })
   const goToMatch = useCallback((idx: number) => {
     if (matchPositions.length === 0 || idx < 0) return;
     const pos = matchPositions[idx];
-    if (viewMode !== 'view' && editorRef?.current instanceof HTMLTextAreaElement) {
+    if (viewMode === 'edit' && editorRef?.current instanceof HTMLTextAreaElement) {
       const ta = editorRef.current;
       ta.focus();
       ta.selectionStart = pos;
@@ -42,8 +47,10 @@ const SearchBar: React.FC<SearchBarProps> = ({ editorRef, viewerRef, viewMode })
       const lineNum = before.split('\n').length;
       ta.scrollTop = Math.max(0, (lineNum - 3) * 24);
     }
-    if (viewMode === 'view' && viewerRef?.current) {
-      highlightInViewer(viewerRef.current, searchQuery, idx);
+    if (viewMode !== 'edit' && viewerRef?.current) {
+      requestAnimationFrame(() => {
+        if (viewerRef?.current) highlightInViewer(viewerRef.current, searchQuery, idx);
+      });
     }
   }, [matchPositions, searchQuery, fileContent, viewMode, editorRef, viewerRef]);
 
@@ -85,8 +92,15 @@ const SearchBar: React.FC<SearchBarProps> = ({ editorRef, viewerRef, viewMode })
   }, [goNext, goPrev, closeSearch]);
 
   return (
-    <div className="flex items-center gap-2 px-3 py-2 bg-white/95 dark:bg-[#1c2733]/95 backdrop-blur-md border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg">
-      <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div
+      className="flex items-center gap-2 px-3 py-2 bg-white/95 dark:bg-[#1c2733]/95 backdrop-blur-md border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg"
+      style={matchToolbarPalette ? {
+        backgroundColor: 'color-mix(in srgb, var(--pal-panel-bg) 95%, transparent)',
+        borderColor: 'var(--pal-border-soft)',
+        filter: 'brightness(1.1)',
+      } : undefined}
+    >
+      <svg className="w-4 h-4 flex-shrink-0" style={{ color: matchToolbarPalette ? 'var(--pal-muted)' : undefined }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
       </svg>
       <input
@@ -97,9 +111,10 @@ const SearchBar: React.FC<SearchBarProps> = ({ editorRef, viewerRef, viewMode })
         onKeyDown={handleKeyDown}
         placeholder="Search in document..."
         className="flex-1 py-1 text-xs bg-transparent outline-none text-gray-800 dark:text-gray-200"
+        style={matchToolbarPalette ? { color: 'var(--pal-text)' } : undefined}
       />
       {searchQuery && (
-        <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap tabular-nums">
+        <span className="text-xs whitespace-nowrap tabular-nums" style={{ color: matchToolbarPalette ? 'var(--pal-muted)' : undefined }}>
           {matchPositions.length > 0 ? `${currentIdx + 1}/${matchPositions.length}` : 'No results'}
         </span>
       )}

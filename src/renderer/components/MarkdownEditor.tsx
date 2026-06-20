@@ -244,7 +244,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
   const pushUndo = useCallback(() => {
     const el = editorRef.current;
     if (!el) return;
-    undoStack.current.push(getText(el));
+    const text = getText(el);
+    if (undoStack.current.length > 0 && undoStack.current[undoStack.current.length - 1] === text) return;
+    undoStack.current.push(text);
     if (undoStack.current.length > 100) undoStack.current.shift();
     redoStack.current = [];
   }, []);
@@ -364,6 +366,12 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
     syncGuard.current = true;
     if (el instanceof HTMLDivElement && syntaxHighlight) {
       el.innerHTML = highlightMarkdown(prev) || '<br>';
+      // Place cursor at end after undo
+      const len = prev.length;
+      setSel(el, len, len);
+    } else if (el instanceof HTMLTextAreaElement) {
+      el.value = prev;
+      lastTypedRef.current = prev;
     }
     setFileContent(prev);
     setTimeout(() => { syncGuard.current = false; }, 100);
@@ -378,6 +386,11 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
     syncGuard.current = true;
     if (el instanceof HTMLDivElement && syntaxHighlight) {
       el.innerHTML = highlightMarkdown(next) || '<br>';
+      const len = next.length;
+      setSel(el, len, len);
+    } else if (el instanceof HTMLTextAreaElement) {
+      el.value = next;
+      lastTypedRef.current = next;
     }
     setFileContent(next);
     setTimeout(() => { syncGuard.current = false; }, 100);
@@ -425,14 +438,16 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
   }, []);
 
   // Sync editor from store for external changes only (file open)
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = editorRef.current;
     if (!el || isHighlighting.current || syncGuard.current) return;
     if (el instanceof HTMLTextAreaElement) return;
     // contentEditable: set initial content when file opens or mode switches
     if (el instanceof HTMLDivElement && syntaxHighlight) {
+      const cursor = saveCursor(el);
       syncGuard.current = true;
       el.innerHTML = highlightMarkdown(fileContent) || '<br>';
+      restoreCursor(el, cursor);
       setTimeout(() => { syncGuard.current = false; }, 100);
     }
   }, [fileContent, syntaxHighlight]);
@@ -440,7 +455,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
   // Input handler: push undo, debounce store, schedule highlighting
   const handleInput = useCallback(() => {
     const el = editorRef.current;
-    if (!el) return;
+    if (!el || syncGuard.current) return;
     const text = getText(el);
     pushUndo(); // per-keystroke undo for contentEditable
     pushToStore(text);
@@ -451,6 +466,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
   // textarea onChange — short debounce (150ms) + startTransition for interruptible preview
   const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const text = e.target.value;
+    pushUndo();
     lastTypedRef.current = text;
     clearTimeout(storeTimer.current);
     storeTimer.current = window.setTimeout(() => {
@@ -458,7 +474,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
         startTransition(() => { setFileContent(text); });
       }
     }, 150);
-  }, [setFileContent]);
+  }, [setFileContent, pushUndo]);
 
   const handleScroll = useCallback(() => {
     if (editorRef.current && lineNumbersRef.current) {
@@ -478,6 +494,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
     // Tab — insert 2 spaces natively, debounce store
     if (e.key === 'Tab') {
       e.preventDefault();
+      pushUndo();
       const { start, end } = getSel(el);
       const value = getText(el);
       if (!e.shiftKey) {
@@ -485,11 +502,14 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
         if (isTa) {
           el.value = nv; lastTypedRef.current = nv;
           el.selectionStart = el.selectionEnd = start + 2;
+          pushUndo(); // save post-Tab state (onChange doesn't fire on programmatic value set)
           clearTimeout(storeTimer.current);
           storeTimer.current = window.setTimeout(() => { startTransition(() => { lastTypedRef.current = nv; setFileContent(nv); }); }, 150);
         } else {
+          syncGuard.current = true;
           setFileContent(nv);
           setTimeout(() => { const el2 = editorRef.current; if (el2 && !(el2 instanceof HTMLTextAreaElement) && syntaxHighlight) el2.innerHTML = highlightMarkdown(nv) || '<br>'; setSel(el2!, start + 2, start + 2); }, 0);
+          setTimeout(() => { syncGuard.current = false; }, 50);
         }
         updateCursorPosition();
       } else {
@@ -503,17 +523,21 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
             clearTimeout(storeTimer.current);
             storeTimer.current = window.setTimeout(() => { startTransition(() => { lastTypedRef.current = nv; setFileContent(nv); }); }, 150);
           } else {
+            syncGuard.current = true;
             setFileContent(nv);
             setTimeout(() => { const el2 = editorRef.current; if (el2 && !(el2 instanceof HTMLTextAreaElement) && syntaxHighlight) el2.innerHTML = highlightMarkdown(nv) || '<br>'; setSel(el2!, start - 2, start - 2); }, 0);
+            setTimeout(() => { syncGuard.current = false; }, 50);
           }
           updateCursorPosition();
         }
       }
       return;
     }
-    // Enter — insert newline + indent natively, debounce store
+    // Enter — textarea: let browser handle natively (native undo); contentEditable: programmatic
     if (e.key === 'Enter') {
+      if (isTa) return; // browser handles Enter + native undo
       e.preventDefault();
+      pushUndo();
       const value = getText(el);
       const { start } = getSel(el);
       const ls = value.lastIndexOf('\n', start - 1) + 1;
@@ -523,11 +547,18 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
         if (isTa) {
           el.value = nv; lastTypedRef.current = nv;
           el.selectionStart = el.selectionEnd = cursor;
+          pushUndo(); // save post-Enter state (onChange doesn't fire on programmatic value set)
           clearTimeout(storeTimer.current);
           storeTimer.current = window.setTimeout(() => { startTransition(() => { lastTypedRef.current = nv; setFileContent(nv); }); }, 150);
         } else {
+          syncGuard.current = true;
           setFileContent(nv);
-          setTimeout(() => { const el2 = editorRef.current; if (el2 && !(el2 instanceof HTMLTextAreaElement) && syntaxHighlight) el2.innerHTML = highlightMarkdown(nv) || '<br>'; setSel(el2!, cursor, cursor); }, 0);
+          requestAnimationFrame(() => {
+            const el2 = editorRef.current;
+            if (el2 && !(el2 instanceof HTMLTextAreaElement) && syntaxHighlight) el2.innerHTML = highlightMarkdown(nv) || '<br>';
+            setSel(el2 || el, cursor, cursor);
+            requestAnimationFrame(() => { syncGuard.current = false; });
+          });
         }
         updateCursorPosition();
       };
@@ -538,7 +569,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
       const ins = indent ? '\n' + indent : '\n';
       doApply(value.substring(0, start) + ins + value.substring(start), start + ins.length);
     }
-  }, [setFileContent, updateCursorPosition, handleUndo, handleRedo, syntaxHighlight]);
+  }, [setFileContent, updateCursorPosition, handleUndo, handleRedo, syntaxHighlight, pushUndo]);
 
   const handleCursorUpdate = useCallback(() => {
     updateCursorPosition();
