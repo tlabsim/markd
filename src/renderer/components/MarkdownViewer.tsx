@@ -58,55 +58,6 @@ function rehypeFilterCustomElements() {
   };
 }
 
-// ---- Remark plugin: footnotes ([^id] / [^id]: definition) ----
-function remarkFootnotes() {
-  return (tree: any) => {
-    const defs = new Map<string, any[]>();
-    for (let i = tree.children.length - 1; i >= 0; i--) {
-      const node = tree.children[i];
-      if (node.type === 'paragraph' && node.children?.[0]?.type === 'footnoteDefinition') {
-        defs.set(node.children[0].identifier, node.children[0].children || []);
-      } else { break; }
-    }
-    if (defs.size === 0) return;
-    tree.children = tree.children.filter((n: any) =>
-      !(n.type === 'paragraph' && n.children?.[0]?.type === 'footnoteDefinition'));
-    const seen = new Map<string, number>();
-    let counter = 1;
-    function scanRefs(node: any) {
-      if (node.type === 'footnoteReference') {
-        if (!seen.has(node.identifier)) { seen.set(node.identifier, counter++); }
-      }
-      if (node.children) for (const c of node.children) scanRefs(c);
-    }
-    scanRefs(tree);
-    const sectionChildren: any[] = [{ type: 'html', value: '<hr class="footnotes-sep" />' }];
-    for (const [id, children] of defs) {
-      const num = seen.get(id);
-      if (!num) continue;
-      sectionChildren.push({
-        type: 'paragraph',
-        data: { hProperties: { className: 'footnote-item', id: `fn-${id}` } },
-        children: [
-          { type: 'html', value: `<a href="#fnref-${id}" class="footnote-backref">↩</a>&#160;` },
-          { type: 'html', value: `<span class="footnote-num">${num}.</span>&#160;` },
-          ...children,
-        ],
-      });
-    }
-    tree.children.push({ type: 'section', data: { hName: 'section', hProperties: { className: 'footnotes' } }, children: sectionChildren });
-    function assignNums(node: any) {
-      if (node.type === 'footnoteReference') {
-        const n = seen.get(node.identifier) || 0;
-        node.type = 'html';
-        node.value = `<sup class="footnote-ref"><a href="#fn-${node.identifier}" id="fnref-${node.identifier}">${n}</a></sup>`;
-      }
-      if (node.children) for (const c of node.children) assignNums(c);
-    }
-    assignNums(tree);
-  };
-}
-
 // ---- Remark plugin: subscript ~text~ and superscript ^text^ ----
 function remarkSubSuper() {
   return (tree: any) => {
@@ -115,7 +66,7 @@ function remarkSubSuper() {
         const parts: Array<{ type: 'text' | 'html'; value: string }> = [];
         let i = 0;
         while (i < node.value.length) {
-          // Superscript: ^text^
+          // Superscript: ^text^ (needs closing ^)
           if (node.value[i] === '^') {
             const end = node.value.indexOf('^', i + 1);
             if (end > i + 1) {
@@ -124,8 +75,12 @@ function remarkSubSuper() {
               i = end + 1;
               continue;
             }
+            // Unmatched ^ — treat as literal
+            parts.push({ type: 'text', value: '^' });
+            i++;
+            continue;
           }
-          // Subscript: ~text~
+          // Subscript: ~text~ (needs closing ~)
           if (node.value[i] === '~') {
             const end = node.value.indexOf('~', i + 1);
             if (end > i + 1) {
@@ -134,6 +89,10 @@ function remarkSubSuper() {
               i = end + 1;
               continue;
             }
+            // Unmatched ~ — treat as literal
+            parts.push({ type: 'text', value: '~' });
+            i++;
+            continue;
           }
           // Collect plain text until next marker
           let j = i;
@@ -192,52 +151,29 @@ function remarkHighlight() {
   };
 }
 
-// ---- Remark plugin: definition lists (term followed by : definition) ----
+// ---- Remark plugin: definition lists (term\n: definition within paragraphs) ----
 function remarkDeflist() {
   return (tree: any) => {
     const newChildren: any[] = [];
-    let i = 0;
-    while (i < tree.children.length) {
+    for (let i = 0; i < tree.children.length; i++) {
       const node = tree.children[i];
-      if (node.type === 'paragraph' && node.children?.length > 0 &&
-          node.children[node.children.length - 1].type === 'text') {
-        const lastText = node.children[node.children.length - 1].value;
-        if (lastText.endsWith('\n')) {
-          const termText = lastText.slice(0, -1);
-          const termChildren = [...node.children.slice(0, -1), { type: 'text', value: termText }];
-          const dlParts: string[] = [];
-          dlParts.push(`<dt>${reconstructText(termChildren)}</dt>`);
-          i++;
-          while (i < tree.children.length) {
-            const next = tree.children[i];
-            if (next.type === 'paragraph' && next.children?.[0]?.type === 'text') {
-              const m = next.children[0].value.match(/^:\s+(.*)/);
-              if (m) {
-                dlParts.push(`<dd>${m[1]}${next.children.slice(1).map((c: any) => c.value || '').join('')}</dd>`);
-                i++; continue;
-              }
-            }
-            break;
-          }
-          newChildren.push({ type: 'html', value: `<dl>${dlParts.join('')}</dl>` });
+      if (node.type === 'paragraph' && node.children?.length > 0) {
+        // Collect all text from paragraph
+        const fullText = node.children.map((c: any) => c.value || '').join('');
+        // Check for definition list pattern: Term\n: Def (and subsequent \n: Def)
+        const parts = fullText.split(/\n(?=:\s+)/);
+        if (parts.length > 1 && parts[1].startsWith(': ')) {
+          const dt = parts[0].trim();
+          const dds = parts.slice(1).map((p: string) => p.replace(/^:\s+/, '').trim());
+          const html = `<dl><dt>${dt}</dt>${dds.map((d: string) => `<dd>${d}</dd>`).join('')}</dl>`;
+          newChildren.push({ type: 'html', value: html });
           continue;
         }
       }
       newChildren.push(node);
-      i++;
     }
     tree.children = newChildren;
   };
-}
-
-function reconstructText(children: any[]): string {
-  return children.map((c: any) => {
-    if (c.type === 'text') return c.value;
-    if (c.type === 'inlineCode') return `<code>${c.value}</code>`;
-    if (c.type === 'strong') return `**${reconstructText(c.children)}**`;
-    if (c.type === 'emphasis') return `*${reconstructText(c.children)}*`;
-    return c.value || '';
-  }).join('');
 }
 
 import TableOfContents from './TableOfContents';
@@ -357,6 +293,27 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, s
 
   useEffect(() => { if (contentRef.current) contentRef.current.scrollTop = 0; }, [currentFilePath]);
 
+  // Intercept footnote link clicks — prevent full page navigation
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const a = target.closest('a');
+      if (!a) return;
+      const href = a.getAttribute('href');
+      if (!href?.startsWith('#user-content-fn')) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const el = contentRef.current;
+      if (!el) return;
+      const targetEl = el.querySelector(`[id="${CSS.escape(href.slice(1))}"]`) as HTMLElement | null;
+      if (targetEl) {
+        el.scrollTo({ top: targetEl.offsetTop - 16, behavior: 'smooth' });
+      }
+    };
+    document.addEventListener('click', handler, true);
+    return () => document.removeEventListener('click', handler, true);
+  }, []);
+
   useEffect(() => {
     const el = contentRef.current; if (!el) return;
     const onWheel = (e: WheelEvent) => {
@@ -378,6 +335,7 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, s
     el.addEventListener('scroll', onViewerScroll, { passive: true });
     return () => el.removeEventListener('scroll', onViewerScroll);
   }, [syncScroll, onViewerScroll]);
+
 
   const AsyncImage: React.FC<{ src: string; alt: string; className?: string }> = ({ src, alt, className }) => {
     const [resolved, setResolved] = useState<string | null>(null);
@@ -514,7 +472,7 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, s
           style={{ fontFamily: computedFont, zoom: `${zoomLevel}%` }}>
           {fileContent ? (
             <ReactMarkdown
-              remarkPlugins={[remarkGfm, remarkMath, remarkEmoji, remarkFrontmatter, remarkSmartypants, remarkWikiLink, remarkDirective, remarkFootnotes, remarkSubSuper, remarkHighlight, remarkDeflist]}
+              remarkPlugins={[remarkGfm, remarkMath, remarkEmoji, remarkFrontmatter, remarkSmartypants, remarkWikiLink, remarkDirective, remarkSubSuper, remarkHighlight, remarkDeflist]}
               rehypePlugins={[rehypeKatex, rehypeHighlight, rehypeRaw, rehypeFilterCustomElements]}
               components={components}>
               {fileContent}

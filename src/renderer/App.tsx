@@ -1066,7 +1066,7 @@ const App: React.FC = () => {
                 {(viewMode === 'edit' || viewMode === 'split') && (
                   <div
                     data-panel="editor"
-                    className="flex flex-col min-w-0"
+                    className="flex flex-col min-w-0 relative z-10"
                     style={viewMode === 'split' ? { width: `${splitRatio}%` } : { flex: 1 }}
                   >
                     <MarkdownEditor

@@ -194,6 +194,10 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
   const [syntaxHighlight, setSyntaxHighlight] = useState(false);
   const savedScrollRef = useRef(0);
   const savedCursorRef = useRef(0);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef<HTMLDivElement>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const [toolbarMode, setToolbarMode] = useState<'compact' | 'medium'>('compact');
 
   // Preserve scroll/cursor when toggling syntax highlight
   useLayoutEffect(() => {
@@ -224,6 +228,28 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
     setTimeout(() => document.addEventListener('mousedown', handler), 0);
     return () => document.removeEventListener('mousedown', handler);
   }, [headingOpen]);
+
+  // Close "More tools" dropdown on click outside
+  useEffect(() => {
+    if (!moreOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) setMoreOpen(false);
+    };
+    setTimeout(() => document.addEventListener('mousedown', handler), 0);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [moreOpen]);
+
+  // ResizeObserver: compact ↔ medium with hysteresis (~3 tool widths)
+  useEffect(() => {
+    const el = toolbarRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      const w = entry.contentRect.width;
+      setToolbarMode(prev => w >= 750 ? 'medium' : w < 680 ? 'compact' : prev);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   interface Snap { text: string; cursor: number }
   const undoStack = useRef<Snap[]>([]);
   const redoStack = useRef<Snap[]>([]);
@@ -380,6 +406,79 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
       focusEl(el2);
     }, 0);
   }, [setFileContent, pushUndo]);
+
+  // ---- Block inserters for the More tools dropdown ----
+  const insertBlock = useCallback((template: string, cursorOffset?: number) => {
+    const el = editorRef.current; if (!el) return;
+    pushUndo();
+    const { start } = getSel(el);
+    const t = getText(el);
+    const nt = t.substring(0, start) + template + t.substring(start);
+    const cursor = start + (cursorOffset ?? template.length);
+    setFileContent(nt);
+    setTimeout(() => {
+      const el2 = editorRef.current; if (!el2) return;
+      if (!(el2 instanceof HTMLTextAreaElement) && syntaxHighlight) el2.innerHTML = highlightMarkdown(nt) || '<br>';
+      setSel(el2, cursor, cursor);
+      focusEl(el2);
+    }, 0);
+  }, [setFileContent, pushUndo, syntaxHighlight]);
+
+  const insertFootnote = useCallback(() => {
+    const el = editorRef.current; if (!el) return;
+    pushUndo();
+    const { start } = getSel(el);
+    const t = getText(el);
+    let n = 1;
+    const re = /\[\^(\d+)\]/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(t)) !== null) {
+      const num = parseInt(m[1]);
+      if (num >= n) n = num + 1;
+    }
+    const ref = `[^${n}]`;
+    const def = `\n[^${n}]: `;
+    const nt = t.substring(0, start) + ref + t.substring(start) + def;
+    setFileContent(nt);
+    setTimeout(() => {
+      const el2 = editorRef.current; if (!el2) return;
+      if (!(el2 instanceof HTMLTextAreaElement) && syntaxHighlight) el2.innerHTML = highlightMarkdown(nt) || '<br>';
+      setSel(el2, start + ref.length, start + ref.length);
+      focusEl(el2);
+    }, 0);
+  }, [pushUndo, setFileContent, syntaxHighlight]);
+
+  const insertCallout = useCallback((type: string) => {
+    insertBlock(`\n:::${type}\n\n:::\n`, 8);
+  }, [insertBlock]);
+
+  const insertMermaid = useCallback(() => {
+    insertBlock('\n```mermaid\n\n```\n', 13);
+  }, [insertBlock]);
+
+  const insertHR = useCallback(() => {
+    insertBlock('\n---\n');
+  }, [insertBlock]);
+
+  const insertComment = useCallback(() => {
+    const el = editorRef.current; if (!el) return;
+    pushUndo();
+    const { start, end } = getSel(el);
+    const t = getText(el);
+    const nt = t.substring(0, start) + '<!-- ' + t.substring(start, end) + ' -->' + t.substring(end);
+    const cursor = start + 5;
+    setFileContent(nt);
+    setTimeout(() => {
+      const el2 = editorRef.current; if (!el2) return;
+      if (!(el2 instanceof HTMLTextAreaElement) && syntaxHighlight) el2.innerHTML = highlightMarkdown(nt) || '<br>';
+      setSel(el2, cursor, cursor);
+      focusEl(el2);
+    }, 0);
+  }, [pushUndo, setFileContent, syntaxHighlight]);
+
+  const insertDeflist = useCallback(() => {
+    insertBlock('\nTerm\n: Definition\n');
+  }, [insertBlock]);
 
   const handleUndo = useCallback(() => {
     const el = editorRef.current;
@@ -610,6 +709,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
       };
       const tm = cl.match(/^(\s*)[-*+]\s+\[([ x])\]\s*(.*)/);
       if (tm) { const ti = tm[1]; const tt = tm[3]; if (!tt) doApply(value.substring(0, ls) + '\n' + ti + value.substring(start), ls + 1 + ti.length); else { const ins = '\n' + ti + '- [ ] '; doApply(value.substring(0, start) + ins + value.substring(start), start + ins.length); } return; }
+      // Footnote definition continuation: [^1]: text → [^2]: 
+      const fn = cl.match(/^\[\^(\d+)\]:\s*(.*)/);
+      if (fn) { const nextNum = parseInt(fn[1]) + 1; const ins = fn[2] ? `\n[^${nextNum}]: ` : '\n'; doApply(value.substring(0, start) + ins + value.substring(start), start + ins.length); return; }
       const lm = cl.match(/^(\s*)([-*+]\s+|(\d+\.)\s+)/);
       if (lm) { const ins = '\n' + indent + (lm[3] ? `${parseInt(lm[3]) + 1}. ` : '- '); doApply(value.substring(0, start) + ins + value.substring(start), start + ins.length); return; }
       const ins = indent ? '\n' + indent : '\n';
@@ -691,6 +793,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
     <div className="h-full flex flex-col bg-white dark:bg-[#1c2733]" style={matchPalette ? { background: 'var(--pal-editor-bg)' } : undefined}>
       {/* Editor toolbar — darker than editor area */}
       <div
+        ref={toolbarRef}
         className="flex items-center gap-0.5 px-3 py-1.5 border-b border-gray-200/60 dark:border-gray-700/50 bg-gray-50/85 dark:bg-[#181e26]/85 backdrop-blur-md flex-wrap"
         style={matchPalette ? {
           backgroundColor: 'var(--pal-editor-toolbar-bg)',
@@ -740,7 +843,11 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
             const cl = full.substring(ls, full.indexOf('\n', sel.start) === -1 ? full.length : full.indexOf('\n', sel.start));
             const hMatch = cl.match(/^(#{1,6})\s/);
             return (
-            <div className="absolute top-full left-0 mt-0.5 bg-white dark:bg-[#28323e] border border-gray-200 dark:border-gray-600 rounded-md shadow-xl z-40 py-0.5 w-36">
+            <div
+              className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-white dark:bg-[#28323e] border border-gray-200 dark:border-gray-600 rounded-md shadow-xl z-40 py-0.5 w-36 editor-popup"
+              data-palette={matchPalette ? '' : undefined}
+              style={matchPalette ? { backgroundColor: 'var(--pal-panel-bg)', borderColor: 'var(--pal-border)', ['--popup-bg' as any]: 'var(--pal-panel-bg)', ['--popup-border' as any]: 'var(--pal-border)' } : undefined}
+            >
               {[1,2,3,4,5,6].map(n => (
                 <button key={n} className="w-full text-left px-3 py-1 text-xs hover:bg-gray-100 dark:hover:bg-white/10 font-mono" onClick={() => { setHeadingOpen(false); toggleHeading(n); }}>
                   <span className="text-gray-400">{'#'.repeat(n)}</span> <span className="font-medium">H{n}</span>
@@ -826,25 +933,66 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
           <svg className="w-[18px] h-[18px] shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M5.616 20q-.691 0-1.153-.462T4 18.384V5.616q0-.691.463-1.153T5.616 4h12.769q.69 0 1.153.463T20 5.616v12.769q0 .69-.462 1.153T18.384 20zm5.884-5.596H5v3.98q0 .27.173.443t.443.173H11.5zm1 0V19h5.885q.269 0 .442-.173t.173-.442v-3.981zm-1-1V8.769H5v4.635zm1 0H19V8.769h-6.5zM5 7.769h14V5.615q0-.269-.173-.442T18.385 5H5.615q-.269 0-.442.173T5 5.616z"/></svg>
         </button>
         <div className="w-px h-5 bg-gray-200 dark:bg-gray-700" />
-        {/* Horizontal separator */}
-        <button className="btn-icon" title="Horizontal separator" onClick={() => {
-          const el = editorRef.current; if (!el) return;
-          pushUndo();
-          const { start } = getSel(el);
-          const t = getText(el);
-          const ins = '\n---\n';
-          const nt = t.substring(0, start) + ins + t.substring(start);
-          setFileContent(nt);
-          setTimeout(() => {
-            const el2 = editorRef.current; if (!el2) return;
-            if (!(el2 instanceof HTMLTextAreaElement) && syntaxHighlight) el2.innerHTML = highlightMarkdown(nt) || '<br>';
-            setSel(el2, start + ins.length, start + ins.length);
-            focusEl(el2);
-            updateCursorPosition();
-          }, 0);
-        }} >
-          <svg className="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14"/></svg>
-        </button>
+        {/* Adaptive toolbar: compact (all in dropdown) / medium (HR + footnote inline) */}
+        {toolbarMode === 'medium' && (
+          <>
+            <button className="btn-icon" title="Horizontal separator" onClick={insertHR}>
+              <svg className="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14"/></svg>
+            </button>
+            <button className="btn-icon" title="Insert footnote" onClick={insertFootnote}>
+              <svg className="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="m2.75 17.248l1.44-3.384m0 0h5.188m-5.187 0l2.208-5.186a.412.412 0 0 1 .771 0l2.208 5.186m0 0l1.441 3.384m2.398-8.838v8.838m5.833-2.916a2.916 2.916 0 1 1-5.833 0a2.916 2.916 0 0 1 5.833 0m0-7.707l2.2-1.375v5.5"/></svg>
+            </button>
+          </>
+        )}
+        {/* Chevron dropdown for remaining tools */}
+        <div className="relative" ref={moreRef}>
+          <button className="btn-icon" title="More tools" onClick={() => setMoreOpen(v => !v)}>
+            <svg className="w-[18px] h-[18px] shrink-0 transition-transform duration-150" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5} style={{ transform: moreOpen ? 'rotate(180deg)' : '' }}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="m6 9l6 6 6-6" />
+            </svg>
+          </button>
+          {moreOpen && (
+            <div
+              className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-white dark:bg-[#28323e] border border-gray-200 dark:border-gray-600 rounded-md shadow-xl z-40 py-1 w-44 editor-popup"
+              data-palette={matchPalette ? '' : undefined}
+              style={{ maxWidth: 'calc(100vw - 1rem)', ...(matchPalette ? { backgroundColor: 'var(--pal-panel-bg)', borderColor: 'var(--pal-border)', ['--popup-bg' as any]: 'var(--pal-panel-bg)', ['--popup-border' as any]: 'var(--pal-border)' } : {}) }}
+            >
+              {toolbarMode === 'compact' && (
+                <>
+                  <button className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 dark:hover:bg-white/10 flex items-center gap-2 text-gray-600 dark:text-gray-300" onClick={() => { setMoreOpen(false); insertHR(); }}>
+                    <svg className="w-4 h-4 shrink-0 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14"/></svg>
+                    Horizontal Rule
+                  </button>
+                  <button className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 dark:hover:bg-white/10 flex items-center gap-2 text-gray-600 dark:text-gray-300" onClick={() => { setMoreOpen(false); insertFootnote(); }}>
+                    <svg className="w-4 h-4 shrink-0 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="m2.75 17.248l1.44-3.384m0 0h5.188m-5.187 0l2.208-5.186a.412.412 0 0 1 .771 0l2.208 5.186m0 0l1.441 3.384m2.398-8.838v8.838m5.833-2.916a2.916 2.916 0 1 1-5.833 0a2.916 2.916 0 0 1 5.833 0m0-7.707l2.2-1.375v5.5"/></svg>
+                    Footnote
+                  </button>
+                  <div className="border-t border-gray-200 dark:border-gray-600 my-0.5" />
+                </>
+              )}
+              <span className="px-3 py-1 text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wider block">Callout</span>
+              {['note','tip','warning','danger'].map(type => (
+                <button key={type} className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 dark:hover:bg-white/10 capitalize flex items-center gap-2 text-gray-600 dark:text-gray-300" onClick={() => { setMoreOpen(false); insertCallout(type); }}>
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: type === 'note' ? '#3b82f6' : type === 'tip' ? '#10b981' : type === 'warning' ? '#f59e0b' : '#ef4444' }} />
+                  {type}
+                </button>
+              ))}
+              <div className="border-t border-gray-200 dark:border-gray-600 my-0.5" />
+              <button className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 dark:hover:bg-white/10 flex items-center gap-2 text-gray-600 dark:text-gray-300" onClick={() => { setMoreOpen(false); insertMermaid(); }}>
+                <svg className="w-4 h-4 shrink-0 text-gray-500 dark:text-gray-400" fill="currentColor" viewBox="0 0 32 32"><path d="M3 6a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v4a3 3 0 0 1-3 3H9v5.266a2 2 0 0 1 .416.32l4.003 4.002a2 2 0 0 1 .317.412H19v-1a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v4a3 3 0 0 1-3 3h-4a3 3 0 0 1-3-3v-1h-5.262q-.128.225-.32.416L9.417 29.42a2 2 0 0 1-2.828 0l-4.002-4.003a2 2 0 0 1 0-2.828l4.002-4.002q.19-.19.412-.317V13H6a3 3 0 0 1-3-3zm5.002 14L4 24.002l4.002 4.002L12 24.007v-.01zM6 5a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1zm16 16a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-4a1 1 0 0 0-1-1z"/></svg>
+                Mermaid Diagram
+              </button>
+              <button className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 dark:hover:bg-white/10 flex items-center gap-2 text-gray-600 dark:text-gray-300" onClick={() => { setMoreOpen(false); insertDeflist(); }}>
+                <svg className="w-4 h-4 shrink-0 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}><path d="M8.72 17.073H2.019v-15.4h7.414A2.567 2.567 0 0 1 12 4.24v5.83m9.981 1.725V1.673h-7.414A2.567 2.567 0 0 0 12 4.24m-.447 11.974a4.315 4.315 0 1 0 8.63 0a4.315 4.315 0 1 0-8.63 0m10.428 6.113l-2.877-2.877"/></svg>
+                Definition List
+              </button>
+              <button className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 dark:hover:bg-white/10 flex items-center gap-2 text-gray-600 dark:text-gray-300" onClick={() => { setMoreOpen(false); insertComment(); }}>
+                <svg className="w-4 h-4 shrink-0 text-gray-500 dark:text-gray-400" fill="currentColor" viewBox="0 0 64 64"><path d="M44.4 19.5H18.6c-1.2 0-2.3 1-2.3 2.3s1 2.3 2.3 2.3h25.9c1.2 0 2.3-1 2.3-2.3s-1.1-2.3-2.4-2.3m-5.2 12.2H18.6c-1.2 0-2.3 1-2.3 2.3s1 2.3 2.3 2.3h20.6c1.2 0 2.3-1 2.3-2.3s-1.1-2.3-2.3-2.3"/><path d="M56 7.9H8c-3.4 0-6.3 2.8-6.3 6.3v37.7c0 1.6.9 3.1 2.4 3.8c.6.3 1.2.4 1.8.4c1 0 1.9-.3 2.7-1l8.5-7H56c3.4 0 6.3-2.8 6.3-6.3V14.2c0-3.5-2.9-6.3-6.3-6.3m1.8 33.9c0 1-.8 1.8-1.8 1.8H16.3c-.5 0-1 .2-1.4.5l-8.6 7.1v-37c0-1 .8-1.8 1.8-1.8h48c1 0 1.8.8 1.8 1.8v27.6z"/></svg>
+                Comment &lt;!-- --&gt;
+              </button>
+            </div>
+          )}
+        </div>
         {/* Spacer */}
         {/* Word wrap toggle */}
         {onToggleWordWrap && (
