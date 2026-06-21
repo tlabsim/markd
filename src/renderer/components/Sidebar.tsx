@@ -271,7 +271,7 @@ const Sidebar: React.FC<{
                 <p className="text-[11px] italic px-1" style={{ color: 'var(--pal-muted)' }}>No recent files</p>
               ) : (
                 <div className="space-y-px">
-                  {recentFiles.slice(0, 6).map((filePath) => {
+                  {recentFiles.slice(0, 10).map((filePath) => {
                     const name = filePath.split(/[/\\]/).pop() || filePath;
                     const df = deadFiles[filePath];
                     if (df === 'removing') return null;

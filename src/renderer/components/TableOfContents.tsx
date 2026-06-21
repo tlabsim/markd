@@ -15,6 +15,7 @@ interface TableOfContentsProps {
   content: string;
   onClose: () => void;
   matchPalette?: boolean;
+  zoomLevel?: number;
 }
 
 // ---- Build tree from flat heading list ----
@@ -100,7 +101,7 @@ const TreeNode: React.FC<{
 
         {/* Label */}
         <button
-          className={`text-xs text-left truncate py-0.5 pr-2 rounded hover:bg-gray-700/10 dark:hover:bg-white/5 transition-colors flex-1
+          className={`text-left truncate py-0.5 pr-2 rounded hover:bg-gray-700/10 dark:hover:bg-white/5 transition-colors flex-1
             ${item.level <= 2 ? 'font-semibold text-gray-700 dark:text-gray-200' : 'text-gray-500 dark:text-gray-400'}`}
           onClick={() => onScroll(item.id)}
           style={{ marginLeft: isRoot ? 0 : hasChildren ? 0 : `${CONNECTOR_LEAF + GAP}px` }}
@@ -130,7 +131,9 @@ const TreeNode: React.FC<{
   );
 };
 
-const TableOfContents: React.FC<TableOfContentsProps> = ({ content, onClose, matchPalette }) => {
+const TableOfContents: React.FC<TableOfContentsProps> = ({ content, onClose, matchPalette, zoomLevel = 100 }) => {
+  // Scale TOC font: +0.25px per 10% zoom above 100%
+  const tocFontSize = 12 + Math.max(0, (zoomLevel - 100) / 10) * 0.25;
   const tocRef = useRef<HTMLDivElement>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
@@ -222,10 +225,10 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ content, onClose, mat
     <div
       ref={tocRef}
       className="p-3 shadow-xl h-full overflow-y-auto rounded-lg border border-gray-200/50 dark:border-gray-700/50 bg-white/85 dark:bg-[#222c36]/85 backdrop-blur-md"
-      style={matchPalette ? { backgroundColor: 'color-mix(in srgb, var(--pal-panel-bg) 85%, transparent)', borderColor: 'var(--pal-border-soft)' } : undefined}
+      style={{ fontSize: tocFontSize, ...(matchPalette ? { backgroundColor: 'color-mix(in srgb, var(--pal-panel-bg) 85%, transparent)', borderColor: 'var(--pal-border-soft)' } : {}) }}
     >
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+        <h3 className="font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400" style={{ fontSize: `${tocFontSize * 0.833}px` }}>
           Contents
         </h3>
         <div className="flex items-center gap-0.5">
