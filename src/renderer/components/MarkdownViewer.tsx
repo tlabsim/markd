@@ -6,7 +6,6 @@ import remarkEmoji from 'remark-emoji';
 import remarkFrontmatter from 'remark-frontmatter';
 import remarkSmartypants from 'remark-smartypants';
 import remarkWikiLink from 'remark-wiki-link';
-import remarkDirective from 'remark-directive';
 import rehypeKatex from 'rehype-katex';
 import rehypeHighlight from 'rehype-highlight';
 import rehypeRaw from 'rehype-raw';
@@ -148,6 +147,58 @@ function remarkHighlight() {
     if (tree.children) {
       for (let i = 0; i < tree.children.length; i++) visit(tree.children[i], tree, i);
     }
+  };
+}
+
+// ---- Remark plugin: callouts (:::type content :::) ----
+function remarkCallouts() {
+  return (tree: any) => {
+    const newChildren: any[] = [];
+    let i = 0;
+    while (i < tree.children.length) {
+      const node = tree.children[i];
+      if (node.type === 'paragraph' && node.children?.length > 0) {
+        const fullText = node.children.map((c: any) => c.value || '').join('');
+        // Single-paragraph format: :::type content :::
+        const sm = fullText.match(/^:::(\w+)\s+(.*?)\s*:::\s*$/);
+        if (sm) {
+          const type = sm[1];
+          const body = sm[2];
+          const icons: Record<string, string> = { note: 'ℹ️', tip: '💡', info: 'ℹ️', warning: '⚠️', caution: '⚠️', danger: '🚨', important: '❗' };
+          const icon = icons[type] || '📝';
+          newChildren.push({ type: 'html', value: `<div class="admonition admonition-${type}"><div class="admonition-header"><span>${icon}</span><span class="admonition-type">${type}</span></div><div class="admonition-body"><p>${body}</p></div></div>` });
+          i++;
+          continue;
+        }
+        // Multi-paragraph format: :::type on its own line
+        const first = node.children[0];
+        if (first.type === 'text') {
+          const m = first.value.match(/^:::(\w+)\s*$/);
+          if (m) {
+            const type = m[1];
+            const bodyParts: string[] = [];
+            i++;
+            while (i < tree.children.length) {
+              const bodyNode = tree.children[i];
+              if (bodyNode.type === 'paragraph' && bodyNode.children?.length > 0) {
+                const bt = bodyNode.children[0];
+                if (bt.type === 'text' && bt.value.trim() === ':::') { i++; break; }
+                bodyParts.push(bodyNode.children?.map((c: any) => c.value || '').join('') || '');
+              }
+              i++;
+            }
+            const icons: Record<string, string> = { note: 'ℹ️', tip: '💡', info: 'ℹ️', warning: '⚠️', caution: '⚠️', danger: '🚨', important: '❗' };
+            const icon = icons[type] || '📝';
+            const bodyHtml = bodyParts.map(b => `<p>${b}</p>`).join('');
+            newChildren.push({ type: 'html', value: `<div class="admonition admonition-${type}"><div class="admonition-header"><span>${icon}</span><span class="admonition-type">${type}</span></div><div class="admonition-body">${bodyHtml}</div></div>` });
+            continue;
+          }
+        }
+      }
+      newChildren.push(node);
+      i++;
+    }
+    tree.children = newChildren;
   };
 }
 
@@ -472,7 +523,7 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, s
           style={{ fontFamily: computedFont, zoom: `${zoomLevel}%` }}>
           {fileContent ? (
             <ReactMarkdown
-              remarkPlugins={[remarkGfm, remarkMath, remarkEmoji, remarkFrontmatter, remarkSmartypants, remarkWikiLink, remarkDirective, remarkSubSuper, remarkHighlight, remarkDeflist]}
+              remarkPlugins={[remarkGfm, remarkMath, remarkEmoji, remarkFrontmatter, remarkSmartypants, remarkWikiLink, remarkCallouts, remarkSubSuper, remarkHighlight, remarkDeflist]}
               rehypePlugins={[rehypeKatex, rehypeHighlight, rehypeRaw, rehypeFilterCustomElements]}
               components={components}>
               {fileContent}

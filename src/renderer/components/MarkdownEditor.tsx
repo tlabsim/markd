@@ -970,13 +970,14 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
                   <div className="border-t border-gray-200 dark:border-gray-600 my-0.5" />
                 </>
               )}
-              <span className="px-3 py-1 text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wider block">Callout</span>
-              {['note','tip','warning','danger'].map(type => (
-                <button key={type} className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 dark:hover:bg-white/10 capitalize flex items-center gap-2 text-gray-600 dark:text-gray-300" onClick={() => { setMoreOpen(false); insertCallout(type); }}>
-                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: type === 'note' ? '#3b82f6' : type === 'tip' ? '#10b981' : type === 'warning' ? '#f59e0b' : '#ef4444' }} />
-                  {type}
-                </button>
-              ))}
+              <button className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 dark:hover:bg-white/10 flex items-center gap-2 text-gray-600 dark:text-gray-300" onClick={() => { setMoreOpen(false); toggleWrap('==', '==', 'highlight'); }}>
+                <svg className="w-4 h-4 shrink-0 text-gray-500 dark:text-gray-400" fill="currentColor" viewBox="0 0 256 256"><path d="M253.66 106.34a8 8 0 0 0-11.32 0L192 156.69L107.31 72l50.35-50.34a8 8 0 1 0-11.32-11.32L96 60.69a16 16 0 0 0-2.82 18.81L72 100.69a16 16 0 0 0 0 22.62l4.69 4.69l-58.35 58.34a8 8 0 0 0 3.13 13.25l72 24A7.9 7.9 0 0 0 96 224a8 8 0 0 0 5.66-2.34L136 187.31l4.69 4.69a16 16 0 0 0 22.62 0l21.19-21.18a16 16 0 0 0 18.81-2.82l50.35-50.34a8 8 0 0 0 0-11.32M93.84 206.85l-55-18.35L88 139.31L124.69 176ZM152 180.69L83.31 112L104 91.31L172.69 160Z"/></svg>
+                Highlight ==text==
+              </button>
+              <button className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 dark:hover:bg-white/10 flex items-center gap-2 text-gray-600 dark:text-gray-300" onClick={() => { setMoreOpen(false); insertComment(); }}>
+                <svg className="w-4 h-4 shrink-0 text-gray-500 dark:text-gray-400" fill="currentColor" viewBox="0 0 64 64"><path d="M44.4 19.5H18.6c-1.2 0-2.3 1-2.3 2.3s1 2.3 2.3 2.3h25.9c1.2 0 2.3-1 2.3-2.3s-1.1-2.3-2.4-2.3m-5.2 12.2H18.6c-1.2 0-2.3 1-2.3 2.3s1 2.3 2.3 2.3h20.6c1.2 0 2.3-1 2.3-2.3s-1.1-2.3-2.3-2.3"/><path d="M56 7.9H8c-3.4 0-6.3 2.8-6.3 6.3v37.7c0 1.6.9 3.1 2.4 3.8c.6.3 1.2.4 1.8.4c1 0 1.9-.3 2.7-1l8.5-7H56c3.4 0 6.3-2.8 6.3-6.3V14.2c0-3.5-2.9-6.3-6.3-6.3m1.8 33.9c0 1-.8 1.8-1.8 1.8H16.3c-.5 0-1 .2-1.4.5l-8.6 7.1v-37c0-1 .8-1.8 1.8-1.8h48c1 0 1.8.8 1.8 1.8v27.6z"/></svg>
+                Comment &lt;!-- --&gt;
+              </button>
               <div className="border-t border-gray-200 dark:border-gray-600 my-0.5" />
               <button className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 dark:hover:bg-white/10 flex items-center gap-2 text-gray-600 dark:text-gray-300" onClick={() => { setMoreOpen(false); insertMermaid(); }}>
                 <svg className="w-4 h-4 shrink-0 text-gray-500 dark:text-gray-400" fill="currentColor" viewBox="0 0 32 32"><path d="M3 6a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v4a3 3 0 0 1-3 3H9v5.266a2 2 0 0 1 .416.32l4.003 4.002a2 2 0 0 1 .317.412H19v-1a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v4a3 3 0 0 1-3 3h-4a3 3 0 0 1-3-3v-1h-5.262q-.128.225-.32.416L9.417 29.42a2 2 0 0 1-2.828 0l-4.002-4.003a2 2 0 0 1 0-2.828l4.002-4.002q.19-.19.412-.317V13H6a3 3 0 0 1-3-3zm5.002 14L4 24.002l4.002 4.002L12 24.007v-.01zM6 5a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1zm16 16a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-4a1 1 0 0 0-1-1z"/></svg>
@@ -986,10 +987,14 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
                 <svg className="w-4 h-4 shrink-0 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}><path d="M8.72 17.073H2.019v-15.4h7.414A2.567 2.567 0 0 1 12 4.24v5.83m9.981 1.725V1.673h-7.414A2.567 2.567 0 0 0 12 4.24m-.447 11.974a4.315 4.315 0 1 0 8.63 0a4.315 4.315 0 1 0-8.63 0m10.428 6.113l-2.877-2.877"/></svg>
                 Definition List
               </button>
-              <button className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 dark:hover:bg-white/10 flex items-center gap-2 text-gray-600 dark:text-gray-300" onClick={() => { setMoreOpen(false); insertComment(); }}>
-                <svg className="w-4 h-4 shrink-0 text-gray-500 dark:text-gray-400" fill="currentColor" viewBox="0 0 64 64"><path d="M44.4 19.5H18.6c-1.2 0-2.3 1-2.3 2.3s1 2.3 2.3 2.3h25.9c1.2 0 2.3-1 2.3-2.3s-1.1-2.3-2.4-2.3m-5.2 12.2H18.6c-1.2 0-2.3 1-2.3 2.3s1 2.3 2.3 2.3h20.6c1.2 0 2.3-1 2.3-2.3s-1.1-2.3-2.3-2.3"/><path d="M56 7.9H8c-3.4 0-6.3 2.8-6.3 6.3v37.7c0 1.6.9 3.1 2.4 3.8c.6.3 1.2.4 1.8.4c1 0 1.9-.3 2.7-1l8.5-7H56c3.4 0 6.3-2.8 6.3-6.3V14.2c0-3.5-2.9-6.3-6.3-6.3m1.8 33.9c0 1-.8 1.8-1.8 1.8H16.3c-.5 0-1 .2-1.4.5l-8.6 7.1v-37c0-1 .8-1.8 1.8-1.8h48c1 0 1.8.8 1.8 1.8v27.6z"/></svg>
-                Comment &lt;!-- --&gt;
-              </button>
+              <div className="border-t border-gray-200 dark:border-gray-600 my-0.5" />
+              <span className="px-3 py-1 text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wider block">Callout</span>
+              {['note','tip','warning','danger'].map(type => (
+                <button key={type} className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 dark:hover:bg-white/10 capitalize flex items-center gap-2 text-gray-600 dark:text-gray-300" onClick={() => { setMoreOpen(false); insertCallout(type); }}>
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: type === 'note' ? '#3b82f6' : type === 'tip' ? '#10b981' : type === 'warning' ? '#f59e0b' : '#ef4444' }} />
+                  {type}
+                </button>
+              ))}
             </div>
           )}
         </div>
