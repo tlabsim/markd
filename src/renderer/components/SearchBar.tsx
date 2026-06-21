@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 
 interface SearchBarProps {
   editorRef?: React.RefObject<HTMLTextAreaElement | HTMLDivElement | null>;
@@ -10,7 +11,14 @@ interface SearchBarProps {
 }
 
 const SearchBar: React.FC<SearchBarProps> = ({ editorRef, viewerRef, viewMode, position, showReplaceInitially }) => {
-  const { fileContent, searchQuery, setSearchQuery, isSearchOpen, setSearchOpen, matchToolbarPalette } = useStore();
+  const { fileContent, searchQuery, setSearchQuery, isSearchOpen, setSearchOpen, matchToolbarPalette } = useStore(useShallow((state) => ({
+    fileContent: state.fileContent,
+    searchQuery: state.searchQuery,
+    setSearchQuery: state.setSearchQuery,
+    isSearchOpen: state.isSearchOpen,
+    setSearchOpen: state.setSearchOpen,
+    matchToolbarPalette: state.matchToolbarPalette,
+  })));
   const [matchPositions, setMatchPositions] = useState<number[]>([]);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [replaceQuery, setReplaceQuery] = useState('');

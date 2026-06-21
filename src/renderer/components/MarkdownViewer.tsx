@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useEffect, useState, useCallback } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -327,7 +328,17 @@ const BackToTop: React.FC<{ containerRef: React.RefObject<HTMLDivElement | null>
 };
 
 const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, syncScroll, onScrollRef, onViewerScroll }) => {
-  const { fileContent, currentFilePath, fontFamily, zoomLevel, previewPalette, zoomIn, zoomOut, matchToolbarPalette, showHeadingAnchors } = useStore();
+  const { fileContent, currentFilePath, fontFamily, zoomLevel, previewPalette, zoomIn, zoomOut, matchToolbarPalette, showHeadingAnchors } = useStore(useShallow((state) => ({
+    fileContent: state.fileContent,
+    currentFilePath: state.currentFilePath,
+    fontFamily: state.fontFamily,
+    zoomLevel: state.zoomLevel,
+    previewPalette: state.previewPalette,
+    zoomIn: state.zoomIn,
+    zoomOut: state.zoomOut,
+    matchToolbarPalette: state.matchToolbarPalette,
+    showHeadingAnchors: state.showHeadingAnchors,
+  })));
   const contentRef = useRef<HTMLDivElement>(null);
   const scrollbarWideRef = useRef(false);
 
@@ -496,7 +507,7 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, s
         navigator.clipboard.writeText(codeText).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); });
       }, [codeText]);
       return (
-        <div className={`code-block my-6 rounded-lg border p-0 relative group/cb ${isDiff ? 'diff-block' : ''}`}>
+        <div className={`code-block ${lang ? 'mt-4' : 'mt-2'} rounded-lg border p-0 relative group/cb ${isDiff ? 'diff-block' : ''}`}>
           {lang && <div className="flex px-4 -mt-2.5"><span className="code-block-lang text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md font-mono">{lang}</span></div>}
           <button className="code-block-btn absolute top-2 right-2 opacity-0 group-hover/cb:opacity-100 transition-opacity p-1.5 rounded-md z-10" onClick={copyCode} title="Copy code">
             {copied

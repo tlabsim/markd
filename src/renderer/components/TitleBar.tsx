@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 import markdLogo from '../assets/markd.svg';
 
 interface TitleBarProps {
@@ -27,7 +28,13 @@ interface TitleBarProps {
 }
 
 const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, isMaximized, onOpenFile, onOpenFolder, onNewFile, onSaveFile, onSaveFileAs, onCloseFile, onReloadFile, onOpenRecentFile, recentFiles, paletteBg, paletteBgDark, distractionFree, onToggleDistractionFree, onEditDocument, onSettings, saveState, matchToolbarPalette }) => {
-  const { currentFile, isModified, theme, setTheme, toggleSidebar } = useStore();
+  const { currentFile, isModified, theme, setTheme, toggleSidebar } = useStore(useShallow((state) => ({
+    currentFile: state.currentFile,
+    isModified: state.isModified,
+    theme: state.theme,
+    setTheme: state.setTheme,
+    toggleSidebar: state.toggleSidebar,
+  })));
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 

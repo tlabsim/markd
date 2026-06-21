@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 import { FileEntry } from '../types';
 
 /** Recursive tree node renderer */
@@ -9,18 +10,14 @@ const TreeNode: React.FC<{
   onToggle: (entry: FileEntry) => void;
   onOpenFile?: (path: string) => void;
 }> = ({ entry, depth, onToggle, onOpenFile }) => {
-  const {
-    currentFilePath,
-    folderChildren,
-    expandedFolderPaths,
-    setFolderChildren,
-    toggleExpandedFolder,
-  } = useStore();
+  const currentFilePath = useStore((state) => state.currentFilePath);
+  const children = useStore((state) => state.folderChildren[entry.path]);
+  const isExpanded = useStore((state) => state.expandedFolderPaths.has(entry.path));
+  const setFolderChildren = useStore((state) => state.setFolderChildren);
+  const toggleExpandedFolder = useStore((state) => state.toggleExpandedFolder);
 
   const isDir = entry.isDirectory;
   const isActive = currentFilePath === entry.path;
-  const isExpanded = expandedFolderPaths.has(entry.path);
-  const children = folderChildren[entry.path];
 
   const handleClick = useCallback(async () => {
     if (isDir) {
@@ -107,13 +104,21 @@ const Sidebar: React.FC<{
     clearFolderChildren,
     toggleSidebar,
     recentFiles,
-  } = useStore();
+  } = useStore(useShallow((state) => ({
+    currentFolderPath: state.currentFolderPath,
+    folderChildren: state.folderChildren,
+    setCurrentFolderPath: state.setCurrentFolderPath,
+    setFolderChildren: state.setFolderChildren,
+    clearFolderChildren: state.clearFolderChildren,
+    toggleSidebar: state.toggleSidebar,
+    recentFiles: state.recentFiles,
+  })));
 
   const [loading, setLoading] = useState(false);
   const rootChildren = currentFolderPath ? (folderChildren[currentFolderPath] || []) : [];
 
   // ---- Dead recent-file detection with animated removal ----
-  const { removeRecentFile } = useStore();
+  const removeRecentFile = useStore((state) => state.removeRecentFile);
   const [deadFiles, setDeadFiles] = useState<Record<string, 'striking' | 'removing'>>({});
   const deadTimers = useRef<Record<string, number>>({});
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useStore, FONT_OPTIONS } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 import { PALETTE_OPTIONS } from '../palettes';
 import { ThemeMode } from '../types';
 import markdLogo from '../assets/markd.svg';
@@ -184,7 +185,30 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
     setMatchToolbarPalette,
     showHeadingAnchors,
     setShowHeadingAnchors,
-  } = useStore();
+  } = useStore(useShallow((state) => ({
+    theme: state.theme,
+    setTheme: state.setTheme,
+    fontFamily: state.fontFamily,
+    setFontFamily: state.setFontFamily,
+    zoomLevel: state.zoomLevel,
+    setZoomLevel: state.setZoomLevel,
+    previewPalette: state.previewPalette,
+    setPreviewPalette: state.setPreviewPalette,
+    wordWrap: state.wordWrap,
+    setWordWrap: state.setWordWrap,
+    tabSize: state.tabSize,
+    setTabSize: state.setTabSize,
+    syntaxHighlight: state.syntaxHighlight,
+    setSyntaxHighlight: state.setSyntaxHighlight,
+    autoSave: state.autoSave,
+    setAutoSave: state.setAutoSave,
+    rememberScrollPosition: state.rememberScrollPosition,
+    setRememberScrollPosition: state.setRememberScrollPosition,
+    matchToolbarPalette: state.matchToolbarPalette,
+    setMatchToolbarPalette: state.setMatchToolbarPalette,
+    showHeadingAnchors: state.showHeadingAnchors,
+    setShowHeadingAnchors: state.setShowHeadingAnchors,
+  })));
 
   if (!open) return null;
 

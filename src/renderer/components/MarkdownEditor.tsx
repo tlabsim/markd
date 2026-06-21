@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useLayoutEffect, useCallback, useState, startTransition } from 'react';
 import { useStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 
 // ---- Regex-based Markdown syntax highlighter ----
 // Returns HTML string with colored spans. Operates line-by-line.
@@ -168,7 +169,11 @@ interface MarkdownEditorProps {
 }
 
 const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef, onEditorScroll, onToggleSync, wordWrap, onToggleWordWrap, onFlushRef, onSave, matchPalette, paletteBg, paletteBgDark }) => {
-  const { fileContent, setFileContent, theme } = useStore();
+  const { fileContent, setFileContent, theme } = useStore(useShallow((state) => ({
+    fileContent: state.fileContent,
+    setFileContent: state.setFileContent,
+    theme: state.theme,
+  })));
   const editorRef = useRef<EditorEl>(null);
   const lineNumbersRef = useRef<HTMLDivElement>(null);
   const scrollbarWideRef = useRef(false);

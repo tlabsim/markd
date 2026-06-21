@@ -23,9 +23,19 @@
     "dist:win:unsigned": "npm run build && set CSC_IDENTITY_AUTO_DISCOVERY=false && electron-builder --win -c.win.signAndEditExecutable=false",
     "generate-icons": "node scripts/generate-icons.mjs"
   },
-  "dependencies": {
+  "dependencies": {},
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "app-builder-bin": "^4.2.0",
+    "autoprefixer": "^10.4.19",
+    "concurrently": "^8.2.2",
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3",
     "katex": "^0.16.9",
     "mermaid": "^11.15.0",
+    "postcss": "^8.4.38",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-markdown": "^9.0.1",
@@ -38,24 +48,13 @@
     "remark-math": "^6.0.0",
     "remark-smartypants": "^3.0.2",
     "remark-wiki-link": "^2.0.1",
-    "zustand": "^4.5.2"
-  },
-  "devDependencies": {
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.3.1",
-    "app-builder-bin": "^4.2.0",
-    "autoprefixer": "^10.4.19",
-    "concurrently": "^8.2.2",
-    "electron": "^31.0.0",
-    "electron-builder": "^24.13.3",
-    "postcss": "^8.4.38",
     "sharp": "^0.35.1",
     "tailwindcss": "^3.4.4",
     "to-ico": "^1.1.5",
     "typescript": "^5.5.2",
     "vite": "^5.3.1",
-    "wait-on": "^7.2.0"
+    "wait-on": "^7.2.0",
+    "zustand": "^4.5.2"
   },
   "build": {
     "appId": "com.markd.app",
@@ -64,8 +63,7 @@
       "output": "release"
     },
     "files": [
-      "dist/main/**/*",
-      "resources/**/*"
+      "dist/main/**/*"
     ],
     "extraResources": [
       {

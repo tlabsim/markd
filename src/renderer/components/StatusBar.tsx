@@ -1,8 +1,14 @@
 import React, { useMemo } from 'react';
 import { useStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 
 const StatusBar: React.FC<{ matchPalette?: boolean; paletteBg?: string; paletteBgDark?: string }> = ({ matchPalette, paletteBg, paletteBgDark }) => {
-  const { fileContent, currentFile, viewMode, setViewMode, theme } = useStore();
+  const { fileContent, currentFile, viewMode, setViewMode } = useStore(useShallow((state) => ({
+    fileContent: state.fileContent,
+    currentFile: state.currentFile,
+    viewMode: state.viewMode,
+    setViewMode: state.setViewMode,
+  })));
 
   const stats = useMemo(() => {
     if (!fileContent) return { lines: 0, words: 0, chars: 0 };

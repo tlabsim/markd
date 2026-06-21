@@ -1,5 +1,6 @@
 import React, { useEffect, useCallback, useRef, useState, useLayoutEffect } from 'react';
 import { useStore, FONT_OPTIONS } from './store';
+import { useShallow } from 'zustand/react/shallow';
 import { PALETTE_OPTIONS } from './palettes';
 import TitleBar from './components/TitleBar';
 import Sidebar from './components/Sidebar';
@@ -25,7 +26,6 @@ const App: React.FC = () => {
   const {
     currentFile,
     currentFilePath,
-    fileContent,
     viewMode,
     isSidebarOpen,
     isSearchOpen,
@@ -52,7 +52,36 @@ const App: React.FC = () => {
     wordWrap,
     setWordWrap,
     matchToolbarPalette,
-  } = useStore();
+  } = useStore(useShallow((state) => ({
+    currentFile: state.currentFile,
+    currentFilePath: state.currentFilePath,
+    viewMode: state.viewMode,
+    isSidebarOpen: state.isSidebarOpen,
+    isSearchOpen: state.isSearchOpen,
+    theme: state.theme,
+    isMaximized: state.isMaximized,
+    setMaximized: state.setMaximized,
+    setCurrentFile: state.setCurrentFile,
+    setCurrentFilePath: state.setCurrentFilePath,
+    setOriginalContent: state.setOriginalContent,
+    setViewMode: state.setViewMode,
+    setTheme: state.setTheme,
+    toggleSidebar: state.toggleSidebar,
+    setSearchOpen: state.setSearchOpen,
+    setSearchQuery: state.setSearchQuery,
+    fontFamily: state.fontFamily,
+    setFontFamily: state.setFontFamily,
+    zoomLevel: state.zoomLevel,
+    zoomIn: state.zoomIn,
+    zoomOut: state.zoomOut,
+    setZoomLevel: state.setZoomLevel,
+    previewPalette: state.previewPalette,
+    setPreviewPalette: state.setPreviewPalette,
+    recentFiles: state.recentFiles,
+    wordWrap: state.wordWrap,
+    setWordWrap: state.setWordWrap,
+    matchToolbarPalette: state.matchToolbarPalette,
+  })));
 
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const flushEditorRef = useRef<(() => void) | null>(null);
@@ -567,7 +596,7 @@ const App: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [fileContent, currentFile, theme, settingsOpen, settingsTab]);
+  }, [theme, isMaximized, settingsOpen, settingsTab]);
 
   // Close font menu on click outside
   useEffect(() => {
