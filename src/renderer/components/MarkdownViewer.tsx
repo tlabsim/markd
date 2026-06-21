@@ -422,12 +422,14 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, s
         e.preventDefault();
         navigator.clipboard.writeText(`#${id}`);
       }, [id]);
+      const topOffset = Tag === 'h1' ? 8 : Tag === 'h2' ? 7 : Tag === 'h3' ? 4.5 : 4;
       return (
         <a href={`#${id}`}
           onClick={handleClick}
-          className="heading-anchor absolute -left-6 top-0 bottom-0 flex items-center opacity-0 group-hover/heading:opacity-100 transition-opacity text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 no-underline"
+          className="heading-anchor absolute -left-6 flex items-center opacity-0 group-hover/heading:opacity-100 transition-opacity text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 no-underline"
+          style={{ top: `${topOffset}px` }}
           aria-label={`Copy link to ${text}`}>
-          <svg className="w-5 h-5 mb-1 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+          <svg className="w-5 h-5 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
             <path d="M9.621 7.5H7.25a4.5 4.5 0 0 0-4.5 4.5v0a4.5 4.5 0 0 0 4.5 4.5h2.371m4.758-9h2.371a4.5 4.5 0 0 1 4.5 4.5v0a4.5 4.5 0 0 1-4.5 4.5h-2.371M7.243 12h9.514" />
           </svg>
         </a>

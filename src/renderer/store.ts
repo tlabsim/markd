@@ -126,7 +126,7 @@ export const useStore = create<EditorState>()(
       rememberScrollPosition: true,
       scrollPositions: {},
       matchToolbarPalette: false,
-      showHeadingAnchors: true,
+      showHeadingAnchors: false,
 
       setCurrentFile: (name) => set({ currentFile: name }),
       setCurrentFilePath: (path) => set({ currentFilePath: path }),
