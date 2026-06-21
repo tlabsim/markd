@@ -436,7 +436,7 @@ h1, h2, h3, h4, h5, h6 {
   margin-bottom: 0.35rem;
 }
 .admonition-type {
-  font-size: 0.7em;
+  font-size: 0.9em;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -485,8 +485,8 @@ mark {
 
 /* ---- Definition lists ---- */
 .markdown-body dl {
-  margin: 1.25rem 0;
-  padding: 0.75rem 1rem;
+  margin: 0.5rem 0;
+  padding: 0.25rem 1rem;
   border-left: 3px solid var(--pal-border-soft, #d1d5db);
   background: color-mix(in srgb, var(--pal-viewer-bg, #f9fafb) 50%, transparent);
 }
@@ -578,28 +578,32 @@ mark {
 .editor-popup {
   --popup-bg: #fff;
   --popup-border: #e5e7eb;
+  --popup-arrow-left: 50%;
+  isolation: isolate;
 }
 .dark .editor-popup {
   --popup-bg: #28323e;
   --popup-border: #4b5563;
 }
-.editor-popup::before,
 .editor-popup::after {
   content: '';
   position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  border-left: 7px solid transparent;
-  border-right: 7px solid transparent;
-}
-.editor-popup::after {
-  top: -7px;
-  border-bottom: 7px solid var(--popup-border);
-}
-.editor-popup::before {
-  top: -5px;
-  border-bottom: 6px solid var(--popup-bg);
+  left: var(--popup-arrow-left);
+  top: -6px;
+  width: 13px;
+  height: 13px;
+  border: 1px solid var(--popup-border);
+  border-radius: 3px 0 2px;
+  background: var(--popup-bg);
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+  transform: translateX(-50%) rotate(45deg);
   z-index: 1;
+}
+.editor-popup[data-placement="top"]::after {
+  top: auto;
+  bottom: -6px;
+  border-radius: 2px 3px 0;
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
 }
 .editor-popup[data-palette] button {
   color: var(--pal-text);

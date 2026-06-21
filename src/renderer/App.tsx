@@ -143,18 +143,6 @@ const App: React.FC = () => {
     document.body.style.userSelect = 'none';
   };
 
-  // Close font menu on click outside
-  useEffect(() => {
-    if (!showFontMenu) return;
-    const handler = (e: MouseEvent) => {
-      if (fontMenuRef.current && !fontMenuRef.current.contains(e.target as Node)) {
-        setShowFontMenu(false);
-      }
-    };
-    setTimeout(() => document.addEventListener('mousedown', handler), 0);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [showFontMenu]);
-
   // Helper: load file content into both store and editor (textarea/contentEditable)
   const loadFileIntoEditor = useCallback((name: string | null, filePath: string | null, content: string) => {
     const state = useStore.getState();
@@ -598,29 +586,18 @@ const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [theme, isMaximized, settingsOpen, settingsTab]);
 
-  // Close font menu on click outside
+  // Keep selector-to-selector clicks intact; close both only outside the toolbar menus.
   useEffect(() => {
-    if (!showFontMenu) return;
+    if (!showFontMenu && !showPaletteMenu) return;
     const handler = (e: MouseEvent) => {
-      if (fontMenuRef.current && !fontMenuRef.current.contains(e.target as Node)) {
-        setShowFontMenu(false);
-      }
+      const target = e.target as Node;
+      if (fontMenuRef.current?.contains(target) || paletteMenuRef.current?.contains(target)) return;
+      setShowFontMenu(false);
+      setShowPaletteMenu(false);
     };
     setTimeout(() => document.addEventListener('mousedown', handler), 0);
     return () => document.removeEventListener('mousedown', handler);
-  }, [showFontMenu]);
-
-  // Close palette menu on click outside
-  useEffect(() => {
-    if (!showPaletteMenu) return;
-    const handler = (e: MouseEvent) => {
-      if (paletteMenuRef.current && !paletteMenuRef.current.contains(e.target as Node)) {
-        setShowPaletteMenu(false);
-      }
-    };
-    setTimeout(() => document.addEventListener('mousedown', handler), 0);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [showPaletteMenu]);
+  }, [showFontMenu, showPaletteMenu]);
 
   const FontSelector = () => {
     const currentLabel = FONT_OPTIONS.find(o => o.value === fontFamily)?.label || 'System Default';
@@ -632,7 +609,9 @@ const App: React.FC = () => {
         const rect = btnRef.current.getBoundingClientRect();
         setPanelStyle({ position: 'fixed', top: rect.bottom + 4, left: rect.left });
       }
-      setShowFontMenu(!showFontMenu);
+      const shouldOpen = !showFontMenu;
+      setShowFontMenu(shouldOpen);
+      if (shouldOpen) setShowPaletteMenu(false);
     };
 
     return (
@@ -695,7 +674,9 @@ const App: React.FC = () => {
         const rect = btnRef.current.getBoundingClientRect();
         setPanelStyle({ position: 'fixed', top: rect.bottom + 4, left: rect.left });
       }
-      setShowPaletteMenu(!showPaletteMenu);
+      const shouldOpen = !showPaletteMenu;
+      setShowPaletteMenu(shouldOpen);
+      if (shouldOpen) setShowFontMenu(false);
     };
 
     return (
@@ -985,7 +966,7 @@ const App: React.FC = () => {
           {/* Toolbar */}
           {currentFile && !distractionFree && (
             <div
-              className={`flex items-center gap-0.5 px-2 h-10 border-b relative z-10 ${
+              className={`flex items-center gap-0.5 px-2 h-10 border-b relative z-100 ${
                 matchToolbarPalette
                   ? 'border-gray-300/40 dark:border-gray-600/40'
                   : 'border-gray-200/60 dark:border-gray-700/60'

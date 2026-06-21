@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useLayoutEffect, useCallback, useState, startTransition } from 'react';
+import { createPortal } from 'react-dom';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -201,6 +202,10 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
   const savedCursorRef = useRef(0);
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
+  const moreButtonRef = useRef<HTMLButtonElement>(null);
+  const morePanelRef = useRef<HTMLDivElement>(null);
+  const [morePanelStyle, setMorePanelStyle] = useState<React.CSSProperties>({});
+  const [morePanelPlacement, setMorePanelPlacement] = useState<'top' | 'bottom'>('bottom');
   const toolbarRef = useRef<HTMLDivElement>(null);
   const [toolbarMode, setToolbarMode] = useState<'compact' | 'medium'>('compact');
 
@@ -238,11 +243,52 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
   useEffect(() => {
     if (!moreOpen) return;
     const handler = (e: MouseEvent) => {
-      if (moreRef.current && !moreRef.current.contains(e.target as Node)) setMoreOpen(false);
+      const target = e.target as Node;
+      if (moreRef.current?.contains(target) || morePanelRef.current?.contains(target)) return;
+      setMoreOpen(false);
     };
     setTimeout(() => document.addEventListener('mousedown', handler), 0);
     return () => document.removeEventListener('mousedown', handler);
   }, [moreOpen]);
+
+  const positionMorePanel = useCallback(() => {
+    const button = moreButtonRef.current;
+    const panel = morePanelRef.current;
+    if (!button || !panel) return;
+
+    const margin = 8;
+    const gap = 8;
+    const buttonRect = button.getBoundingClientRect();
+    const panelRect = panel.getBoundingClientRect();
+    const centeredLeft = buttonRect.left + buttonRect.width / 2 - panelRect.width / 2;
+    const left = Math.min(
+      Math.max(centeredLeft, margin),
+      window.innerWidth - panelRect.width - margin
+    );
+    const fitsBelow = buttonRect.bottom + gap + panelRect.height <= window.innerHeight - margin;
+    const top = fitsBelow
+      ? buttonRect.bottom + gap
+      : Math.max(margin, buttonRect.top - panelRect.height - gap);
+    const arrowLeft = Math.min(
+      Math.max(buttonRect.left + buttonRect.width / 2 - left, 12),
+      panelRect.width - 12
+    );
+
+    setMorePanelPlacement(fitsBelow ? 'bottom' : 'top');
+    setMorePanelStyle({
+      position: 'fixed',
+      left,
+      top,
+      ['--popup-arrow-left' as string]: `${arrowLeft}px`,
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!moreOpen) return;
+    positionMorePanel();
+    window.addEventListener('resize', positionMorePanel);
+    return () => window.removeEventListener('resize', positionMorePanel);
+  }, [moreOpen, positionMorePanel]);
 
   // ResizeObserver: compact ↔ medium with hysteresis (~3 tool widths)
   useEffect(() => {
@@ -951,16 +997,18 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
         )}
         {/* Chevron dropdown for remaining tools */}
         <div className="relative" ref={moreRef}>
-          <button className="btn-icon" title="More tools" onClick={() => setMoreOpen(v => !v)}>
+          <button ref={moreButtonRef} className="btn-icon" title="More tools" onClick={() => setMoreOpen(v => !v)}>
             <svg className="w-[18px] h-[18px] shrink-0 transition-transform duration-150" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5} style={{ transform: moreOpen ? 'rotate(180deg)' : '' }}>
               <path strokeLinecap="round" strokeLinejoin="round" d="m6 9l6 6 6-6" />
             </svg>
           </button>
-          {moreOpen && (
+          {moreOpen && createPortal(
             <div
-              className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-white dark:bg-[#28323e] border border-gray-200 dark:border-gray-600 rounded-md shadow-xl z-40 py-1 w-44 editor-popup"
+              ref={morePanelRef}
+              className="bg-white dark:bg-[#28323e] border border-gray-200 dark:border-gray-600 rounded-md shadow-xl py-1 w-44 editor-popup"
               data-palette={matchPalette ? '' : undefined}
-              style={{ maxWidth: 'calc(100vw - 1rem)', ...(matchPalette ? { backgroundColor: 'var(--pal-panel-bg)', borderColor: 'var(--pal-border)', ['--popup-bg' as any]: 'var(--pal-panel-bg)', ['--popup-border' as any]: 'var(--pal-border)' } : {}) }}
+              data-placement={morePanelPlacement}
+              style={{ zIndex: 9999, maxWidth: 'calc(100vw - 1rem)', ...morePanelStyle, ...(matchPalette ? { backgroundColor: 'var(--pal-panel-bg)', borderColor: 'var(--pal-border)', ['--popup-bg' as any]: 'var(--pal-panel-bg)', ['--popup-border' as any]: 'var(--pal-border)' } : {}) }}
             >
               {toolbarMode === 'compact' && (
                 <>
@@ -1000,7 +1048,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
                   {type}
                 </button>
               ))}
-            </div>
+            </div>,
+            document.body
           )}
         </div>
         {/* Spacer */}

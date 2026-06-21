@@ -20,6 +20,15 @@ mermaid.initialize({
   fontFamily: 'inherit',
 });
 
+function reactNodeToText(node: React.ReactNode): string {
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(reactNodeToText).join('');
+  if (React.isValidElement<{ children?: React.ReactNode }>(node)) {
+    return reactNodeToText(node.props.children);
+  }
+  return '';
+}
+
 const KNOWN_HTML_TAGS = new Set([
   'a','abbr','address','area','article','aside','audio',
   'b','base','bdi','bdo','blockquote','body','br','button',
@@ -498,7 +507,7 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, s
       const langClass = codeChild?.props?.className || '';
       const langMatch = langClass.match(/language-(\w+)/);
       const lang = langMatch ? langMatch[1] : null;
-      const codeText = typeof codeChild?.props?.children === 'string' ? codeChild.props.children : (codeChild?.props?.children?.[0] || '');
+      const codeText = reactNodeToText(codeChild?.props?.children);
       if (lang === 'mermaid') return <MermaidBlock code={codeText} />;
       const isDiff = lang === 'diff';
       const [copied, setCopied] = useState(false);
