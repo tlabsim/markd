@@ -28,7 +28,7 @@ html[data-match-palette] [class*="px-2.5 py-1 text-xs"] { color: var(--pal-muted
   --pal-bg: #ffffff;
   --pal-text: #1f2328;
   --pal-link: #0969da;
-  --pal-border: #d0d7de;
+  --pal-border: #c5cdd5;
   --pal-muted: #656d76;
   --pal-blockquote-border: #d0d7de;
   --pal-blockquote-text: #656d76;

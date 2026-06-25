@@ -5,7 +5,7 @@ import { PALETTE_OPTIONS } from './palettes';
 import TitleBar from './components/TitleBar';
 import Sidebar from './components/Sidebar';
 import MarkdownViewer from './components/MarkdownViewer';
-import MarkdownEditor from './components/MarkdownEditor';
+import MarkdownEditor, { type MarkdownEditorSearchApi } from './components/MarkdownEditor';
 import ConfirmModal from './components/ConfirmModal';
 import SearchBar from './components/SearchBar';
 import WelcomeScreen from './components/WelcomeScreen';
@@ -109,6 +109,7 @@ const App: React.FC = () => {
   const isDragging = useRef(false);
   const isSyncing = useRef(false); // prevent scroll feedback loop
   const editorScrollRef = useRef<HTMLElement | null>(null);
+  const editorSearchApiRef = useRef<MarkdownEditorSearchApi | null>(null);
   const viewerScrollRef = useRef<HTMLElement | null>(null);
   const dragRatio = useRef(50); // ref for instant drag updates
 
@@ -1055,12 +1056,13 @@ const App: React.FC = () => {
           <div ref={contentRef} className="flex-1 overflow-hidden flex flex-col relative">
             {/* Search bar — contextual position per mode */}
             {isSearchOpen && (
-              <div className={`${viewMode === 'view'
+              <div key="search-bar" className={`${viewMode === 'view'
                 ? 'absolute top-3 left-1/2 -translate-x-1/2 z-50 w-full max-w-xl'
                 : 'w-full'
               }`}>
                 <SearchBar
                   editorRef={editorScrollRef as React.RefObject<HTMLTextAreaElement | HTMLDivElement | null>}
+                  editorSearchApiRef={editorSearchApiRef as React.RefObject<MarkdownEditorSearchApi | null>}
                   viewerRef={viewerScrollRef as React.RefObject<HTMLDivElement | null>}
                   viewMode={viewMode}
                   position={viewMode === 'view' ? 'viewer-center' : 'editor-top'}
@@ -1068,7 +1070,7 @@ const App: React.FC = () => {
                 />
               </div>
             )}
-            <div className="flex-1 overflow-hidden flex">
+            <div key="document-content" className="flex-1 overflow-hidden flex">
             {!currentFile ? (
               <WelcomeScreen onOpen={handleOpen} onOpenFolder={handleOpenFolder} onNew={handleNewFile} />
             ) : (
@@ -1082,6 +1084,7 @@ const App: React.FC = () => {
                     <MarkdownEditor
                       syncScroll={viewMode === 'edit' ? undefined : syncScroll}
                       onScrollRef={(el) => { editorScrollRef.current = el; }}
+                      onSearchApiRef={(api) => { editorSearchApiRef.current = api; }}
                       onEditorScroll={handleEditorScroll}
                       onToggleSync={viewMode === 'edit' ? undefined : () => setSyncScroll(v => v === 'off' ? 'content' : v === 'content' ? 'position' : 'off')}
                       wordWrap={wordWrap}

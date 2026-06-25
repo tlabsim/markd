@@ -23,6 +23,9 @@ interface EditorState {
   isSidebarOpen: boolean;
   isSearchOpen: boolean;
   searchQuery: string;
+  searchCurrentIndex: number;
+  searchUseRegex: boolean;
+  searchCaseSensitive: boolean;
   isMaximized: boolean;
 
   // Preview settings
@@ -60,6 +63,9 @@ interface EditorState {
   toggleSidebar: () => void;
   setSearchOpen: (open: boolean) => void;
   setSearchQuery: (query: string) => void;
+  setSearchCurrentIndex: (index: number) => void;
+  setSearchUseRegex: (useRegex: boolean) => void;
+  setSearchCaseSensitive: (caseSensitive: boolean) => void;
   setMaximized: (maximized: boolean) => void;
   setFontFamily: (font: string) => void;
   setZoomLevel: (zoom: number) => void;
@@ -114,6 +120,9 @@ export const useStore = create<EditorState>()(
       isSidebarOpen: true,
       isSearchOpen: false,
       searchQuery: '',
+      searchCurrentIndex: 0,
+      searchUseRegex: false,
+      searchCaseSensitive: false,
       isMaximized: false,
       fontFamily: 'system',
       zoomLevel: 100,
@@ -155,6 +164,9 @@ export const useStore = create<EditorState>()(
       toggleSidebar: () => set({ isSidebarOpen: !get().isSidebarOpen }),
       setSearchOpen: (open) => set({ isSearchOpen: open }),
       setSearchQuery: (query) => set({ searchQuery: query }),
+      setSearchCurrentIndex: (index) => set({ searchCurrentIndex: index }),
+      setSearchUseRegex: (useRegex) => set({ searchUseRegex: useRegex }),
+      setSearchCaseSensitive: (caseSensitive) => set({ searchCaseSensitive }),
       setMaximized: (maximized) => set({ isMaximized: maximized }),
       setFontFamily: (font) => set({ fontFamily: font }),
       setZoomLevel: (zoom) => set({ zoomLevel: Math.max(50, Math.min(200, zoom)) }),

@@ -479,8 +479,38 @@ mark {
   padding: 0.1rem 0.2rem;
   border-radius: 0.2rem;
 }
+.editor-search-current,
+.editor-search-match {
+  padding: 0 !important;
+  border-radius: 0.125rem;
+  font: inherit;
+  line-height: inherit;
+  vertical-align: baseline;
+}
+.editor-search-current {
+  background: #fcd34d;
+}
+.editor-search-match {
+  background: rgba(252, 211, 77, 0.5);
+}
+.editor-search-match-current {
+  background: rgba(251, 191, 36, 0.75);
+}
+.editor-search-overlay,
+.editor-search-overlay .editor-search-match {
+  color: transparent !important;
+}
 .dark mark {
   background: rgba(250, 204, 21, 0.3);
+}
+.dark .editor-search-current {
+  background: #f59e0b;
+}
+.dark .editor-search-match {
+  background: rgba(180, 83, 9, 0.5);
+}
+.dark .editor-search-match-current {
+  background: rgba(245, 158, 11, 0.75);
 }
 
 /* ---- Definition lists ---- */

@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useLayoutEffect, useCallback, useState, startTransition } from 'react';
+import React, { useRef, useEffect, useLayoutEffect, useCallback, useMemo, useState, startTransition } from 'react';
 import { createPortal } from 'react-dom';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
@@ -11,7 +11,57 @@ function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function highlightMarkdown(raw: string): string {
+interface SearchHighlightOptions {
+  query: string;
+  currentIndex: number;
+  useRegex: boolean;
+  caseSensitive: boolean;
+}
+
+function makeSearchRegex(query: string, useRegex: boolean, caseSensitive: boolean): RegExp | null {
+  if (!query.trim()) return null;
+  try {
+    const source = useRegex ? query : query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(source, `g${caseSensitive ? '' : 'i'}`);
+  } catch {
+    return null;
+  }
+}
+
+function highlightSearchMatches(
+  raw: string,
+  { query, currentIndex, useRegex, caseSensitive }: SearchHighlightOptions,
+): string {
+  const re = makeSearchRegex(query, useRegex, caseSensitive);
+  if (!re) return esc(raw);
+
+  const pieces: string[] = [];
+  let last = 0;
+  let index = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = re.exec(raw)) !== null) {
+    if (match[0].length === 0) {
+      re.lastIndex = match.index + 1;
+      continue;
+    }
+
+    if (match.index > last) pieces.push(esc(raw.slice(last, match.index)));
+    const cls = index === currentIndex
+      ? 'editor-search-match editor-search-match-current'
+      : 'editor-search-match';
+    const currentAttr = index === currentIndex ? ' data-editor-search-current="true"' : '';
+    pieces.push(`<mark class="${cls}"${currentAttr}>${esc(match[0])}</mark>`);
+    last = match.index + match[0].length;
+    index += 1;
+  }
+
+  if (last < raw.length) pieces.push(esc(raw.slice(last)));
+  return pieces.length ? pieces.join('') : esc(raw);
+}
+
+function highlightMarkdown(raw: string, searchOptions?: SearchHighlightOptions | null): string {
+  if (searchOptions?.query.trim()) return highlightSearchMatches(raw, searchOptions);
   const lines = raw.split('\n');
   let inFence = false;
   return lines.map((line) => {
@@ -118,8 +168,13 @@ function setSelectionRange(editor: HTMLElement, start: number, end: number) {
 
 type EditorEl = HTMLTextAreaElement | HTMLDivElement;
 
+function getContentEditableText(el: HTMLDivElement): string {
+  const text = el.innerText || el.textContent || '';
+  return text.replace(/\u00a0/g, ' ');
+}
+
 function getText(el: EditorEl): string {
-  return el instanceof HTMLTextAreaElement ? el.value : (el.textContent || '');
+  return el instanceof HTMLTextAreaElement ? el.value : getContentEditableText(el);
 }
 
 function getSel(el: EditorEl): { start: number; end: number; text: string } {
@@ -158,6 +213,7 @@ function getLineCol(el: EditorEl): { line: number; col: number; total: number } 
 interface MarkdownEditorProps {
   syncScroll?: 'off' | 'position' | 'content';
   onScrollRef?: (el: HTMLElement | null) => void;
+  onSearchApiRef?: (api: MarkdownEditorSearchApi | null) => void;
   onEditorScroll?: () => void;
   onToggleSync?: () => void;
   wordWrap?: boolean;
@@ -169,13 +225,36 @@ interface MarkdownEditorProps {
   paletteBgDark?: string;
 }
 
-const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef, onEditorScroll, onToggleSync, wordWrap, onToggleWordWrap, onFlushRef, onSave, matchPalette, paletteBg, paletteBgDark }) => {
-  const { fileContent, setFileContent, theme } = useStore(useShallow((state) => ({
+export interface MarkdownEditorSearchApi {
+  revealRange: (start: number, end: number, options?: { preserveFocus?: boolean }) => void;
+  replaceContent: (nextText: string, cursor?: number) => void;
+  clearSearchHighlight: () => void;
+  getContent: () => string;
+}
+
+const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef, onSearchApiRef, onEditorScroll, onToggleSync, wordWrap, onToggleWordWrap, onFlushRef, onSave, matchPalette, paletteBg, paletteBgDark }) => {
+  const {
+    fileContent,
+    setFileContent,
+    theme,
+    isSearchOpen,
+    searchQuery,
+    searchCurrentIndex,
+    searchUseRegex,
+    searchCaseSensitive,
+  } = useStore(useShallow((state) => ({
     fileContent: state.fileContent,
     setFileContent: state.setFileContent,
     theme: state.theme,
+    isSearchOpen: state.isSearchOpen,
+    searchQuery: state.searchQuery,
+    searchCurrentIndex: state.searchCurrentIndex,
+    searchUseRegex: state.searchUseRegex,
+    searchCaseSensitive: state.searchCaseSensitive,
   })));
   const editorRef = useRef<EditorEl>(null);
+  const textareaOverlayInnerRef = useRef<HTMLDivElement>(null);
+  const pendingTextareaRevealOffsetRef = useRef<number | null>(null);
   const lineNumbersRef = useRef<HTMLDivElement>(null);
   const scrollbarWideRef = useRef(false);
 
@@ -198,6 +277,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
   const [lineCount, setLineCount] = useState(1);
   const [taWidth, setTaWidth] = useState(0);
   const [syntaxHighlight, setSyntaxHighlight] = useState(false);
+  const [liveEditorText, setLiveEditorText] = useState(fileContent);
   const savedScrollRef = useRef(0);
   const savedCursorRef = useRef(0);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -208,6 +288,27 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
   const [morePanelPlacement, setMorePanelPlacement] = useState<'top' | 'bottom'>('bottom');
   const toolbarRef = useRef<HTMLDivElement>(null);
   const [toolbarMode, setToolbarMode] = useState<'compact' | 'medium'>('compact');
+  const searchHighlightOptions = useMemo<SearchHighlightOptions | null>(() => {
+    if (!isSearchOpen || !searchQuery.trim()) return null;
+    return {
+      query: searchQuery,
+      currentIndex: searchCurrentIndex,
+      useRegex: searchUseRegex,
+      caseSensitive: searchCaseSensitive,
+    };
+  }, [isSearchOpen, searchCaseSensitive, searchCurrentIndex, searchQuery, searchUseRegex]);
+  const textareaSearchHtml = useMemo(() => {
+    if (syntaxHighlight || !searchHighlightOptions) return '';
+    return highlightSearchMatches(liveEditorText, searchHighlightOptions);
+  }, [liveEditorText, searchHighlightOptions, syntaxHighlight]);
+
+  const syncTextareaSearchOverlay = useCallback((el?: HTMLTextAreaElement | null) => {
+    const source = el ?? editorRef.current;
+    if (!(source instanceof HTMLTextAreaElement)) return;
+    const overlay = textareaOverlayInnerRef.current;
+    if (!overlay) return;
+    overlay.style.transform = `translate(${-source.scrollLeft}px, ${-source.scrollTop}px)`;
+  }, []);
 
   // Preserve scroll/cursor when toggling syntax highlight
   useLayoutEffect(() => {
@@ -217,7 +318,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
         el.selectionStart = el.selectionEnd = savedCursorRef.current;
       } else if (el instanceof HTMLDivElement) {
         // Fill content first so cursor can land, then scroll
-        el.innerHTML = highlightMarkdown(fileContent) || '<br>';
+        el.innerHTML = highlightMarkdown(liveEditorText, searchHighlightOptions) || '<br>';
         setSel(el, savedCursorRef.current, savedCursorRef.current);
       }
       el.scrollTop = savedScrollRef.current;
@@ -333,11 +434,11 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
       const el = editorRef.current;
       if (!el || el instanceof HTMLTextAreaElement) return;
       const cursor = saveCursor(el);
-      el.innerHTML = highlightMarkdown(getText(el)) || '<br>';
+      el.innerHTML = highlightMarkdown(getText(el), searchHighlightOptions) || '<br>';
       restoreCursor(el, cursor);
       isHighlighting.current = false;
     }, 300);
-  }, [syntaxHighlight]);
+  }, [syntaxHighlight, searchHighlightOptions]);
 
   const pushUndo = useCallback(() => {
     const el = editorRef.current;
@@ -351,6 +452,141 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
     if (undoStack.current.length > 100) undoStack.current.shift();
     redoStack.current = [];
   }, []);
+
+  const scrollEditorToOffset = useCallback((el: EditorEl, offset: number) => {
+    const line = getText(el).substring(0, offset).split('\n').length;
+    const lineHeight = parseFloat(window.getComputedStyle(el).lineHeight) || 24;
+    el.scrollTop = Math.max(0, (line - 3) * lineHeight);
+  }, []);
+
+  const scrollTextareaToCurrentSearchMatch = useCallback((el: HTMLTextAreaElement, fallbackOffset: number) => {
+    const mark = textareaOverlayInnerRef.current?.querySelector('[data-editor-search-current="true"]') as HTMLElement | null;
+    if (!mark) {
+      scrollEditorToOffset(el, fallbackOffset);
+      syncTextareaSearchOverlay(el);
+      return;
+    }
+
+    const targetTop = mark.offsetTop - (el.clientHeight / 2) + (mark.offsetHeight / 2);
+    el.scrollTop = Math.max(0, targetTop);
+    if (!wordWrap) {
+      el.scrollLeft = Math.max(0, mark.offsetLeft - 24);
+    }
+    if (lineNumbersRef.current) lineNumbersRef.current.scrollTop = el.scrollTop;
+    syncTextareaSearchOverlay(el);
+  }, [scrollEditorToOffset, syncTextareaSearchOverlay, wordWrap]);
+
+  const renderContentEditable = useCallback((preserveSelection = true) => {
+    const el = editorRef.current;
+    if (!el || el instanceof HTMLTextAreaElement) return;
+    const active = document.activeElement === el;
+    const cursor = active && preserveSelection ? saveCursor(el) : 0;
+    const text = getText(el) || fileContent;
+    syncGuard.current = true;
+    el.innerHTML = highlightMarkdown(text, searchHighlightOptions) || '<br>';
+    if (active && preserveSelection) restoreCursor(el, cursor);
+    requestAnimationFrame(() => {
+      const mark = el.querySelector('[data-editor-search-current="true"]') as HTMLElement | null;
+      mark?.scrollIntoView({ block: 'center', behavior: 'auto' });
+    });
+    setTimeout(() => { syncGuard.current = false; }, 100);
+  }, [fileContent, searchHighlightOptions]);
+
+  const revealRange = useCallback((start: number, end: number, options: { preserveFocus?: boolean } = {}) => {
+    const el = editorRef.current;
+    if (!el) return;
+    const preserveFocus = options.preserveFocus !== false;
+    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+    if (el instanceof HTMLTextAreaElement) {
+      pendingTextareaRevealOffsetRef.current = start;
+      const shouldRestoreFocus = preserveFocus && previouslyFocused && previouslyFocused !== el && previouslyFocused.isConnected;
+      const previousScrollTop = el.scrollTop;
+      setSel(el, start, end);
+      el.focus({ preventScroll: true });
+      if (el.scrollTop === previousScrollTop) {
+        scrollEditorToOffset(el, start);
+      }
+      syncTextareaSearchOverlay(el);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (editorRef.current !== el) return;
+          scrollTextareaToCurrentSearchMatch(el, start);
+          pendingTextareaRevealOffsetRef.current = null;
+          if (shouldRestoreFocus && document.activeElement !== previouslyFocused) {
+            previouslyFocused.focus({ preventScroll: true });
+          }
+        });
+      });
+      if (!preserveFocus) {
+        el.focus({ preventScroll: true });
+      }
+      return;
+    }
+
+    if (!preserveFocus) el.focus({ preventScroll: true });
+  }, [scrollEditorToOffset, scrollTextareaToCurrentSearchMatch, syncTextareaSearchOverlay]);
+
+  const replaceContent = useCallback((nextText: string, cursor = 0) => {
+    pushUndo();
+    lastTypedRef.current = nextText;
+    setLiveEditorText(nextText);
+    setFileContent(nextText);
+
+    requestAnimationFrame(() => {
+      const nextEl = editorRef.current;
+      if (!nextEl) return;
+      if (nextEl instanceof HTMLTextAreaElement) {
+        nextEl.value = nextText;
+      } else if (syntaxHighlight) {
+        nextEl.innerHTML = highlightMarkdown(nextText, searchHighlightOptions) || '<br>';
+      } else {
+        nextEl.textContent = nextText;
+      }
+      setSel(nextEl, cursor, cursor);
+      scrollEditorToOffset(nextEl, cursor);
+    });
+  }, [pushUndo, scrollEditorToOffset, setFileContent, syntaxHighlight, searchHighlightOptions]);
+
+  const clearSearchHighlight = useCallback(() => {
+    const el = editorRef.current;
+    if (!el || el instanceof HTMLTextAreaElement) return;
+    const active = document.activeElement === el;
+    const cursor = active ? saveCursor(el) : 0;
+    syncGuard.current = true;
+    el.innerHTML = highlightMarkdown(getText(el), null) || '<br>';
+    if (active) restoreCursor(el, cursor);
+    setTimeout(() => { syncGuard.current = false; }, 100);
+  }, []);
+
+  const getContent = useCallback(() => {
+    const el = editorRef.current;
+    return el ? getText(el) : liveEditorText;
+  }, [liveEditorText]);
+
+  useEffect(() => {
+    onSearchApiRef?.({ revealRange, replaceContent, clearSearchHighlight, getContent });
+    return () => onSearchApiRef?.(null);
+  }, [onSearchApiRef, revealRange, replaceContent, clearSearchHighlight, getContent]);
+
+  useLayoutEffect(() => {
+    const el = editorRef.current;
+    if (!el || el instanceof HTMLTextAreaElement || !syntaxHighlight) return;
+    renderContentEditable();
+  }, [searchHighlightOptions, syntaxHighlight, renderContentEditable]);
+
+  useLayoutEffect(() => {
+    if (syntaxHighlight) return;
+    const el = editorRef.current;
+    if (!(el instanceof HTMLTextAreaElement)) return;
+    const fallbackOffset = pendingTextareaRevealOffsetRef.current;
+    if (fallbackOffset !== null) {
+      scrollTextareaToCurrentSearchMatch(el, fallbackOffset);
+      pendingTextareaRevealOffsetRef.current = null;
+      return;
+    }
+    syncTextareaSearchOverlay(el);
+  }, [syntaxHighlight, textareaSearchHtml, scrollTextareaToCurrentSearchMatch, syncTextareaSearchOverlay]);
 
   // Smart toggle: wrap/unwrap selection with prefix/suffix
   const toggleWrap = useCallback((prefix: string, suffix: string, placeholder: string) => {
@@ -381,7 +617,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
       selStart = start + pLen;
       selEnd = selStart + selected.length;
     }
-    if (el instanceof HTMLTextAreaElement) { el.value = newText; lastTypedRef.current = newText; }
+    if (el instanceof HTMLTextAreaElement) { el.value = newText; lastTypedRef.current = newText; setLiveEditorText(newText); }
     setFileContent(newText);
     setTimeout(() => {
       const el2 = editorRef.current; if (!el2) return;
@@ -411,7 +647,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
       cursorDelta = pfx.length;
     }
     const newText = full.substring(0, lineStart) + newLine + full.substring(lineEnd);
-    if (el instanceof HTMLTextAreaElement) { el.value = newText; lastTypedRef.current = newText; }
+    if (el instanceof HTMLTextAreaElement) { el.value = newText; lastTypedRef.current = newText; setLiveEditorText(newText); }
     setFileContent(newText);
     setTimeout(() => {
       const el2 = editorRef.current; if (!el2) return;
@@ -449,7 +685,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
       cursorDelta = pfx.length;
     }
     const newText = full.substring(0, lineStart) + newLine + full.substring(lineEnd);
-    if (el instanceof HTMLTextAreaElement) { el.value = newText; lastTypedRef.current = newText; }
+    if (el instanceof HTMLTextAreaElement) { el.value = newText; lastTypedRef.current = newText; setLiveEditorText(newText); }
     setFileContent(newText);
     setTimeout(() => {
       const el2 = editorRef.current; if (!el2) return;
@@ -555,6 +791,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
     } else if (el instanceof HTMLTextAreaElement) {
       el.value = prev.text;
       lastTypedRef.current = prev.text;
+      setLiveEditorText(prev.text);
       el.selectionStart = el.selectionEnd = Math.min(prev.cursor, prev.text.length);
     }
     setFileContent(prev.text);
@@ -577,6 +814,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
     } else if (el instanceof HTMLTextAreaElement) {
       el.value = next.text;
       lastTypedRef.current = next.text;
+      setLiveEditorText(next.text);
       el.selectionStart = el.selectionEnd = Math.min(next.cursor, next.text.length);
     }
     setFileContent(next.text);
@@ -634,6 +872,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
         el.value = fileContent;
         lastTypedRef.current = fileContent;
       }
+      setLiveEditorText(el.value);
       return;
     }
     // contentEditable: set initial content when file opens or mode switches
@@ -641,18 +880,20 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
       const cursor = saveCursor(el);
       const st = el.scrollTop;
       syncGuard.current = true;
-      el.innerHTML = highlightMarkdown(fileContent) || '<br>';
+      el.innerHTML = highlightMarkdown(fileContent, searchHighlightOptions) || '<br>';
+      setLiveEditorText(fileContent);
       restoreCursor(el, cursor);
       el.scrollTop = st;
       setTimeout(() => { syncGuard.current = false; }, 100);
     }
-  }, [fileContent, syntaxHighlight]);
+  }, [fileContent, syntaxHighlight, searchHighlightOptions]);
 
   // Input handler: push undo, debounce store, schedule highlighting
   const handleInput = useCallback(() => {
     const el = editorRef.current;
     if (!el || syncGuard.current) return;
     const text = getText(el);
+    setLiveEditorText(text);
     pushUndo(); // per-keystroke undo for contentEditable
     pushToStore(text);
     applyHighlight();
@@ -662,6 +903,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
   // textarea onChange — short debounce (150ms) + startTransition for interruptible preview
   const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const text = e.target.value;
+    setLiveEditorText(text);
     pushUndo();
     lastTypedRef.current = text;
     clearTimeout(storeTimer.current);
@@ -676,7 +918,10 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
     if (editorRef.current && lineNumbersRef.current) {
       lineNumbersRef.current.scrollTop = editorRef.current.scrollTop;
     }
-  }, []);
+    if (editorRef.current instanceof HTMLTextAreaElement) {
+      syncTextareaSearchOverlay(editorRef.current);
+    }
+  }, [syncTextareaSearchOverlay]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     const el = editorRef.current; if (!el) return;
@@ -697,6 +942,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
         const nv = value.substring(0, start) + '  ' + value.substring(end);
         if (isTa) {
           el.value = nv; lastTypedRef.current = nv;
+          setLiveEditorText(nv);
           el.selectionStart = el.selectionEnd = start + 2;
           pushUndo(); // snapshot post-Tab state for undo granularity
           clearTimeout(storeTimer.current);
@@ -715,6 +961,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
           const nv = value.substring(0, ls) + bl.substring(2) + value.substring(start);
           if (isTa) {
             el.value = nv; lastTypedRef.current = nv;
+            setLiveEditorText(nv);
             el.selectionStart = el.selectionEnd = start - 2;
             clearTimeout(storeTimer.current);
             storeTimer.current = window.setTimeout(() => { startTransition(() => { lastTypedRef.current = nv; setFileContent(nv); }); }, 150);
@@ -742,6 +989,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
       const doApply = (nv: string, cursor: number) => {
         if (isTa) {
           el.value = nv; lastTypedRef.current = nv;
+          setLiveEditorText(nv);
           el.selectionStart = el.selectionEnd = cursor;
           pushUndo(); // snapshot post-Enter state for undo granularity
           clearTimeout(storeTimer.current);
@@ -1071,6 +1319,11 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
           onClick={() => {
             const el = editorRef.current;
             if (el) {
+              const text = getText(el);
+              clearTimeout(storeTimer.current);
+              lastTypedRef.current = text;
+              setLiveEditorText(text);
+              setFileContent(text);
               savedScrollRef.current = el.scrollTop;
               savedCursorRef.current = getSel(el).start;
             }
@@ -1124,22 +1377,38 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
 
         {/* Editor: textarea (fast, no highlight) or contentEditable div (syntax colored) */}
         {!syntaxHighlight ? (
-          <textarea
-            ref={editorRef as React.RefObject<HTMLTextAreaElement>}
-            defaultValue={fileContent}
-            onChange={handleChange}
-            onKeyDown={handleKeyDown}
-            onClick={handleCursorUpdate}
-            onScroll={handleScroll}
-            spellCheck={false}
-            className={`flex-1 bg-transparent text-sm leading-6 font-mono p-3 resize-none outline-none text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-600 scrollbar-expand ${wordWrap ? 'wrap' : 'no-wrap'}`}
-            placeholder="Start writing markdown..."
-            style={{ tabSize: 2, whiteSpace: wordWrap ? 'pre-wrap' : 'pre', background: 'transparent' }}
-            onMouseMove={handleEditorMouseMove}
-            onMouseLeave={handleEditorMouseLeave}
-          />
+          <div className="relative flex-1 overflow-hidden bg-transparent">
+            {textareaSearchHtml && (
+              <div
+                aria-hidden="true"
+                className={`editor-search-overlay absolute inset-0 overflow-hidden pointer-events-none text-transparent text-sm leading-6 font-mono p-3 ${wordWrap ? 'wrap' : 'no-wrap'}`}
+                style={{ tabSize: 2, whiteSpace: wordWrap ? 'pre-wrap' : 'pre', background: 'transparent' }}
+              >
+                <div
+                  ref={textareaOverlayInnerRef}
+                  dangerouslySetInnerHTML={{ __html: textareaSearchHtml }}
+                />
+              </div>
+            )}
+            <textarea
+              key="markdown-textarea-editor"
+              ref={editorRef as React.RefObject<HTMLTextAreaElement>}
+              defaultValue={liveEditorText}
+              onChange={handleChange}
+              onKeyDown={handleKeyDown}
+              onClick={handleCursorUpdate}
+              onScroll={handleScroll}
+              spellCheck={false}
+              className={`relative z-10 w-full h-full bg-transparent text-sm leading-6 font-mono p-3 resize-none outline-none text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-600 scrollbar-expand ${wordWrap ? 'wrap' : 'no-wrap'}`}
+              placeholder="Start writing markdown..."
+              style={{ tabSize: 2, whiteSpace: wordWrap ? 'pre-wrap' : 'pre', background: 'transparent' }}
+              onMouseMove={handleEditorMouseMove}
+              onMouseLeave={handleEditorMouseLeave}
+            />
+          </div>
         ) : (
           <div
+            key="markdown-contenteditable-editor"
             ref={editorRef as React.RefObject<HTMLDivElement>}
             contentEditable
             suppressContentEditableWarning

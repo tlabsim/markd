@@ -282,6 +282,76 @@ interface MarkdownViewerProps {
   onViewerScroll?: () => void;
 }
 
+function escapeSearchRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function rehypeSearchHighlight(options: {
+  enabled: boolean;
+  query: string;
+  currentIndex: number;
+  useRegex: boolean;
+  caseSensitive: boolean;
+}) {
+  return (tree: any) => {
+    if (!options.enabled || !options.query.trim()) return;
+    let re: RegExp;
+    try {
+      re = options.useRegex
+        ? new RegExp(options.query, `g${options.caseSensitive ? '' : 'i'}`)
+        : new RegExp(escapeSearchRegex(options.query), `g${options.caseSensitive ? '' : 'i'}`);
+    } catch {
+      return;
+    }
+
+    let matchIndex = 0;
+    const visit = (node: any) => {
+      if (!node || !node.children || node.tagName === 'script' || node.tagName === 'style') return;
+      const nextChildren: any[] = [];
+      for (const child of node.children) {
+        if (child.type !== 'text' || !child.value) {
+          visit(child);
+          nextChildren.push(child);
+          continue;
+        }
+
+        const text = child.value;
+        const pieces: any[] = [];
+        let last = 0;
+        let match: RegExpExecArray | null;
+        re.lastIndex = 0;
+        while ((match = re.exec(text)) !== null) {
+          if (match[0].length === 0) {
+            re.lastIndex = match.index + 1;
+            continue;
+          }
+          if (match.index > last) pieces.push({ type: 'text', value: text.slice(last, match.index) });
+          const current = matchIndex === options.currentIndex;
+          pieces.push({
+            type: 'element',
+            tagName: 'mark',
+            properties: {
+              className: current
+                ? ['search-match', 'bg-amber-400', 'dark:bg-amber-500', 'text-black']
+                : ['search-match', 'bg-amber-200', 'dark:bg-amber-700/40'],
+              dataSearchCurrent: current ? 'true' : undefined,
+              style: 'border-radius:2px',
+            },
+            children: [{ type: 'text', value: match[0] }],
+          });
+          last = match.index + match[0].length;
+          matchIndex++;
+        }
+        if (last < text.length) pieces.push({ type: 'text', value: text.slice(last) });
+        nextChildren.push(...(pieces.length ? pieces : [child]));
+      }
+      node.children = nextChildren;
+    };
+
+    visit(tree);
+  };
+}
+
 // ---- Mermaid diagram renderer ----
 const MermaidBlock: React.FC<{ code: string }> = ({ code }) => {
   const [svg, setSvg] = useState<string | null>(null);
@@ -372,7 +442,23 @@ const BackToTop: React.FC<{ containerRef: React.RefObject<HTMLDivElement | null>
 };
 
 const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, syncScroll, onScrollRef, onViewerScroll }) => {
-  const { fileContent, currentFilePath, fontFamily, zoomLevel, previewPalette, zoomIn, zoomOut, matchToolbarPalette, showHeadingAnchors } = useStore(useShallow((state) => ({
+  const {
+    fileContent,
+    currentFilePath,
+    fontFamily,
+    zoomLevel,
+    previewPalette,
+    zoomIn,
+    zoomOut,
+    matchToolbarPalette,
+    showHeadingAnchors,
+    viewMode,
+    isSearchOpen,
+    searchQuery,
+    searchCurrentIndex,
+    searchUseRegex,
+    searchCaseSensitive
+  } = useStore(useShallow((state) => ({
     fileContent: state.fileContent,
     currentFilePath: state.currentFilePath,
     fontFamily: state.fontFamily,
@@ -382,6 +468,12 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, s
     zoomOut: state.zoomOut,
     matchToolbarPalette: state.matchToolbarPalette,
     showHeadingAnchors: state.showHeadingAnchors,
+    viewMode: state.viewMode,
+    isSearchOpen: state.isSearchOpen,
+    searchQuery: state.searchQuery,
+    searchCurrentIndex: state.searchCurrentIndex,
+    searchUseRegex: state.searchUseRegex,
+    searchCaseSensitive: state.searchCaseSensitive,
   })));
   const contentRef = useRef<HTMLDivElement>(null);
   const scrollbarWideRef = useRef(false);
@@ -398,6 +490,16 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, s
   }, []);
 
   useEffect(() => { if (contentRef.current) contentRef.current.scrollTop = 0; }, [currentFilePath]);
+
+  useEffect(() => {
+    if (viewMode !== 'view' || !isSearchOpen || !searchQuery.trim()) return;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const current = contentRef.current?.querySelector('[data-search-current="true"]') as HTMLElement | null;
+        current?.scrollIntoView({ block: 'center', behavior: 'auto' });
+      });
+    });
+  }, [viewMode, isSearchOpen, searchQuery, searchCurrentIndex]);
 
   // Intercept footnote link clicks — prevent full page navigation
   useEffect(() => {
@@ -569,6 +671,14 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, s
     },
   }), [makeHeading]);
 
+  const searchHighlightPlugin = useMemo(() => [rehypeSearchHighlight, {
+    enabled: viewMode === 'view' && isSearchOpen,
+    query: searchQuery,
+    currentIndex: searchCurrentIndex,
+    useRegex: searchUseRegex,
+    caseSensitive: searchCaseSensitive,
+  }] as any, [viewMode, isSearchOpen, searchQuery, searchCurrentIndex, searchUseRegex, searchCaseSensitive]);
+
   return (
     <div className="h-full flex flex-col relative">
       <div ref={contentRef}
@@ -581,7 +691,7 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, s
           {fileContent ? (
             <ReactMarkdown
               remarkPlugins={[remarkGfm, remarkMath, remarkEmoji, remarkFrontmatter, remarkSmartypants, remarkWikiLink, remarkDirective, remarkCallouts, remarkSubSuper, remarkHighlight, remarkDeflist]}
-              rehypePlugins={[rehypeKatex, rehypeHighlight, rehypeRaw, rehypeFilterCustomElements]}
+              rehypePlugins={[rehypeKatex, rehypeHighlight, rehypeRaw, rehypeFilterCustomElements, searchHighlightPlugin]}
               components={components}>
               {fileContent}
             </ReactMarkdown>
