@@ -622,6 +622,27 @@ ipcMain.handle('open-external', async (_event, url: string) => {
   }
 });
 
+ipcMain.handle('locate-on-disk', async (_event, filePath: string) => {
+  try {
+    const resolved = path.resolve(filePath);
+    if (!fs.existsSync(resolved)) {
+      return { success: false, error: 'File does not exist' };
+    }
+
+    shell.showItemInFolder(resolved);
+
+    const parentPath = path.dirname(resolved);
+    const openError = await shell.openPath(parentPath);
+    if (openError) {
+      return { success: false, error: openError };
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+});
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();

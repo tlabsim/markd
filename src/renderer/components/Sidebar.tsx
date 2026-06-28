@@ -120,6 +120,8 @@ const Sidebar: React.FC<{
   // ---- Dead recent-file detection with animated removal ----
   const removeRecentFile = useStore((state) => state.removeRecentFile);
   const [deadFiles, setDeadFiles] = useState<Record<string, 'striking' | 'removing'>>({});
+  const [recentMenu, setRecentMenu] = useState<{ filePath: string; x: number; y: number } | null>(null);
+  const recentMenuRef = useRef<HTMLDivElement>(null);
   const deadTimers = useRef<Record<string, number>>({});
 
   const markDead = useCallback((fp: string) => {
@@ -141,6 +143,84 @@ const Sidebar: React.FC<{
       markDead(filePath);
     }
   }, [onOpenPath, markDead]);
+
+  const ensureRecentFileExists = useCallback(async (filePath: string) => {
+    const r = await window.markd?.getFileContent(filePath);
+    if (r?.success) return true;
+    markDead(filePath);
+    return false;
+  }, [markDead]);
+
+  const handleRecentContextMenu = useCallback(async (event: React.MouseEvent, filePath: string) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setRecentMenu(null);
+    const exists = await ensureRecentFileExists(filePath);
+    if (!exists) return;
+
+    const menuWidth = 176;
+    const menuHeight = 104;
+    const margin = 8;
+    const x = Math.min(event.clientX, window.innerWidth - menuWidth - margin);
+    const y = Math.min(event.clientY, window.innerHeight - menuHeight - margin);
+    setRecentMenu({
+      filePath,
+      x: Math.max(margin, x),
+      y: Math.max(margin, y),
+    });
+  }, [ensureRecentFileExists]);
+
+  const openRecentFromMenu = useCallback(async () => {
+    const filePath = recentMenu?.filePath;
+    setRecentMenu(null);
+    if (!filePath) return;
+    if (await ensureRecentFileExists(filePath)) onOpenPath?.(filePath);
+  }, [ensureRecentFileExists, onOpenPath, recentMenu]);
+
+  const locateRecentFromMenu = useCallback(async () => {
+    const filePath = recentMenu?.filePath;
+    setRecentMenu(null);
+    if (!filePath) return;
+    if (!(await ensureRecentFileExists(filePath))) return;
+    const locateOnDisk = window.markd?.locateOnDisk;
+    if (typeof locateOnDisk !== 'function') {
+      console.warn('Locate on Disk is unavailable until the Electron app is restarted.');
+      return;
+    }
+    const result = await locateOnDisk(filePath);
+    if (!result?.success) markDead(filePath);
+  }, [ensureRecentFileExists, markDead, recentMenu]);
+
+  const removeRecentFromMenu = useCallback(() => {
+    const filePath = recentMenu?.filePath;
+    setRecentMenu(null);
+    if (!filePath) return;
+    removeRecentFile(filePath);
+  }, [recentMenu, removeRecentFile]);
+
+  useEffect(() => {
+    if (!recentMenu) return;
+    const close = (event: MouseEvent) => {
+      if (recentMenuRef.current?.contains(event.target as Node)) return;
+      setRecentMenu(null);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setRecentMenu(null);
+    };
+    const closeOnScroll = () => setRecentMenu(null);
+    document.addEventListener('mousedown', close);
+    document.addEventListener('contextmenu', close);
+    document.addEventListener('keydown', closeOnEscape);
+    window.addEventListener('resize', closeOnScroll);
+    window.addEventListener('scroll', closeOnScroll, true);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('contextmenu', close);
+      document.removeEventListener('keydown', closeOnEscape);
+      window.removeEventListener('resize', closeOnScroll);
+      window.removeEventListener('scroll', closeOnScroll, true);
+    };
+  }, [recentMenu]);
 
   useEffect(() => {
     if (recentFiles.length === 0) return;
@@ -286,6 +366,7 @@ const Sidebar: React.FC<{
                         key={filePath}
                         className={`w-full flex items-center gap-2 text-left px-2 py-1.5 rounded text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-700/10 dark:hover:bg-white/10 transition-colors ${isDead ? 'pointer-events-none opacity-50' : ''}`}
                         onClick={() => handleRecentClick(filePath)}
+                        onContextMenu={(event) => handleRecentContextMenu(event, filePath)}
                         title={isDead ? `${filePath} (file missing)` : filePath}
                       >
                         <svg className={`w-[16px] h-[16px] flex-shrink-0 ${isDead ? 'text-red-400 dark:text-red-500' : 'text-blue-500 dark:text-blue-400'}`} fill="currentColor" viewBox="0 0 16 16">
@@ -308,6 +389,41 @@ const Sidebar: React.FC<{
           </div>
         )}
       </div>
+      {recentMenu && (
+        <div
+          ref={recentMenuRef}
+          className="fixed z-[100] min-w-44 overflow-hidden rounded-lg border border-gray-200/80 dark:border-gray-700/80 bg-white/95 dark:bg-[#1c2733]/95 shadow-xl backdrop-blur-md py-1"
+          style={{
+            left: recentMenu.x,
+            top: recentMenu.y,
+            ...(matchPalette ? {
+              backgroundColor: 'color-mix(in srgb, var(--pal-panel-bg) 94%, transparent)',
+              borderColor: 'var(--pal-border-soft)',
+              color: 'var(--pal-text)',
+            } : {}),
+          }}
+        >
+          <button
+            className="w-full px-3 py-1.5 text-left text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-700/10 dark:hover:bg-white/10"
+            onClick={openRecentFromMenu}
+          >
+            Open
+          </button>
+          <button
+            className="w-full px-3 py-1.5 text-left text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-700/10 dark:hover:bg-white/10"
+            onClick={locateRecentFromMenu}
+          >
+            Locate on Disk
+          </button>
+          <div className="my-1 border-t border-gray-200/70 dark:border-gray-700/70" />
+          <button
+            className="w-full px-3 py-1.5 text-left text-xs text-red-600 dark:text-red-400 hover:bg-red-500/10"
+            onClick={removeRecentFromMenu}
+          >
+            Remove from Recent
+          </button>
+        </div>
+      )}
     </div>
   );
 };

@@ -55,6 +55,8 @@ const api = {
   exportHtml: (data: { content: string; title: string }): Promise<FileResult | null> =>
     ipcRenderer.invoke('export-html', data),
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke('open-external', url),
+  locateOnDisk: (filePath: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('locate-on-disk', filePath),
   getSetting: (key: string): Promise<unknown> => ipcRenderer.invoke('get-setting', key),
   setSetting: (key: string, value: unknown): Promise<void> => ipcRenderer.invoke('set-setting', key, value),
   resolveImagePath: async (src: string, currentFilePath: string): Promise<string> => {

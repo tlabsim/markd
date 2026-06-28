@@ -12,7 +12,7 @@ interface SearchBarProps {
   showReplaceInitially?: boolean;
 }
 
-const SearchBar: React.FC<SearchBarProps> = ({ editorSearchApiRef, viewerRef, viewMode, position, showReplaceInitially }) => {
+const SearchBar: React.FC<SearchBarProps> = ({ editorRef, editorSearchApiRef, viewerRef, viewMode, position, showReplaceInitially }) => {
   const {
     fileContent,
     searchQuery,
@@ -44,6 +44,11 @@ const SearchBar: React.FC<SearchBarProps> = ({ editorSearchApiRef, viewerRef, vi
   const [replaceQuery, setReplaceQuery] = useState('');
   const [showReplace, setShowReplace] = useState(!!showReplaceInitially);
   const inputRef = useRef<HTMLInputElement>(null);
+  const lastSearchKeyRef = useRef('');
+  const lastSourceRef = useRef('');
+  const hasBuiltMatchesRef = useRef(false);
+  const matchPositionsRef = useRef<number[]>([]);
+  const searchAnchorRef = useRef<number | null>(null);
   const searchTarget = viewMode === 'view' ? 'viewer' : 'editor';
 
   useEffect(() => { if (isSearchOpen && inputRef.current) inputRef.current.focus(); }, [isSearchOpen]);
@@ -54,25 +59,25 @@ const SearchBar: React.FC<SearchBarProps> = ({ editorSearchApiRef, viewerRef, vi
     catch { return null; }
   }, [searchUseRegex, searchCaseSensitive]);
 
-  const buildMatches = useCallback((query: string) => {
-    if (!query.trim()) { setMatchPositions([]); setSearchCurrentIndex(0); return; }
-    const re = buildRegex(query);
-    if (!re) { setMatchPositions([]); setSearchCurrentIndex(0); return; }
-    const source = searchTarget === 'viewer' && viewerRef?.current
+  const getSearchSource = useCallback(() => (
+    searchTarget === 'viewer' && viewerRef?.current
       ? viewerRef.current.textContent || ''
-      : editorSearchApiRef?.current?.getContent() ?? fileContent;
+      : editorSearchApiRef?.current?.getContent() ?? fileContent
+  ), [editorSearchApiRef, fileContent, searchTarget, viewerRef]);
+
+  const findMatches = useCallback((query: string, source: string) => {
+    const re = buildRegex(query);
     const pos: number[] = []; let m: RegExpExecArray | null;
+    if (!re) return pos;
     while ((m = re.exec(source)) !== null) {
       if (m[0].length > 0) pos.push(m.index);
       if (m[0].length === 0) re.lastIndex = m.index + 1;
     }
-    setMatchPositions(pos); setSearchCurrentIndex(pos.length > 0 ? 0 : -1);
-  }, [fileContent, searchTarget, viewerRef, editorSearchApiRef, buildRegex, setSearchCurrentIndex]);
+    return pos;
+  }, [buildRegex]);
 
-  useEffect(() => { buildMatches(searchQuery); }, [searchQuery, buildMatches]);
-
-  const goToMatch = useCallback((idx: number) => {
-    if (matchPositions.length === 0 || idx < 0) return;
+  const goToMatch = useCallback((idx: number, positions = matchPositions, query = searchQuery) => {
+    if (positions.length === 0 || idx < 0) return;
     if (searchTarget === 'viewer') {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -82,12 +87,73 @@ const SearchBar: React.FC<SearchBarProps> = ({ editorSearchApiRef, viewerRef, vi
       });
       return;
     }
-    const pos = matchPositions[idx];
-    const re = buildRegex(searchQuery);
-    const source = editorSearchApiRef?.current?.getContent() ?? fileContent;
-    const len = re ? (() => { re.lastIndex = pos; const m = re.exec(source); return m ? m[0].length : searchQuery.length; })() : searchQuery.length;
+    const pos = positions[idx];
+    searchAnchorRef.current = pos;
+    const re = buildRegex(query);
+    const source = getSearchSource();
+    const len = re ? (() => { re.lastIndex = pos; const m = re.exec(source); return m ? m[0].length : query.length; })() : query.length;
     editorSearchApiRef?.current?.revealRange(pos, pos + len, { preserveFocus: true });
-  }, [matchPositions, searchTarget, searchQuery, fileContent, editorSearchApiRef, viewerRef, buildRegex]);
+  }, [matchPositions, searchTarget, searchQuery, editorSearchApiRef, viewerRef, buildRegex, getSearchSource]);
+
+  useEffect(() => {
+    const searchKey = `${searchTarget}\u0000${searchQuery}\u0000${searchUseRegex ? '1' : '0'}\u0000${searchCaseSensitive ? '1' : '0'}`;
+    const source = getSearchSource();
+    const previousPositions = matchPositionsRef.current;
+    const firstBuild = !hasBuiltMatchesRef.current;
+    const searchChanged = searchKey !== lastSearchKeyRef.current;
+    const sourceChanged = source !== lastSourceRef.current;
+    const editorHasFocus = !!editorRef?.current && document.activeElement === editorRef.current;
+
+    lastSearchKeyRef.current = searchKey;
+    lastSourceRef.current = source;
+    hasBuiltMatchesRef.current = true;
+
+    if (!searchQuery.trim()) {
+      matchPositionsRef.current = [];
+      searchAnchorRef.current = null;
+      setMatchPositions((prev) => prev.length === 0 ? prev : []);
+      setSearchCurrentIndex(0);
+      editorSearchApiRef?.current?.clearSearchHighlight();
+      return;
+    }
+
+    const nextPositions = findMatches(searchQuery, source);
+    matchPositionsRef.current = nextPositions;
+    setMatchPositions((prev) => positionsEqual(prev, nextPositions) ? prev : nextPositions);
+
+    if (nextPositions.length === 0) {
+      searchAnchorRef.current = null;
+      setSearchCurrentIndex(-1);
+      return;
+    }
+
+    if (firstBuild || searchChanged || (sourceChanged && !editorHasFocus)) {
+      setSearchCurrentIndex(0);
+      goToMatch(0, nextPositions, searchQuery);
+      return;
+    }
+
+    if (sourceChanged && editorHasFocus) {
+      const currentStart = searchCurrentIndex >= 0 ? previousPositions[searchCurrentIndex] : -1;
+      const sameMatchIndex = currentStart >= 0 ? nextPositions.indexOf(currentStart) : -1;
+      if (sameMatchIndex === -1 && currentStart >= 0) {
+        searchAnchorRef.current = currentStart;
+      }
+      setSearchCurrentIndex(sameMatchIndex);
+    }
+  }, [
+    editorRef,
+    editorSearchApiRef,
+    findMatches,
+    getSearchSource,
+    goToMatch,
+    searchCaseSensitive,
+    searchCurrentIndex,
+    searchQuery,
+    searchTarget,
+    searchUseRegex,
+    setSearchCurrentIndex,
+  ]);
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
@@ -95,22 +161,29 @@ const SearchBar: React.FC<SearchBarProps> = ({ editorSearchApiRef, viewerRef, vi
 
   const goNext = useCallback(() => {
     if (matchPositions.length === 0) return;
-    const next = (searchCurrentIndex + 1) % matchPositions.length;
+    const anchor = searchAnchorRef.current;
+    const anchoredNext = searchCurrentIndex < 0 && anchor !== null
+      ? matchPositions.findIndex((position) => position > anchor)
+      : -1;
+    const next = anchoredNext >= 0
+      ? anchoredNext
+      : (Math.max(searchCurrentIndex, -1) + 1) % matchPositions.length;
     setSearchCurrentIndex(next);
     goToMatch(next);
   }, [matchPositions, searchCurrentIndex, setSearchCurrentIndex, goToMatch]);
 
   const goPrev = useCallback(() => {
     if (matchPositions.length === 0) return;
-    const prev = (searchCurrentIndex - 1 + matchPositions.length) % matchPositions.length;
+    const anchor = searchAnchorRef.current;
+    const anchoredPrev = searchCurrentIndex < 0 && anchor !== null
+      ? findPreviousPositionIndex(matchPositions, anchor)
+      : -1;
+    const prev = anchoredPrev >= 0
+      ? anchoredPrev
+      : (searchCurrentIndex - 1 + matchPositions.length) % matchPositions.length;
     setSearchCurrentIndex(prev);
     goToMatch(prev);
   }, [matchPositions, searchCurrentIndex, setSearchCurrentIndex, goToMatch]);
-
-  useEffect(() => {
-    if (searchCurrentIndex >= 0 && matchPositions.length > 0) goToMatch(searchCurrentIndex);
-    if (matchPositions.length === 0) editorSearchApiRef?.current?.clearSearchHighlight();
-  }, [searchCurrentIndex, matchPositions, goToMatch, editorSearchApiRef]);
 
   const closeSearch = useCallback(() => {
     editorSearchApiRef?.current?.clearSearchHighlight();
@@ -147,12 +220,15 @@ const SearchBar: React.FC<SearchBarProps> = ({ editorSearchApiRef, viewerRef, vi
   const palBg = matchToolbarPalette
     ? { backgroundColor: 'color-mix(in srgb, var(--pal-editor-toolbar-bg) 90%, var(--pal-text))', borderColor: 'var(--pal-border-soft)' }
     : undefined;
+  const palBgFloating = matchToolbarPalette
+    ? { backgroundColor: 'color-mix(in srgb, var(--pal-editor-toolbar-bg) 80%, transparent)', borderColor: 'var(--pal-border-soft)', backdropFilter: 'blur(10px)' }
+    : undefined;
   const cMuted = matchToolbarPalette ? { color: 'var(--pal-muted)' } : undefined;
   const cText = matchToolbarPalette ? { color: 'var(--pal-text)' } : undefined;
   const inEditor = position === 'editor-top';
 
   return (
-    <div className={`${inEditor ? 'w-full rounded-none border-l-0 border-r-0 border-t-0 bg-gray-100 dark:bg-[#141c24]' : 'rounded-lg bg-white/95 dark:bg-[#1c2733]/95'} backdrop-blur-md border border-gray-200 dark:border-gray-700 shadow-lg`} style={palBg}>
+    <div className={`${inEditor ? 'w-full rounded-none border-l-0 border-r-0 border-t-0 bg-gray-100 dark:bg-[#141c24]' : 'rounded-lg bg-white/95 dark:bg-[#1c2733]/95'} backdrop-blur-md border border-gray-200 dark:border-gray-700 shadow-lg`} style={inEditor ? palBg : palBgFloating}>
       <div className="flex items-center gap-1.5 px-3 py-2">
         <svg className="w-4 h-4 flex-shrink-0" style={cMuted} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
         <input ref={inputRef} type="text" value={searchQuery} onChange={handleChange} onKeyDown={handleKeyDown}
@@ -185,5 +261,20 @@ const SearchBar: React.FC<SearchBarProps> = ({ editorSearchApiRef, viewerRef, vi
 };
 
 function escapeRegex(s: string): string { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+function positionsEqual(a: number[], b: number[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
+function findPreviousPositionIndex(positions: number[], anchor: number): number {
+  for (let i = positions.length - 1; i >= 0; i -= 1) {
+    if (positions[i] < anchor) return i;
+  }
+  return -1;
+}
 
 export default SearchBar;

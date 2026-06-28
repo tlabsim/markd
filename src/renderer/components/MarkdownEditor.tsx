@@ -255,6 +255,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
   const editorRef = useRef<EditorEl>(null);
   const textareaOverlayInnerRef = useRef<HTMLDivElement>(null);
   const pendingTextareaRevealOffsetRef = useRef<number | null>(null);
+  const pendingContentEditableRevealRef = useRef(false);
   const lineNumbersRef = useRef<HTMLDivElement>(null);
   const scrollbarWideRef = useRef(false);
 
@@ -276,6 +277,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
   const [cursorPosition, setCursorPosition] = useState({ line: 1, col: 1 });
   const [lineCount, setLineCount] = useState(1);
   const [taWidth, setTaWidth] = useState(0);
+  const [textareaViewport, setTextareaViewport] = useState({ width: 0, height: 0 });
   const [syntaxHighlight, setSyntaxHighlight] = useState(false);
   const [liveEditorText, setLiveEditorText] = useState(fileContent);
   const savedScrollRef = useRef(0);
@@ -308,6 +310,15 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
     const overlay = textareaOverlayInnerRef.current;
     if (!overlay) return;
     overlay.style.transform = `translate(${-source.scrollLeft}px, ${-source.scrollTop}px)`;
+  }, []);
+
+  const syncTextareaViewport = useCallback((el?: HTMLTextAreaElement | null) => {
+    const source = el ?? editorRef.current;
+    if (!(source instanceof HTMLTextAreaElement)) return;
+    const next = { width: source.clientWidth, height: source.clientHeight };
+    setTextareaViewport((prev) => (
+      prev.width === next.width && prev.height === next.height ? prev : next
+    ));
   }, []);
 
   // Preserve scroll/cursor when toggling syntax highlight
@@ -460,21 +471,21 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
   }, []);
 
   const scrollTextareaToCurrentSearchMatch = useCallback((el: HTMLTextAreaElement, fallbackOffset: number) => {
+    const previousScrollLeft = el.scrollLeft;
     const mark = textareaOverlayInnerRef.current?.querySelector('[data-editor-search-current="true"]') as HTMLElement | null;
     if (!mark) {
       scrollEditorToOffset(el, fallbackOffset);
+      el.scrollLeft = previousScrollLeft;
       syncTextareaSearchOverlay(el);
       return;
     }
 
     const targetTop = mark.offsetTop - (el.clientHeight / 2) + (mark.offsetHeight / 2);
     el.scrollTop = Math.max(0, targetTop);
-    if (!wordWrap) {
-      el.scrollLeft = Math.max(0, mark.offsetLeft - 24);
-    }
+    el.scrollLeft = previousScrollLeft;
     if (lineNumbersRef.current) lineNumbersRef.current.scrollTop = el.scrollTop;
     syncTextareaSearchOverlay(el);
-  }, [scrollEditorToOffset, syncTextareaSearchOverlay, wordWrap]);
+  }, [scrollEditorToOffset, syncTextareaSearchOverlay]);
 
   const renderContentEditable = useCallback((preserveSelection = true) => {
     const el = editorRef.current;
@@ -482,13 +493,18 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
     const active = document.activeElement === el;
     const cursor = active && preserveSelection ? saveCursor(el) : 0;
     const text = getText(el) || fileContent;
+    const shouldRevealSearchMatch = pendingContentEditableRevealRef.current;
     syncGuard.current = true;
     el.innerHTML = highlightMarkdown(text, searchHighlightOptions) || '<br>';
     if (active && preserveSelection) restoreCursor(el, cursor);
-    requestAnimationFrame(() => {
-      const mark = el.querySelector('[data-editor-search-current="true"]') as HTMLElement | null;
-      mark?.scrollIntoView({ block: 'center', behavior: 'auto' });
-    });
+    if (shouldRevealSearchMatch) {
+      requestAnimationFrame(() => {
+        if (!pendingContentEditableRevealRef.current) return;
+        const mark = el.querySelector('[data-editor-search-current="true"]') as HTMLElement | null;
+        mark?.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'auto' });
+        pendingContentEditableRevealRef.current = false;
+      });
+    }
     setTimeout(() => { syncGuard.current = false; }, 100);
   }, [fileContent, searchHighlightOptions]);
 
@@ -502,16 +518,20 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
       pendingTextareaRevealOffsetRef.current = start;
       const shouldRestoreFocus = preserveFocus && previouslyFocused && previouslyFocused !== el && previouslyFocused.isConnected;
       const previousScrollTop = el.scrollTop;
+      const previousScrollLeft = el.scrollLeft;
       setSel(el, start, end);
       el.focus({ preventScroll: true });
       if (el.scrollTop === previousScrollTop) {
         scrollEditorToOffset(el, start);
       }
+      el.scrollLeft = previousScrollLeft;
       syncTextareaSearchOverlay(el);
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           if (editorRef.current !== el) return;
+          if (pendingTextareaRevealOffsetRef.current !== start) return;
           scrollTextareaToCurrentSearchMatch(el, start);
+          el.scrollLeft = previousScrollLeft;
           pendingTextareaRevealOffsetRef.current = null;
           if (shouldRestoreFocus && document.activeElement !== previouslyFocused) {
             previouslyFocused.focus({ preventScroll: true });
@@ -524,6 +544,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
       return;
     }
 
+    pendingContentEditableRevealRef.current = true;
     if (!preserveFocus) el.focus({ preventScroll: true });
   }, [scrollEditorToOffset, scrollTextareaToCurrentSearchMatch, syncTextareaSearchOverlay]);
 
@@ -579,6 +600,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
     if (syntaxHighlight) return;
     const el = editorRef.current;
     if (!(el instanceof HTMLTextAreaElement)) return;
+    syncTextareaViewport(el);
     const fallbackOffset = pendingTextareaRevealOffsetRef.current;
     if (fallbackOffset !== null) {
       scrollTextareaToCurrentSearchMatch(el, fallbackOffset);
@@ -586,7 +608,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
       return;
     }
     syncTextareaSearchOverlay(el);
-  }, [syntaxHighlight, textareaSearchHtml, scrollTextareaToCurrentSearchMatch, syncTextareaSearchOverlay]);
+  }, [syntaxHighlight, textareaSearchHtml, scrollTextareaToCurrentSearchMatch, syncTextareaSearchOverlay, syncTextareaViewport]);
 
   // Smart toggle: wrap/unwrap selection with prefix/suffix
   const toggleWrap = useCallback((prefix: string, suffix: string, placeholder: string) => {
@@ -829,12 +851,16 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
   // Track editor width for word-wrap line calc
   useLayoutEffect(() => {
     const el = editorRef.current;
-    if (!el || !wordWrap) return;
+    if (!el) return;
     setTaWidth(el.clientWidth);
-    const observer = new ResizeObserver(([entry]) => { setTaWidth(entry.contentRect.width); });
+    if (el instanceof HTMLTextAreaElement) syncTextareaViewport(el);
+    const observer = new ResizeObserver(([entry]) => {
+      setTaWidth(entry.contentRect.width);
+      if (el instanceof HTMLTextAreaElement) syncTextareaViewport(el);
+    });
     observer.observe(el);
     return () => observer.disconnect();
-  }, [wordWrap]);
+  }, [syntaxHighlight, syncTextareaViewport]);
 
   // Auto-focus on mount
   useEffect(() => { editorRef.current?.focus(); }, []);
@@ -892,6 +918,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
   const handleInput = useCallback(() => {
     const el = editorRef.current;
     if (!el || syncGuard.current) return;
+    pendingTextareaRevealOffsetRef.current = null;
+    pendingContentEditableRevealRef.current = false;
     const text = getText(el);
     setLiveEditorText(text);
     pushUndo(); // per-keystroke undo for contentEditable
@@ -902,7 +930,10 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
 
   // textarea onChange — short debounce (150ms) + startTransition for interruptible preview
   const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    pendingTextareaRevealOffsetRef.current = null;
+    pendingContentEditableRevealRef.current = false;
     const text = e.target.value;
+    syncTextareaViewport(e.target);
     setLiveEditorText(text);
     pushUndo();
     lastTypedRef.current = text;
@@ -912,16 +943,17 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
         startTransition(() => { setFileContent(text); });
       }
     }, 150);
-  }, [setFileContent, pushUndo]);
+  }, [setFileContent, pushUndo, syncTextareaViewport]);
 
   const handleScroll = useCallback(() => {
     if (editorRef.current && lineNumbersRef.current) {
       lineNumbersRef.current.scrollTop = editorRef.current.scrollTop;
     }
     if (editorRef.current instanceof HTMLTextAreaElement) {
+      syncTextareaViewport(editorRef.current);
       syncTextareaSearchOverlay(editorRef.current);
     }
-  }, [syncTextareaSearchOverlay]);
+  }, [syncTextareaSearchOverlay, syncTextareaViewport]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     const el = editorRef.current; if (!el) return;
@@ -1087,6 +1119,20 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
     el.focus();
     handleRedo();
   }, [handleRedo]);
+
+  const textareaWrapStyle: React.CSSProperties = {
+    tabSize: 2,
+    whiteSpace: wordWrap ? 'pre-wrap' : 'pre',
+    overflowWrap: wordWrap ? 'break-word' : 'normal',
+    wordBreak: 'normal',
+    background: 'transparent',
+  };
+
+  const textareaOverlayStyle: React.CSSProperties = {
+    ...textareaWrapStyle,
+    width: textareaViewport.width ? `${textareaViewport.width}px` : undefined,
+    height: textareaViewport.height ? `${textareaViewport.height}px` : undefined,
+  };
 
   return (
     <div className="h-full flex flex-col bg-white dark:bg-[#1c2733]" style={matchPalette ? { background: 'var(--pal-editor-bg)' } : undefined}>
@@ -1382,7 +1428,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
               <div
                 aria-hidden="true"
                 className={`editor-search-overlay absolute inset-0 overflow-hidden pointer-events-none text-transparent text-sm leading-6 font-mono p-3 ${wordWrap ? 'wrap' : 'no-wrap'}`}
-                style={{ tabSize: 2, whiteSpace: wordWrap ? 'pre-wrap' : 'pre', background: 'transparent' }}
+                style={textareaOverlayStyle}
               >
                 <div
                   ref={textareaOverlayInnerRef}
@@ -1401,7 +1447,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
               spellCheck={false}
               className={`relative z-10 w-full h-full bg-transparent text-sm leading-6 font-mono p-3 resize-none outline-none text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-600 scrollbar-expand ${wordWrap ? 'wrap' : 'no-wrap'}`}
               placeholder="Start writing markdown..."
-              style={{ tabSize: 2, whiteSpace: wordWrap ? 'pre-wrap' : 'pre', background: 'transparent' }}
+              wrap={wordWrap ? 'soft' : 'off'}
+              style={textareaWrapStyle}
               onMouseMove={handleEditorMouseMove}
               onMouseLeave={handleEditorMouseLeave}
             />

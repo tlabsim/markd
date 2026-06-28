@@ -34,6 +34,7 @@ export interface MarkdAPI {
   isMaximized: () => Promise<boolean>;
   exportHtml: (data: { content: string; title: string }) => Promise<FileResult | null>;
   openExternal: (url: string) => Promise<void>;
+  locateOnDisk: (filePath: string) => Promise<{ success: boolean; error?: string }>;
   resolveImagePath: (src: string, currentFilePath: string) => string;
   onMenuAction: (callback: (action: string) => void) => () => void;
   onWindowStateChanged: (callback: (state: string) => void) => () => void;
