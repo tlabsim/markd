@@ -16,6 +16,7 @@ interface TableOfContentsProps {
   onClose: () => void;
   matchPalette?: boolean;
   zoomLevel?: number;
+  scrollContainerRef?: React.RefObject<HTMLElement | null>;
 }
 
 // ---- Build tree from flat heading list ----
@@ -131,7 +132,7 @@ const TreeNode: React.FC<{
   );
 };
 
-const TableOfContents: React.FC<TableOfContentsProps> = ({ content, onClose, matchPalette, zoomLevel = 100 }) => {
+const TableOfContents: React.FC<TableOfContentsProps> = ({ content, onClose, matchPalette, zoomLevel = 100, scrollContainerRef }) => {
   // Scale TOC font: +0.25px per 10% zoom above 100%
   const tocFontSize = 12 + Math.max(0, (zoomLevel - 100) / 10) * 0.25;
   const tocRef = useRef<HTMLDivElement>(null);
@@ -193,7 +194,7 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ content, onClose, mat
   const scrollToHeading = useCallback((id: string) => {
     const isLarge = content.length > 50000;
     const behavior = isLarge ? ('auto' as const) : ('smooth' as const);
-    const previewContainer = document.querySelector('.markdown-body')?.parentElement;
+    const previewContainer = scrollContainerRef?.current ?? document.querySelector('.markdown-body')?.parentElement;
     if (!previewContainer) {
       const el = document.getElementById(id);
       if (el) el.scrollIntoView({ behavior, block: 'start' });
@@ -201,9 +202,12 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ content, onClose, mat
     }
     const heading = previewContainer.querySelector(`[id="${CSS.escape(id)}"]`) as HTMLElement | null;
     if (heading) {
-      previewContainer.scrollTo({ top: heading.offsetTop - 16, behavior });
+      const containerRect = previewContainer.getBoundingClientRect();
+      const headingRect = heading.getBoundingClientRect();
+      const top = previewContainer.scrollTop + headingRect.top - containerRect.top - 16;
+      previewContainer.scrollTo({ top: Math.max(0, top), behavior });
     }
-  }, [content.length]);
+  }, [content.length, scrollContainerRef]);
 
   const collapseAll = useCallback(() => {
     const ids = new Set<string>();

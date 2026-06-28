@@ -515,7 +515,10 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, s
       if (!el) return;
       const targetEl = el.querySelector(`[id="${CSS.escape(href.slice(1))}"]`) as HTMLElement | null;
       if (targetEl) {
-        el.scrollTo({ top: targetEl.offsetTop - 16, behavior: 'smooth' });
+        const containerRect = el.getBoundingClientRect();
+        const targetRect = targetEl.getBoundingClientRect();
+        const top = el.scrollTop + targetRect.top - containerRect.top - 16;
+        el.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
       }
     };
     document.addEventListener('click', handler, true);
@@ -702,7 +705,7 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, s
       </div>
       <BackToTop containerRef={contentRef} />
       <div className={`absolute top-3 right-3 bottom-3 w-64 z-10 transition-opacity ${showToc ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
-        <TableOfContents content={fileContent} onClose={() => onToggleToc?.()} matchPalette={matchToolbarPalette} zoomLevel={zoomLevel} />
+        <TableOfContents content={fileContent} onClose={() => onToggleToc?.()} matchPalette={matchToolbarPalette} zoomLevel={zoomLevel} scrollContainerRef={contentRef} />
       </div>
     </div>
   );

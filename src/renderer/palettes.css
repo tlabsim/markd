@@ -34,7 +34,9 @@ div.markdown-body[data-palette] tr:nth-child(even),
 .dark div.markdown-body[data-palette] tr:nth-child(even) { background: var(--pal-tr-even-bg); }
 div.markdown-body[data-palette] hr { border-color: var(--pal-hr); }
 
-.code-block { background: var(--pal-cb-bg); border-color: var(--pal-cb-border); }
+/* Keep enough specificity to beat Tailwind's later `.border` utility. */
+.code-block,
+div.markdown-body[data-palette] .code-block { background: var(--pal-cb-bg); border-color: var(--pal-cb-border); }
 .code-block-lang { background: var(--pal-cb-lang-bg); color: var(--pal-cb-lang-text); font-family: monospace; }
 .code-block-btn { background: var(--pal-cb-btn-bg); color: var(--pal-cb-btn-text); font-family: monospace; }
 .code-block-btn:hover { background: var(--pal-cb-btn-hover); }
