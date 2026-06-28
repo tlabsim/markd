@@ -218,7 +218,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ editorRef, editorSearchApiRef, vi
   }, []);
 
   const palBg = matchToolbarPalette
-    ? { backgroundColor: 'color-mix(in srgb, var(--pal-editor-toolbar-bg) 90%, var(--pal-text))', borderColor: 'var(--pal-border-soft)' }
+    ? { backgroundColor: 'color-mix(in srgb, var(--pal-editor-toolbar-bg) 95%, var(--pal-text))', borderColor: 'var(--pal-border-soft)' }
     : undefined;
   const palBgFloating = matchToolbarPalette
     ? { backgroundColor: 'color-mix(in srgb, var(--pal-editor-toolbar-bg) 80%, transparent)', borderColor: 'var(--pal-border-soft)', backdropFilter: 'blur(10px)' }
@@ -228,7 +228,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ editorRef, editorSearchApiRef, vi
   const inEditor = position === 'editor-top';
 
   return (
-    <div className={`${inEditor ? 'w-full rounded-none border-l-0 border-r-0 border-t-0 bg-gray-100 dark:bg-[#141c24]' : 'rounded-lg bg-white/95 dark:bg-[#1c2733]/95'} backdrop-blur-md border border-gray-200 dark:border-gray-700 shadow-lg`} style={inEditor ? palBg : palBgFloating}>
+    <div className={`${inEditor ? 'w-full rounded-none border-l-0 border-r-0 border-t-0 bg-gray-100 dark:bg-[#141c24] shadow-none' : 'rounded-lg bg-white/95 dark:bg-[#1c2733]/95'} backdrop-blur-md border border-gray-200 dark:border-gray-700 shadow-lg`} style={inEditor ? palBg : palBgFloating}>
       <div className="flex items-center gap-1.5 px-3 py-2">
         <svg className="w-4 h-4 flex-shrink-0" style={cMuted} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
         <input ref={inputRef} type="text" value={searchQuery} onChange={handleChange} onKeyDown={handleKeyDown}
@@ -253,7 +253,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ editorRef, editorSearchApiRef, vi
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); doReplace(false); } }} placeholder="Replace with..." style={cText}
             className="flex-1 py-1 text-sm font-semibold bg-transparent outline-none text-gray-800 dark:text-gray-200 min-w-0 border-0 placeholder:text-gray-800/70 dark:placeholder:text-gray-200/70" />
           <button className="px-2 py-1 text-sm rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors font-medium" onMouseDown={keepToolbarFocus} onClick={() => doReplace(false)} disabled={searchTarget !== 'editor' || matchPositions.length === 0}>Replace</button>
-          <button className="px-2 py-1 text-sm rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors font-medium" onMouseDown={keepToolbarFocus} onClick={() => doReplace(true)} disabled={searchTarget !== 'editor' || matchPositions.length === 0}>All</button>
+          <button className="px-2 py-1 text-sm rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors font-medium" onMouseDown={keepToolbarFocus} onClick={() => doReplace(true)} disabled={searchTarget !== 'editor' || matchPositions.length === 0}>Replace All</button>
         </div>
       )}
     </div>
