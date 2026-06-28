@@ -704,7 +704,7 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, s
         </div>
       </div>
       <BackToTop containerRef={contentRef} />
-      <div className={`absolute top-3 right-3 bottom-3 w-64 z-10 transition-opacity ${showToc ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+      <div className={`absolute top-3 right-3 bottom-3 w-64 z-50 transition-opacity ${showToc ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
         <TableOfContents content={fileContent} onClose={() => onToggleToc?.()} matchPalette={matchToolbarPalette} zoomLevel={zoomLevel} scrollContainerRef={contentRef} />
       </div>
     </div>
