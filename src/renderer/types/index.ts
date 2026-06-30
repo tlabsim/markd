@@ -28,6 +28,7 @@ export interface MarkdAPI {
   getFileContent: (filePath: string) => Promise<FileResult>;
   readDirectory: (dirPath: string) => Promise<DirectoryResult>;
   getAppPath: () => Promise<string>;
+  getAppVersion?: () => Promise<string>;
   minimizeWindow: () => Promise<void>;
   maximizeWindow: () => Promise<void>;
   closeWindow: () => Promise<void>;
@@ -35,7 +36,8 @@ export interface MarkdAPI {
   exportHtml: (data: { content: string; title: string }) => Promise<FileResult | null>;
   openExternal: (url: string) => Promise<void>;
   locateOnDisk: (filePath: string) => Promise<{ success: boolean; error?: string }>;
-  resolveImagePath: (src: string, currentFilePath: string) => string;
+  resolveImagePath: (src: string, currentFilePath: string) => Promise<string>;
+  resolveMediaPath: (src: string, currentFilePath: string) => Promise<string>;
   onMenuAction: (callback: (action: string) => void) => () => void;
   onWindowStateChanged: (callback: (state: string) => void) => () => void;
 }

@@ -254,6 +254,14 @@ const App: React.FC = () => {
     });
   }, [openWithDirtyCheck, loadFileIntoEditor]);
 
+  const reloadFileFromDisk = useCallback(async (filePath: string) => {
+    const result = await window.markd?.getFileContent(filePath);
+    if (result?.success && result.content !== undefined) {
+      loadFileIntoEditor(filePath.split(/[/\\]/).pop() || null, filePath, result.content);
+      useStore.getState().refreshLinkedAssets();
+    }
+  }, [loadFileIntoEditor]);
+
   const handleCloseFile = useCallback(() => {
     openWithDirtyCheck(() => {
       // Save scroll position before clearing
@@ -284,17 +292,19 @@ const App: React.FC = () => {
   }, [viewMode]);
 
   const handleOpenRecentFile = useCallback((filePath: string) => {
-    if (filePath === currentFilePath) {
-      // Same file — show reload confirmation instead
-      flushEditorRef.current?.();
-      const content = useStore.getState().fileContent;
-      const original = useStore.getState().originalContent;
-      if (content !== original) {
-        pendingFilePath.current = filePath;
-        setReloadModalOpen(true);
+      if (filePath === currentFilePath) {
+        // Same file — show reload confirmation instead
+        flushEditorRef.current?.();
+        const content = useStore.getState().fileContent;
+        const original = useStore.getState().originalContent;
+        if (content !== original) {
+          pendingFilePath.current = filePath;
+          setReloadModalOpen(true);
+        } else {
+          reloadFileFromDisk(filePath);
+        }
+        return;
       }
-      return;
-    }
     openWithDirtyCheck(async () => {
       const result = await window.markd?.getFileContent(filePath);
       if (result?.success && result.content !== undefined) {
@@ -303,7 +313,7 @@ const App: React.FC = () => {
         useStore.getState().addRecentFile(filePath);
       }
     });
-  }, [openWithDirtyCheck, loadFileIntoEditor, currentFilePath]);
+  }, [openWithDirtyCheck, loadFileIntoEditor, currentFilePath, reloadFileFromDisk]);
 
   // Shared slugify — must match the one in MarkdownViewer
   const syncSlugify = (text: string) =>
@@ -767,6 +777,8 @@ const App: React.FC = () => {
         if (content !== original) {
           pendingFilePath.current = filePath;
           setReloadModalOpen(true);
+        } else {
+          reloadFileFromDisk(filePath);
         }
         return;
       }
@@ -776,7 +788,7 @@ const App: React.FC = () => {
     }
 
     await loadDroppedFile(filePath);
-  }, [currentFile, currentFilePath]);
+  }, [currentFile, currentFilePath, reloadFileFromDisk]);
 
   const loadDroppedFile = useCallback(async (filePath: string) => {
     const result = await window.markd?.getFileContent(filePath);
@@ -835,12 +847,9 @@ const App: React.FC = () => {
     const filePath = pendingFilePath.current;
     pendingFilePath.current = null;
     if (filePath) {
-      const result = await window.markd?.getFileContent(filePath);
-      if (result?.success && result.content !== undefined) {
-        loadFileIntoEditor(filePath.split(/[/\\]/).pop() || null, filePath, result.content);
-      }
+      await reloadFileFromDisk(filePath);
     }
-  }, [loadFileIntoEditor]);
+  }, [reloadFileFromDisk]);
 
   // Set data-palette + dark class on <html> (tokens.css is the single source for --pal-*)
   useEffect(() => {
@@ -944,6 +953,8 @@ const App: React.FC = () => {
               if (content !== original) {
                 pendingFilePath.current = path;
                 setReloadModalOpen(true);
+              } else {
+                reloadFileFromDisk(path);
               }
               return;
             }
@@ -1118,7 +1129,7 @@ const App: React.FC = () => {
                     className="overflow-hidden relative"
                     style={viewMode === 'split' ? { flex: 1 } : { flex: 1 }}
                   >
-                    <MarkdownViewer showToc={showToc} onToggleToc={() => setShowToc(false)} syncScroll={syncScroll} onScrollRef={(el) => { viewerScrollRef.current = el; }} onViewerScroll={handleViewerScroll} />
+                    <MarkdownViewer showToc={showToc} onToggleToc={() => setShowToc(false)} syncScroll={syncScroll} onScrollRef={(el) => { viewerScrollRef.current = el; }} onViewerScroll={handleViewerScroll} distractionFree={distractionFree} />
                     {/* Welcome back toast — minimal, right-side, translucent */}
                     {welcomeBackFile && (
                       <div className="absolute bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl bg-white/75 dark:bg-black/75 backdrop-blur-sm text-[13px] text-emerald-600 dark:text-emerald-400 shadow-lg animate-slide-in-right">

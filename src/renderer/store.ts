@@ -32,6 +32,7 @@ interface EditorState {
   fontFamily: string;
   zoomLevel: number;
   previewPalette: string;
+  assetReloadToken: number;
 
   // Recent files
   recentFiles: string[];
@@ -40,6 +41,7 @@ interface EditorState {
   wordWrap: boolean;
   tabSize: number;
   syntaxHighlight: boolean;
+  undoStackLimit: number;
   autoSave: boolean;
   rememberScrollPosition: boolean;
   /** Maps file path → last scrollTop */
@@ -70,12 +72,14 @@ interface EditorState {
   setFontFamily: (font: string) => void;
   setZoomLevel: (zoom: number) => void;
   setPreviewPalette: (palette: string) => void;
+  refreshLinkedAssets: () => void;
   addRecentFile: (path: string) => void;
   removeRecentFile: (path: string) => void;
   clearRecentFiles: () => void;
   setWordWrap: (wrap: boolean) => void;
   setTabSize: (size: number) => void;
   setSyntaxHighlight: (on: boolean) => void;
+  setUndoStackLimit: (limit: number) => void;
   setAutoSave: (on: boolean) => void;
   setRememberScrollPosition: (on: boolean) => void;
   setScrollPosition: (filePath: string, scrollTop: number) => void;
@@ -127,10 +131,12 @@ export const useStore = create<EditorState>()(
       fontFamily: 'system',
       zoomLevel: 100,
       previewPalette: 'default',
+      assetReloadToken: 0,
       recentFiles: [],
       wordWrap: true,
       tabSize: 4,
       syntaxHighlight: false,
+      undoStackLimit: 256,
       autoSave: false,
       rememberScrollPosition: true,
       scrollPositions: {},
@@ -166,11 +172,12 @@ export const useStore = create<EditorState>()(
       setSearchQuery: (query) => set({ searchQuery: query }),
       setSearchCurrentIndex: (index) => set({ searchCurrentIndex: index }),
       setSearchUseRegex: (useRegex) => set({ searchUseRegex: useRegex }),
-      setSearchCaseSensitive: (caseSensitive) => set({ searchCaseSensitive }),
+      setSearchCaseSensitive: (caseSensitive) => set({ searchCaseSensitive: caseSensitive }),
       setMaximized: (maximized) => set({ isMaximized: maximized }),
       setFontFamily: (font) => set({ fontFamily: font }),
       setZoomLevel: (zoom) => set({ zoomLevel: Math.max(50, Math.min(200, zoom)) }),
       setPreviewPalette: (palette) => set({ previewPalette: palette }),
+      refreshLinkedAssets: () => set((s) => ({ assetReloadToken: s.assetReloadToken + 1 })),
       addRecentFile: (filePath) =>
         set((state) => {
           const filtered = state.recentFiles.filter((p) => p !== filePath);
@@ -182,6 +189,7 @@ export const useStore = create<EditorState>()(
       setWordWrap: (wrap) => set({ wordWrap: wrap }),
       setTabSize: (size) => set({ tabSize: size }),
       setSyntaxHighlight: (on) => set({ syntaxHighlight: on }),
+      setUndoStackLimit: (limit) => set({ undoStackLimit: Math.max(10, Math.min(2000, Math.floor(limit))) }),
       setAutoSave: (on) => set({ autoSave: on }),
       setRememberScrollPosition: (on) => set({ rememberScrollPosition: on }),
       setScrollPosition: (filePath, scrollTop) =>
@@ -202,6 +210,7 @@ export const useStore = create<EditorState>()(
         wordWrap: state.wordWrap,
         tabSize: state.tabSize,
         syntaxHighlight: state.syntaxHighlight,
+        undoStackLimit: state.undoStackLimit,
         autoSave: state.autoSave,
         rememberScrollPosition: state.rememberScrollPosition,
         scrollPositions: state.scrollPositions,

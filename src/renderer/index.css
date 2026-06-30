@@ -234,6 +234,22 @@ html[data-match-palette] .splitter:hover {
   @apply max-w-full h-auto rounded-lg my-4;
 }
 
+.markdown-body .media-block video,
+.markdown-body .media-block audio,
+.markdown-body .media-block iframe {
+  display: block;
+}
+
+.markdown-body .media-block video,
+.markdown-body .media-block iframe {
+  background: var(--pal-pre-bg, #f8f9fa);
+  border-color: var(--pal-pre-border, #d0d7de);
+}
+
+.markdown-body .media-block iframe {
+  min-height: 240px;
+}
+
 .markdown-body .contains-task-list {
   @apply list-none pl-0;
 }

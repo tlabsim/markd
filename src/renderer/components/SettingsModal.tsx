@@ -149,6 +149,7 @@ const TabBar: React.FC<{ activeTab: Tab; onTab: (t: Tab) => void }> = ({ activeT
 const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab }) => {
   const [tab, setTab] = useState<Tab>(initialTab || 'settings');
   const [multiInstance, setMultiInstance] = useState(false);
+  const [appVersion, setAppVersion] = useState<string>('');
 
   // Reset tab when modal opens
   useEffect(() => {
@@ -161,6 +162,19 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
       if (typeof v === 'boolean') setMultiInstance(v);
     });
   }, [open]);
+
+  useEffect(() => {
+    const getAppVersion = window.markd?.getAppVersion;
+    if (typeof getAppVersion !== 'function') return;
+
+    getAppVersion().then((version) => {
+      if (typeof version === 'string' && version.trim()) {
+        setAppVersion(version);
+      }
+    }).catch(() => {
+      // Older dev preload builds may not expose this yet; keep the static fallback.
+    });
+  }, []);
 
   const {
     theme,
@@ -417,7 +431,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
                   Markd
                 </h3>
                 <p className="text-[12px] text-gray-500 dark:text-gray-400">
-                  v1.0.0 — A beautiful, feature-rich desktop markdown viewer and editor
+                  v{appVersion || '1.0.2'} — A beautiful, feature-rich desktop markdown viewer and editor
                 </p>
               </div>
 

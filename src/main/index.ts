@@ -112,11 +112,26 @@ function registerLocalFileProtocol(): void {
     '.webp': 'image/webp',
     '.bmp': 'image/bmp',
     '.ico': 'image/x-icon',
+    '.mp4': 'video/mp4',
+    '.m4v': 'video/mp4',
+    '.webm': 'video/webm',
+    '.ogv': 'video/ogg',
+    '.ogg': 'video/ogg',
+    '.mov': 'video/quicktime',
+    '.mp3': 'audio/mpeg',
+    '.m4a': 'audio/mp4',
+    '.wav': 'audio/wav',
+    '.oga': 'audio/ogg',
+    '.flac': 'audio/flac',
+    '.aac': 'audio/aac',
+    '.html': 'text/html',
+    '.htm': 'text/html',
   };
   protocol.handle('local-file', (request) => {
     try {
-      const encoded = request.url.replace(/^local-file:\/\/+\/?/, '');
-      const filePath = decodeURIComponent(encoded);
+      const url = new URL(request.url);
+      let filePath = decodeURIComponent(url.pathname);
+      if (/^\/[A-Za-z]:\//.test(filePath)) filePath = filePath.slice(1);
       const resolved = path.resolve(filePath);
       const data = fs.readFileSync(resolved);
       const ext = path.extname(resolved).toLowerCase();
@@ -350,7 +365,7 @@ function setupMenu(): void {
               dialog.showMessageBox(win, {
                 type: 'info',
                 title: 'About Markd',
-                message: 'Markd v1.0.0',
+                message: `Markd v${app.getVersion()}`,
                 detail: 'A beautiful, feature-rich desktop markdown viewer and editor.\n\nBuilt with Electron, React, and TypeScript.',
               });
             }
@@ -435,6 +450,18 @@ ipcMain.handle('read-local-file', async (_event, filePath: string) => {
       '.webp': 'image/webp',
       '.bmp': 'image/bmp',
       '.ico': 'image/x-icon',
+      '.mp4': 'video/mp4',
+      '.m4v': 'video/mp4',
+      '.webm': 'video/webm',
+      '.ogv': 'video/ogg',
+      '.ogg': 'video/ogg',
+      '.mov': 'video/quicktime',
+      '.mp3': 'audio/mpeg',
+      '.m4a': 'audio/mp4',
+      '.wav': 'audio/wav',
+      '.oga': 'audio/ogg',
+      '.flac': 'audio/flac',
+      '.aac': 'audio/aac',
     };
     const mime = mimeTypes[ext] || 'application/octet-stream';
     const base64 = data.toString('base64');
@@ -446,6 +473,10 @@ ipcMain.handle('read-local-file', async (_event, filePath: string) => {
 
 ipcMain.handle('get-app-path', () => {
   return app.getPath('documents');
+});
+
+ipcMain.handle('get-app-version', () => {
+  return app.getVersion();
 });
 
 // Settings IPC

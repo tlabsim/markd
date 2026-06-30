@@ -39,6 +39,12 @@ function resolvePath(base: string, relative: string): string {
   return parts.join('/');
 }
 
+function toLocalFileUrl(filePath: string): string {
+  const normalized = filePath.replace(/\\/g, '/');
+  const withLeadingSlash = normalized.startsWith('/') ? normalized : `/${normalized}`;
+  return `local-file://${encodeURI(withLeadingSlash)}`;
+}
+
 const api = {
   openFile: (): Promise<FileResult | null> => ipcRenderer.invoke('open-file'),
   openFolder: (): Promise<{ success: boolean; path?: string; error?: string } | null> =>
@@ -48,6 +54,7 @@ const api = {
   getFileContent: (filePath: string): Promise<FileResult> => ipcRenderer.invoke('get-file-content', filePath),
   readDirectory: (dirPath: string): Promise<DirectoryResult> => ipcRenderer.invoke('read-directory', dirPath),
   getAppPath: (): Promise<string> => ipcRenderer.invoke('get-app-path'),
+  getAppVersion: (): Promise<string> => ipcRenderer.invoke('get-app-version'),
   minimizeWindow: (): Promise<void> => ipcRenderer.invoke('window-minimize'),
   maximizeWindow: (): Promise<void> => ipcRenderer.invoke('window-maximize'),
   closeWindow: (): Promise<void> => ipcRenderer.invoke('window-close'),
@@ -70,6 +77,19 @@ const api = {
       return result.dataUrl;
     }
     return src;
+  },
+  resolveMediaPath: async (src: string, currentFilePath: string): Promise<string> => {
+    if (
+      src.startsWith('http://') ||
+      src.startsWith('https://') ||
+      src.startsWith('data:') ||
+      src.startsWith('blob:') ||
+      src.startsWith('local-file:')
+    ) {
+      return src;
+    }
+    const dir = getDirname(currentFilePath);
+    return toLocalFileUrl(resolvePath(dir, src));
   },
   onMenuAction: (callback: (action: string) => void) => {
     ipcRenderer.on('menu-action', (_event, action: string) => callback(action));

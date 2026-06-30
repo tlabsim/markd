@@ -30,6 +30,24 @@ function reactNodeToText(node: React.ReactNode): string {
   return '';
 }
 
+const VIDEO_EXTENSIONS = new Set(['.mp4', '.webm', '.ogg', '.ogv', '.mov', '.m4v', '.avi', '.mkv']);
+const AUDIO_EXTENSIONS = new Set(['.mp3', '.wav', '.ogg', '.oga', '.m4a', '.flac', '.aac']);
+
+function getSourceExtension(src?: string | null): string {
+  if (!src) return '';
+  const clean = src.split(/[?#]/, 1)[0].toLowerCase();
+  const index = clean.lastIndexOf('.');
+  return index >= 0 ? clean.slice(index) : '';
+}
+
+function isVideoSource(src?: string | null): boolean {
+  return VIDEO_EXTENSIONS.has(getSourceExtension(src));
+}
+
+function isAudioSource(src?: string | null): boolean {
+  return AUDIO_EXTENSIONS.has(getSourceExtension(src));
+}
+
 const KNOWN_HTML_TAGS = new Set([
   'a','abbr','address','area','article','aside','audio',
   'b','base','bdi','bdo','blockquote','body','br','button',
@@ -280,6 +298,7 @@ interface MarkdownViewerProps {
   syncScroll?: 'off' | 'position' | 'content';
   onScrollRef?: (el: HTMLElement | null) => void;
   onViewerScroll?: () => void;
+  distractionFree?: boolean;
 }
 
 function escapeSearchRegex(s: string): string {
@@ -441,7 +460,68 @@ const BackToTop: React.FC<{ containerRef: React.RefObject<HTMLDivElement | null>
   );
 };
 
-const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, syncScroll, onScrollRef, onViewerScroll }) => {
+const ZoomIndicator: React.FC<{ enabled: boolean; zoomLevel: number }> = ({ enabled, zoomLevel }) => {
+  const [phase, setPhase] = useState<'idle' | 'entering' | 'visible' | 'exiting'>('idle');
+  const firstRunRef = useRef(true);
+  const timersRef = useRef<number[]>([]);
+
+  useEffect(() => {
+    timersRef.current.forEach(window.clearTimeout);
+    timersRef.current = [];
+
+    if (!enabled) {
+      firstRunRef.current = true;
+      setPhase('idle');
+      return;
+    }
+
+    if (firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+
+    setPhase('entering');
+    timersRef.current = [
+      window.setTimeout(() => setPhase('visible'), 250),
+      window.setTimeout(() => setPhase('exiting'), 3000),
+      window.setTimeout(() => setPhase('idle'), 3250),
+    ];
+
+    return () => {
+      timersRef.current.forEach(window.clearTimeout);
+      timersRef.current = [];
+    };
+  }, [enabled, zoomLevel]);
+
+  if (!enabled || phase === 'idle') return null;
+
+  return (
+    <div
+      className={`absolute bottom-4 right-12 z-20 h-6 rounded-md px-2 flex items-center justify-center text-[12px] tabular-nums font-medium pointer-events-none ${
+        phase === 'entering' ? 'animate-btt-in' : phase === 'exiting' ? 'animate-btt-out' : ''
+      }`}
+      style={{
+        backgroundColor: 'color-mix(in srgb, var(--pal-editor-toolbar-bg) 85%, transparent)',
+        color: 'var(--pal-muted)',
+        backdropFilter: 'blur(4px)',
+        filter: 'brightness(1.05)',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+      }}
+      aria-live="polite"
+    >
+      <svg className="w-5 h-5 shrink-0 mr-1" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 11h3m3 0h-3m0 0V8m0 3v3m6 3l4 4M3 11a8 8 0 1 0 16 0a8 8 0 0 0-16 0"/></svg>
+      {zoomLevel}%
+    </div>
+  );
+};
+
+function cacheBustLocalFileUrl(src: string, token: number): string {
+  if (!src.startsWith('local-file:') || token <= 0) return src;
+  const separator = src.includes('?') ? '&' : '?';
+  return `${src}${separator}markdReload=${token}`;
+}
+
+const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, syncScroll, onScrollRef, onViewerScroll, distractionFree = false }) => {
   const {
     fileContent,
     currentFilePath,
@@ -548,10 +628,104 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, s
   }, [syncScroll, onViewerScroll]);
 
 
-  const AsyncImage: React.FC<{ src: string; alt: string; className?: string }> = ({ src, alt, className }) => {
+  const useResolvedMediaSrc = (src?: string | null) => {
+    const [resolved, setResolved] = useState<string | null>(src || null);
+    const currentPath = useStore((s) => s.currentFilePath);
+    const reloadToken = useStore((s) => s.assetReloadToken);
+    useEffect(() => {
+      let cancelled = false;
+      if (!src) {
+        setResolved(null);
+        return () => { cancelled = true; };
+      }
+      setResolved(null);
+      (async () => {
+        if (!currentPath) {
+          if (!cancelled) setResolved(src);
+          return;
+        }
+        const result = await window.markd?.resolveMediaPath(src, currentPath);
+        if (!cancelled) setResolved(cacheBustLocalFileUrl(result || src, reloadToken));
+      })();
+      return () => { cancelled = true; };
+    }, [src, currentPath, reloadToken]);
+    return resolved;
+  };
+
+  const MediaCaption: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
+    if (!children) return null;
+    return <span className="block text-xs text-gray-500 text-center mt-1">{children}</span>;
+  };
+
+  const AsyncVideo: React.FC<{ src?: string; alt?: string; title?: string; className?: string; children?: React.ReactNode } & React.VideoHTMLAttributes<HTMLVideoElement>> = ({ src, alt, title, className, children, controls, preload, ...props }) => {
+    const resolved = useResolvedMediaSrc(src);
+    const caption = alt || title;
+    if (src && !resolved) return <span className="block my-4 h-32 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />;
+    return (
+      <span className="media-block block my-4">
+        <video
+          src={resolved || undefined}
+          controls={controls ?? true}
+          className={className || 'w-full max-w-full rounded-lg shadow-sm'}
+          preload={preload || 'metadata'}
+          {...props}
+        >
+          {children}
+        </video>
+        <MediaCaption>{caption}</MediaCaption>
+      </span>
+    );
+  };
+
+  const AsyncAudio: React.FC<{ src?: string; title?: string; className?: string; children?: React.ReactNode } & React.AudioHTMLAttributes<HTMLAudioElement>> = ({ src, title, className, children, controls, preload, ...props }) => {
+    const resolved = useResolvedMediaSrc(src);
+    if (src && !resolved) return <span className="block my-4 h-12 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />;
+    return (
+      <span className="media-block block my-4">
+        <audio
+          src={resolved || undefined}
+          controls={controls ?? true}
+          className={className || 'w-full'}
+          preload={preload || 'metadata'}
+          {...props}
+        >
+          {children}
+        </audio>
+        <MediaCaption>{title}</MediaCaption>
+      </span>
+    );
+  };
+
+  const AsyncSource: React.FC<{ src?: string; type?: string } & React.SourceHTMLAttributes<HTMLSourceElement>> = ({ src, ...props }) => {
+    const resolved = useResolvedMediaSrc(src);
+    return <source src={resolved || src} {...props} />;
+  };
+
+  const AsyncIframe: React.FC<{ src?: string; title?: string; className?: string } & React.IframeHTMLAttributes<HTMLIFrameElement>> = ({ src, title, className, loading, allow, allowFullScreen, referrerPolicy, ...props }) => {
+    const resolved = useResolvedMediaSrc(src);
+    if (src && !resolved) return <span className="block my-4 aspect-video bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />;
+    return (
+      <span className="media-block block my-4">
+        <iframe
+          src={resolved || src}
+          title={title || 'Embedded content'}
+          className={className || 'w-full aspect-video rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm'}
+          loading={loading || 'lazy'}
+          allow={allow || 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share'}
+          allowFullScreen={allowFullScreen ?? true}
+          referrerPolicy={referrerPolicy || 'strict-origin-when-cross-origin'}
+          {...props}
+        />
+        <MediaCaption>{title}</MediaCaption>
+      </span>
+    );
+  };
+
+  const ResolvedImage: React.FC<{ src: string; alt: string; className?: string }> = ({ src, alt, className }) => {
     const [resolved, setResolved] = useState<string | null>(null);
     const [error, setError] = useState(false);
     const currentPath = useStore((s) => s.currentFilePath);
+    const reloadToken = useStore((s) => s.assetReloadToken);
     useEffect(() => {
       let cancelled = false; setError(false); setResolved(null);
       (async () => {
@@ -560,7 +734,7 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, s
         if (!cancelled) setResolved((result && result !== src) ? result : src);
       })();
       return () => { cancelled = true; };
-    }, [src, currentPath]);
+    }, [src, currentPath, reloadToken]);
     if (error || !resolved) return resolved === null ? <span className="block my-4 h-8 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" /> : null;
     return (
       <span className="block my-4">
@@ -568,6 +742,12 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, s
         {alt && <span className="block text-xs text-gray-500 text-center mt-1">{alt}</span>}
       </span>
     );
+  };
+
+  const AsyncImage: React.FC<{ src: string; alt: string; className?: string }> = ({ src, alt, className }) => {
+    if (isVideoSource(src)) return <AsyncVideo src={src} alt={alt} className={className} />;
+    if (isAudioSource(src)) return <AsyncAudio src={src} title={alt} className={className} />;
+    return <ResolvedImage src={src} alt={alt} className={className} />;
   };
 
   const computedFont = useMemo(() => fontFamily === 'system' ? undefined : fontFamily, [fontFamily]);
@@ -613,7 +793,11 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, s
     a: ({ href, children, ...props }: any) => (
       <a href={href} onClick={(e) => { if (href?.startsWith('http://') || href?.startsWith('https://')) { e.preventDefault(); window.markd?.openExternal(href); } }} {...props}>{children}</a>
     ),
-    img: ({ src, alt }: any) => <AsyncImage src={src} alt={alt} />,
+    img: ({ src, alt, ...props }: any) => <AsyncImage src={src} alt={alt} {...props} />,
+    video: ({ src, children, ...props }: any) => <AsyncVideo src={src} {...props}>{children}</AsyncVideo>,
+    audio: ({ src, children, ...props }: any) => <AsyncAudio src={src} {...props}>{children}</AsyncAudio>,
+    source: ({ src, ...props }: any) => <AsyncSource src={src} {...props} />,
+    iframe: ({ src, ...props }: any) => <AsyncIframe src={src} {...props} />,
     table: ({ children }: any) => <div className="overflow-x-auto"><table className="min-w-full">{children}</table></div>,
     input: ({ type, checked, ...props }: any) => {
       if (type !== 'checkbox') return <input type={type} checked={checked} {...props} />;
@@ -704,6 +888,7 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, s
         </div>
       </div>
       <BackToTop containerRef={contentRef} />
+      <ZoomIndicator enabled={distractionFree} zoomLevel={zoomLevel} />
       <div className={`absolute top-3 right-3 bottom-3 w-64 z-50 transition-opacity ${showToc ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
         <TableOfContents content={fileContent} onClose={() => onToggleToc?.()} matchPalette={matchToolbarPalette} zoomLevel={zoomLevel} scrollContainerRef={contentRef} />
       </div>

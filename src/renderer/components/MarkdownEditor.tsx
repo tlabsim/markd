@@ -235,6 +235,7 @@ export interface MarkdownEditorSearchApi {
 const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef, onSearchApiRef, onEditorScroll, onToggleSync, wordWrap, onToggleWordWrap, onFlushRef, onSave, matchPalette, paletteBg, paletteBgDark }) => {
   const {
     fileContent,
+    currentFilePath,
     setFileContent,
     theme,
     isSearchOpen,
@@ -242,8 +243,10 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
     searchCurrentIndex,
     searchUseRegex,
     searchCaseSensitive,
+    undoStackLimit,
   } = useStore(useShallow((state) => ({
     fileContent: state.fileContent,
+    currentFilePath: state.currentFilePath,
     setFileContent: state.setFileContent,
     theme: state.theme,
     isSearchOpen: state.isSearchOpen,
@@ -251,6 +254,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
     searchCurrentIndex: state.searchCurrentIndex,
     searchUseRegex: state.searchUseRegex,
     searchCaseSensitive: state.searchCaseSensitive,
+    undoStackLimit: state.undoStackLimit,
   })));
   const editorRef = useRef<EditorEl>(null);
   const textareaOverlayInnerRef = useRef<HTMLDivElement>(null);
@@ -420,6 +424,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
   const highlightTimer = useRef<number>(0);
   const storeTimer = useRef<number>(0);
   const lastTypedRef = useRef(fileContent);
+  const lastDocumentPathRef = useRef<string | null>(currentFilePath);
   const syncGuard = useRef(false); // prevents effect from overwriting textarea during programmatic changes
 
   // Push text to store (debounced for both modes to prevent effect from destroying undo)
@@ -451,6 +456,13 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
     }, 300);
   }, [syntaxHighlight, searchHighlightOptions]);
 
+  useEffect(() => {
+    if (lastDocumentPathRef.current === currentFilePath) return;
+    undoStack.current = [];
+    redoStack.current = [];
+    lastDocumentPathRef.current = currentFilePath;
+  }, [currentFilePath]);
+
   const pushUndo = useCallback(() => {
     const el = editorRef.current;
     if (!el) return;
@@ -460,9 +472,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
     const lastText = last ? (typeof last === 'string' ? last : last.text) : null;
     if (lastText === text) return;
     undoStack.current.push({ text, cursor });
-    if (undoStack.current.length > 100) undoStack.current.shift();
+    if (undoStack.current.length > undoStackLimit) undoStack.current.splice(0, undoStack.current.length - undoStackLimit);
     redoStack.current = [];
-  }, []);
+  }, [undoStackLimit]);
 
   const scrollEditorToOffset = useCallback((el: EditorEl, offset: number) => {
     const line = getText(el).substring(0, offset).split('\n').length;
@@ -806,6 +818,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
     }
     if (!prev || prev.text === curText) return; // nothing to undo
     redoStack.current.push({ text: curText, cursor: curCursor });
+    if (redoStack.current.length > undoStackLimit) redoStack.current.splice(0, redoStack.current.length - undoStackLimit);
     syncGuard.current = true;
     if (el instanceof HTMLDivElement && syntaxHighlight) {
       el.innerHTML = highlightMarkdown(prev.text) || '<br>';
@@ -818,7 +831,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
     }
     setFileContent(prev.text);
     setTimeout(() => { syncGuard.current = false; }, 100);
-  }, [setFileContent, syntaxHighlight]);
+  }, [setFileContent, syntaxHighlight, undoStackLimit]);
 
   const handleRedo = useCallback(() => {
     const el = editorRef.current;
@@ -826,6 +839,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
     const curText = getText(el);
     const curCursor = getCursorOffset(el);
     undoStack.current.push({ text: curText, cursor: curCursor });
+    if (undoStack.current.length > undoStackLimit) undoStack.current.splice(0, undoStack.current.length - undoStackLimit);
     const norm = (s: Snap | string): Snap =>
       typeof s === 'string' ? { text: s, cursor: s.length } : s;
     const next = norm(redoStack.current.pop()!);
@@ -841,7 +855,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
     }
     setFileContent(next.text);
     setTimeout(() => { syncGuard.current = false; }, 100);
-  }, [setFileContent, syntaxHighlight]);
+  }, [setFileContent, syntaxHighlight, undoStackLimit]);
 
   // Pass flushStore to parent so App can flush pending text before saving
   useEffect(() => {
