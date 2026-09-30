@@ -7,6 +7,8 @@ import markdLogo from '../assets/markd.svg';
 
 type Tab = 'settings' | 'shortcuts' | 'about';
 
+const SHOW_SVG_BACKGROUND_SETTING = false;
+
 interface SettingsModalProps {
   open: boolean;
   onClose: () => void;
@@ -106,7 +108,7 @@ const SegmentedControl: React.FC<{
 );
 
 // ----- Settings row -----
-const SettingRow: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
+const SettingRow: React.FC<{ label: React.ReactNode; children: React.ReactNode }> = ({ label, children }) => (
   <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700/10 dark:border-white/5">
     <span className="text-[13px] text-gray-700 dark:text-gray-200">{label}</span>
     {children}
@@ -185,6 +187,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
     setZoomLevel,
     previewPalette,
     setPreviewPalette,
+    showSvgBackgroundToggle,
+    setShowSvgBackgroundToggle,
     wordWrap,
     setWordWrap,
     tabSize,
@@ -208,6 +212,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
     setZoomLevel: state.setZoomLevel,
     previewPalette: state.previewPalette,
     setPreviewPalette: state.setPreviewPalette,
+    showSvgBackgroundToggle: state.showSvgBackgroundToggle,
+    setShowSvgBackgroundToggle: state.setShowSvgBackgroundToggle,
     wordWrap: state.wordWrap,
     setWordWrap: state.setWordWrap,
     tabSize: state.tabSize,
@@ -322,6 +328,31 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
                   onChange={() => setMatchToolbarPalette(!matchToolbarPalette)}
                 />
               </SettingRow>
+
+              {SHOW_SVG_BACKGROUND_SETTING && (
+                <SettingRow label={
+                  <span className="inline-flex items-center gap-1.5">
+                    SVG Background Toggle (Dark Mode)
+                    <span
+                      tabIndex={0}
+                      role="img"
+                      aria-label="In dark mode, hover over a transparent SVG containing text to show a button that toggles a white background. The SVG itself is unchanged."
+                      title="In dark mode, hover over a transparent SVG containing text to show a button that toggles a white background. The SVG itself is unchanged."
+                      className="inline-flex h-4 w-4 items-center justify-center rounded-full text-gray-400 dark:text-gray-500 cursor-help focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                    >
+                      <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                        <circle cx="12" cy="12" r="9" />
+                        <path strokeLinecap="round" d="M12 11v5m0-8h.01" />
+                      </svg>
+                    </span>
+                  </span>
+                }>
+                  <ToggleSwitch
+                    checked={showSvgBackgroundToggle}
+                    onChange={() => setShowSvgBackgroundToggle(!showSvgBackgroundToggle)}
+                  />
+                </SettingRow>
+              )}
 
               {/* Editor */}
               <div className="px-4 py-2.5 text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">

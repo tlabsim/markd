@@ -35,6 +35,7 @@ interface EditorState {
   zoomLevel: number;
   previewPalette: string;
   assetReloadToken: number;
+  showSvgBackgroundToggle: boolean;
 
   // Recent files
   recentFiles: string[];
@@ -75,6 +76,7 @@ interface EditorState {
   setZoomLevel: (zoom: number) => void;
   setPreviewPalette: (palette: string) => void;
   refreshLinkedAssets: () => void;
+  setShowSvgBackgroundToggle: (on: boolean) => void;
   addRecentFile: (path: string) => void;
   removeRecentFile: (path: string) => void;
   clearRecentFiles: () => void;
@@ -134,6 +136,7 @@ export const useStore = create<EditorState>()(
       zoomLevel: 100,
       previewPalette: 'default',
       assetReloadToken: 0,
+      showSvgBackgroundToggle: true,
       recentFiles: [],
       wordWrap: true,
       tabSize: 4,
@@ -180,6 +183,7 @@ export const useStore = create<EditorState>()(
       setZoomLevel: (zoom) => set({ zoomLevel: Math.max(50, Math.min(200, zoom)) }),
       setPreviewPalette: (palette) => set({ previewPalette: palette }),
       refreshLinkedAssets: () => set((s) => ({ assetReloadToken: s.assetReloadToken + 1 })),
+      setShowSvgBackgroundToggle: (on) => set({ showSvgBackgroundToggle: on }),
       addRecentFile: (filePath) =>
         set((state) => {
           const filtered = state.recentFiles.filter((p) => p !== filePath);
@@ -203,11 +207,17 @@ export const useStore = create<EditorState>()(
     }),
     {
       name: 'markd-preferences',
+      version: 1,
+      migrate: (persistedState) => ({
+        ...(persistedState as EditorState),
+        showSvgBackgroundToggle: true,
+      }),
       partialize: (state) => ({
         theme: state.theme,
         fontFamily: state.fontFamily,
         zoomLevel: state.zoomLevel,
         previewPalette: state.previewPalette,
+        showSvgBackgroundToggle: state.showSvgBackgroundToggle,
         recentFiles: state.recentFiles,
         wordWrap: state.wordWrap,
         tabSize: state.tabSize,

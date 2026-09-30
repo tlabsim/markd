@@ -14,6 +14,8 @@ import rehypeRaw from 'rehype-raw';
 import { useStore } from '../store';
 import mermaid from 'mermaid';
 
+const SvgBackgroundImage = React.lazy(() => import('./SvgBackgroundImage'));
+
 mermaid.initialize({
   startOnLoad: false,
   theme: 'default',
@@ -665,6 +667,8 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, s
     fontFamily,
     zoomLevel,
     previewPalette,
+    theme,
+    showSvgBackgroundToggle,
     zoomIn,
     zoomOut,
     matchToolbarPalette,
@@ -681,6 +685,8 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, s
     fontFamily: state.fontFamily,
     zoomLevel: state.zoomLevel,
     previewPalette: state.previewPalette,
+    theme: state.theme,
+    showSvgBackgroundToggle: state.showSvgBackgroundToggle,
     zoomIn: state.zoomIn,
     zoomOut: state.zoomOut,
     matchToolbarPalette: state.matchToolbarPalette,
@@ -873,9 +879,17 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, s
       return () => { cancelled = true; };
     }, [src, currentPath, reloadToken]);
     if (error || !resolved) return resolved === null ? <span className="block my-4 h-8 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" /> : null;
+    const showSvgControl = theme === 'dark' && showSvgBackgroundToggle && /^data:image\/svg\+xml(?:;[^,]*)?,/i.test(resolved);
+    const imageClassName = className || 'max-w-full h-auto rounded-lg shadow-sm';
     return (
       <span className="block my-4">
-        <img src={resolved} alt={alt || ''} loading="lazy" className={className || 'max-w-full h-auto rounded-lg shadow-sm'} onError={() => setError(true)} />
+        {showSvgControl ? (
+          <React.Suspense fallback={<img src={resolved} alt={alt || ''} loading="lazy" className={imageClassName} onError={() => setError(true)} />}>
+            <SvgBackgroundImage src={resolved} alt={alt || ''} className={imageClassName} onError={() => setError(true)} />
+          </React.Suspense>
+        ) : (
+          <img src={resolved} alt={alt || ''} loading="lazy" className={imageClassName} onError={() => setError(true)} />
+        )}
         {alt && <span className="block text-xs text-gray-500 text-center mt-1">{alt}</span>}
       </span>
     );
@@ -993,7 +1007,7 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, s
       if (!className) return <code className="bg-gray-100 dark:bg-[#1e2733] px-1.5 py-0.5 rounded text-sm font-mono text-[#3d5a6b] dark:text-[#9cccd8]" {...props}>{children}</code>;
       return <code className={className} {...props}>{children}</code>;
     },
-  }), [makeHeading]);
+  }), [makeHeading, theme, showSvgBackgroundToggle]);
 
   const normalizedFileContent = useMemo(() => normalizeAiMathDelimiters(fileContent), [fileContent]);
 
