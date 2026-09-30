@@ -137,7 +137,7 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
               </button>
               {/* Submenu flyout — CSS hover, no gap */}
               <div
-                className="absolute left-full top-0 w-52 bg-white dark:bg-[#28323e] border border-gray-200 dark:border-gray-600 rounded-md shadow-2xl py-1 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity duration-75 -translate-y-2"
+                className="absolute left-full top-0 w-56 bg-white dark:bg-[#28323e] border border-gray-200 dark:border-gray-600 rounded-md shadow-2xl py-1 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity duration-75 -translate-y-2"
                 style={matchToolbarPalette ? { backgroundColor: 'var(--pal-panel-bg)', borderColor: 'var(--pal-border)' } : undefined}
               >
                 {recentFiles && recentFiles.length > 0 ? (
