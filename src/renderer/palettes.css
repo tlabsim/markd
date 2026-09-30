@@ -48,3 +48,6 @@ html[data-palette="cool"]:not(.dark) .welcome-action:hover {
 html[data-palette="sepia"]:not(.dark) .welcome-action:hover {
   background-color: #e8e0d4;
 }
+
+.toc-panel { --toc-background-opacity: 75%; }
+.dark .toc-panel { --toc-background-opacity: 85%; }

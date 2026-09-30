@@ -228,8 +228,8 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ content, onClose, mat
   return (
     <div
       ref={tocRef}
-      className="p-3 shadow-xl h-full overflow-y-auto rounded-lg border border-gray-200/50 dark:border-gray-700/50 bg-white/85 dark:bg-[#222c36]/85 backdrop-blur-md"
-      style={{ fontSize: tocFontSize, ...(matchPalette ? { backgroundColor: 'color-mix(in srgb, var(--pal-panel-bg) 85%, transparent)', borderColor: 'var(--pal-border-soft)' } : {}) }}
+      className="toc-panel p-3 shadow-xl h-full overflow-y-auto rounded-lg border border-gray-200/50 dark:border-gray-700/50 bg-white/75 dark:bg-[#222c36]/85 backdrop-blur-md"
+      style={{ fontSize: tocFontSize, ...(matchPalette ? { backgroundColor: 'color-mix(in srgb, var(--pal-panel-bg) var(--toc-background-opacity), transparent)', borderColor: 'var(--pal-border-soft)' } : {}) }}
     >
       <div className="flex items-center justify-between mb-2">
         <h3 className="font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400" style={{ fontSize: `${tocFontSize * 0.833}px` }}>
