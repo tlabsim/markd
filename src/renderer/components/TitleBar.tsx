@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { useStore } from '../store';
+import { MAX_RECENT_FILES, useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import markdLogo from '../assets/markd.svg';
 
@@ -141,7 +141,7 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
                 style={matchToolbarPalette ? { backgroundColor: 'var(--pal-panel-bg)', borderColor: 'var(--pal-border)' } : undefined}
               >
                 {recentFiles && recentFiles.length > 0 ? (
-                  recentFiles.slice(0, 10).map((filePath) => {
+                  recentFiles.slice(0, MAX_RECENT_FILES).map((filePath) => {
                       const name = filePath.split(/[/\\]/).pop() || filePath;
                       const dir = filePath.split(/[/\\]/).slice(0, -1).join('\\') || filePath;
                       return (

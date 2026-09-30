@@ -3,6 +3,8 @@ import { persist } from 'zustand/middleware';
 import { ViewMode, ThemeMode, FileEntry } from './types';
 import { PALETTE_OPTIONS } from './palettes';
 
+export const MAX_RECENT_FILES = 15;
+
 interface EditorState {
   // File state
   currentFile: string | null;
@@ -181,7 +183,7 @@ export const useStore = create<EditorState>()(
       addRecentFile: (filePath) =>
         set((state) => {
           const filtered = state.recentFiles.filter((p) => p !== filePath);
-          return { recentFiles: [filePath, ...filtered].slice(0, 10) };
+          return { recentFiles: [filePath, ...filtered].slice(0, MAX_RECENT_FILES) };
         }),
       removeRecentFile: (filePath) =>
         set((state) => ({ recentFiles: state.recentFiles.filter((p) => p !== filePath) })),
