@@ -1,7 +1,8 @@
 {
   "name": "markd",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "A beautiful, feature-rich desktop markdown viewer and editor",
+  "homepage": "https://markd.tlabsinc.com",
   "author": {
     "name": "Iftekhar Mahmud Towhid",
     "email": "tlabs.im@gmail.com",

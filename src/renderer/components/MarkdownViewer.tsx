@@ -30,6 +30,143 @@ function reactNodeToText(node: React.ReactNode): string {
   return '';
 }
 
+function looksLikeMathExpression(value: string): boolean {
+  const text = value.trim();
+  if (!text || text.length < 3) return false;
+
+  return (
+    /\\[A-Za-z]+/.test(text) ||
+    /[_^]\{?[\w\\]/.test(text) ||
+    /(?:\\times|\\approx|\\frac|\\sum|\\int|\\sqrt|\\leq|\\geq|\\neq)/.test(text) ||
+    /[A-Za-z0-9})]\s*(?:=|\\approx|≈|≤|≥|<|>)\s*[A-Za-z0-9({\\]/.test(text)
+  );
+}
+
+function findLatexDelimiterEnd(value: string, delimiter: '\\)' | '\\]', from: number): number {
+  let index = from;
+  while (index < value.length) {
+    const found = value.indexOf(delimiter, index);
+    if (found === -1) return -1;
+
+    let slashCount = 0;
+    for (let i = found; i >= 0 && value[i] === '\\'; i--) slashCount++;
+    if (slashCount % 2 === 1) return found;
+
+    index = found + delimiter.length;
+  }
+
+  return -1;
+}
+
+function formatDisplayMath(expression: string): string {
+  const body = expression
+    .replace(/^\s*\r?\n/, '')
+    .replace(/\r?\n\s*$/, '')
+    .trim();
+
+  return body ? `\n\n$$\n${body}\n$$\n\n` : '';
+}
+
+function normalizeLatexMathInText(markdown: string): string {
+  let output = '';
+  let index = 0;
+
+  while (index < markdown.length) {
+    if (markdown[index] === '`') {
+      const runMatch = markdown.slice(index).match(/^`+/);
+      const run = runMatch?.[0] ?? '`';
+      const close = markdown.indexOf(run, index + run.length);
+
+      if (close === -1) {
+        output += markdown.slice(index);
+        break;
+      }
+
+      output += markdown.slice(index, close + run.length);
+      index = close + run.length;
+      continue;
+    }
+
+    if (markdown.startsWith('\\(', index)) {
+      const end = findLatexDelimiterEnd(markdown, '\\)', index + 2);
+      if (end !== -1) {
+        const expression = markdown.slice(index + 2, end).trim();
+        output += expression ? `$${expression}$` : markdown.slice(index, end + 2);
+        index = end + 2;
+        continue;
+      }
+    }
+
+    if (markdown.startsWith('\\[', index)) {
+      const end = findLatexDelimiterEnd(markdown, '\\]', index + 2);
+      if (end !== -1) {
+        const expression = markdown.slice(index + 2, end);
+        if (looksLikeMathExpression(expression)) {
+          output += formatDisplayMath(expression);
+          index = end + 2;
+          continue;
+        }
+      }
+    }
+
+    output += markdown[index];
+    index++;
+  }
+
+  return output;
+}
+
+function normalizeAiMathDelimiters(markdown: string): string {
+  const lines = markdown.split('\n');
+  let inFence = false;
+  let fenceMarker = '';
+  let textBuffer: string[] = [];
+  const output: string[] = [];
+
+  const flushTextBuffer = () => {
+    if (textBuffer.length === 0) return;
+    const normalized = normalizeLatexMathInText(textBuffer.join('\n'));
+    for (const line of normalized.split('\n')) {
+      const match = line.match(/^(\s*)\[\s*(.+?)\s*\](\s*)$/);
+      if (match && looksLikeMathExpression(match[2])) {
+        output.push(`${match[1]}$$`);
+        output.push(`${match[1]}${match[2].trim()}`);
+        output.push(`${match[1]}$$${match[3]}`);
+      } else {
+        output.push(line);
+      }
+    }
+    textBuffer = [];
+  };
+
+  for (const line of lines) {
+    const fenceMatch = line.match(/^(\s*)(`{3,}|~{3,})/);
+    if (fenceMatch) {
+      flushTextBuffer();
+      const marker = fenceMatch[2][0];
+      if (!inFence) {
+        inFence = true;
+        fenceMarker = marker;
+      } else if (marker === fenceMarker) {
+        inFence = false;
+        fenceMarker = '';
+      }
+      output.push(line);
+      continue;
+    }
+
+    if (inFence) {
+      output.push(line);
+      continue;
+    }
+
+    textBuffer.push(line);
+  }
+
+  flushTextBuffer();
+  return output.join('\n').replace(/\n{4,}/g, '\n\n\n');
+}
+
 const VIDEO_EXTENSIONS = new Set(['.mp4', '.webm', '.ogg', '.ogv', '.mov', '.m4v', '.avi', '.mkv']);
 const AUDIO_EXTENSIONS = new Set(['.mp3', '.wav', '.ogg', '.oga', '.m4a', '.flac', '.aac']);
 
@@ -59,13 +196,13 @@ const KNOWN_HTML_TAGS = new Set([
   'i','iframe','img','input','ins',
   'kbd',
   'label','legend','li','link',
-  'main','map','mark','meta','meter',
+  'main','map','mark','math','meta','meter','mi','mn','mo','mrow','msub','msup','msubsup','mfrac','msqrt','mroot','mstyle','mspace','mtext','munderover','munder','mover','mpadded','mphantom','mfenced','mtable','mtr','mtd',
   'nav','noscript',
   'object','ol','optgroup','option','output',
   'p','picture','pre','progress',
   'q',
   'rp','rt','ruby',
-  's','samp','script','section','select','slot','small','source','span','strong','style','sub','summary','sup',
+  's','samp','script','section','select','semantics','slot','small','source','span','strong','style','sub','summary','sup',
   'table','tbody','td','template','textarea','tfoot','th','thead','time','title','tr','track',
   'u','ul',
   'var','video',
@@ -858,6 +995,8 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, s
     },
   }), [makeHeading]);
 
+  const normalizedFileContent = useMemo(() => normalizeAiMathDelimiters(fileContent), [fileContent]);
+
   const searchHighlightPlugin = useMemo(() => [rehypeSearchHighlight, {
     enabled: viewMode === 'view' && isSearchOpen,
     query: searchQuery,
@@ -880,7 +1019,7 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, s
               remarkPlugins={[remarkGfm, remarkMath, remarkEmoji, remarkFrontmatter, remarkSmartypants, remarkWikiLink, remarkDirective, remarkCallouts, remarkSubSuper, remarkHighlight, remarkDeflist]}
               rehypePlugins={[rehypeKatex, rehypeHighlight, rehypeRaw, rehypeFilterCustomElements, searchHighlightPlugin]}
               components={components}>
-              {fileContent}
+              {normalizedFileContent}
             </ReactMarkdown>
           ) : currentFilePath ? null : (
             <div className="flex items-center justify-center h-64 text-gray-500"><p>No content</p></div>
