@@ -24,8 +24,8 @@ mermaid.initialize({
 function reactNodeToText(node: React.ReactNode): string {
   if (typeof node === 'string' || typeof node === 'number') return String(node);
   if (Array.isArray(node)) return node.map(reactNodeToText).join('');
-  if (React.isValidElement<{ children?: React.ReactNode }>(node)) {
-    return reactNodeToText(node.props.children);
+  if (React.isValidElement<{ children?: React.ReactNode; alt?: string }>(node)) {
+    return node.props.children == null ? node.props.alt ?? '' : reactNodeToText(node.props.children);
   }
   return '';
 }
@@ -913,7 +913,7 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, s
       );
     };
     return ({ children, ...props }: any) => {
-      const text = String(children).replace(/<[^>]*>/g, '');
+      const text = reactNodeToText(children);
       const id = slugify(text);
       return (
         <Tag id={id} className="group/heading relative" {...props}>

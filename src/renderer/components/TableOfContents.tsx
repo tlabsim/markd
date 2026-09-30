@@ -51,10 +51,11 @@ const BORDER_ADJUST = 13;   // per-level correction to align border with chevron
 const TreeNode: React.FC<{
   node: TocNode;
   isRoot: boolean;
+  isLastSibling: boolean;
   collapsed: Set<string>;
   onToggle: (id: string) => void;
   onScroll: (id: string) => void;
-}> = ({ node, isRoot, collapsed, onToggle, onScroll }) => {
+}> = ({ node, isRoot, isLastSibling, collapsed, onToggle, onScroll }) => {
   const { item, children } = node;
   const hasChildren = children.length > 0;
   const isCollapsed = collapsed.has(item.id);
@@ -67,9 +68,15 @@ const TreeNode: React.FC<{
   const connectorW = hasChildren ? CONNECTOR_PARENT : CONNECTOR_LEAF;
 
   return (
-    <div>
+    <div className="relative">
+      {!isRoot && !isLastSibling && (
+        <span aria-hidden="true" className="pointer-events-none absolute -left-px top-0 bottom-0 w-px bg-slate-200 dark:bg-slate-700" />
+      )}
       {/* Item row */}
       <div className="flex items-center group relative">
+        {!isRoot && isLastSibling && (
+          <span aria-hidden="true" className="pointer-events-none absolute -left-px top-0 h-1/2 w-px bg-slate-200 dark:bg-slate-700" />
+        )}
         {/* Horizontal connector: touches the border */}
         {!isRoot && (
           <span
@@ -111,15 +118,16 @@ const TreeNode: React.FC<{
         </button>
       </div>
 
-      {/* Children group: border at chevron center */}
+      {/* Children group: vertical spine at chevron center */}
       {hasChildren && !isCollapsed && (
         <div style={{ paddingLeft: `${myChildrenBorderX}px` }}>
-          <div className="border-l border-slate-200 dark:border-slate-700">
+          <div className="pl-px">
             {children.map((child, i) => (
               <TreeNode
                 key={child.item.id || i}
                 node={child}
                 isRoot={false}
+                isLastSibling={i === children.length - 1}
                 collapsed={collapsed}
                 onToggle={onToggle}
                 onScroll={onScroll}
@@ -263,6 +271,7 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ content, onClose, mat
             key={node.item.id || i}
             node={node}
             isRoot={true}
+            isLastSibling={i === tree.length - 1}
             collapsed={collapsed}
             onToggle={toggleCollapse}
             onScroll={scrollToHeading}
