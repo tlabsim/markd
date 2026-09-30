@@ -1205,6 +1205,10 @@ const App: React.FC = () => {
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         initialTab={settingsTab}
+        onSyntaxHighlightChange={(enabled) => {
+          flushEditorRef.current?.();
+          useStore.getState().setSyntaxHighlight(enabled);
+        }}
       />
     </div>
   );

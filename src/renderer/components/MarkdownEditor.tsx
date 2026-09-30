@@ -244,6 +244,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
     searchUseRegex,
     searchCaseSensitive,
     undoStackLimit,
+    syntaxHighlight,
+    setSyntaxHighlight,
   } = useStore(useShallow((state) => ({
     fileContent: state.fileContent,
     currentFilePath: state.currentFilePath,
@@ -255,6 +257,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
     searchUseRegex: state.searchUseRegex,
     searchCaseSensitive: state.searchCaseSensitive,
     undoStackLimit: state.undoStackLimit,
+    syntaxHighlight: state.syntaxHighlight,
+    setSyntaxHighlight: state.setSyntaxHighlight,
   })));
   const editorRef = useRef<EditorEl>(null);
   const textareaOverlayInnerRef = useRef<HTMLDivElement>(null);
@@ -282,10 +286,10 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
   const [lineCount, setLineCount] = useState(1);
   const [taWidth, setTaWidth] = useState(0);
   const [textareaViewport, setTextareaViewport] = useState({ width: 0, height: 0 });
-  const [syntaxHighlight, setSyntaxHighlight] = useState(false);
   const [liveEditorText, setLiveEditorText] = useState(fileContent);
   const savedScrollRef = useRef(0);
   const savedCursorRef = useRef(0);
+  const restoreEditorFocusRef = useRef(true);
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
   const moreButtonRef = useRef<HTMLButtonElement>(null);
@@ -337,9 +341,12 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
         setSel(el, savedCursorRef.current, savedCursorRef.current);
       }
       el.scrollTop = savedScrollRef.current;
-      focusEl(el);
-      // Re-apply scroll after focus — browser may auto-scroll focused element
-      el.scrollTop = savedScrollRef.current;
+      if (restoreEditorFocusRef.current) {
+        focusEl(el);
+        // Re-apply scroll after focus — browser may auto-scroll focused element
+        el.scrollTop = savedScrollRef.current;
+      }
+      restoreEditorFocusRef.current = false;
     }
   }, [syntaxHighlight]); // eslint-disable-line react-hooks/exhaustive-deps
   const [headingOpen, setHeadingOpen] = useState(false);
@@ -438,7 +445,13 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
     clearTimeout(storeTimer.current);
     const el = editorRef.current;
     if (!el) return;
+    savedScrollRef.current = el.scrollTop;
+    if (el instanceof HTMLTextAreaElement || el.contains(window.getSelection()?.anchorNode ?? null)) {
+      savedCursorRef.current = getSel(el).start;
+    }
     const text = getText(el);
+    lastTypedRef.current = text;
+    setLiveEditorText(text);
     setFileContent(text);
   }, [setFileContent]);
 
@@ -897,6 +910,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
   const updateCursorPosition = useCallback(() => {
     const el = editorRef.current;
     if (!el) return;
+    if (document.activeElement === el) savedCursorRef.current = getSel(el).start;
     const { line, col, total } = getLineCol(el);
     setCursorPosition({ line, col });
     setLineCount(total);
@@ -1385,9 +1399,12 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
               setLiveEditorText(text);
               setFileContent(text);
               savedScrollRef.current = el.scrollTop;
-              savedCursorRef.current = getSel(el).start;
+              if (el instanceof HTMLTextAreaElement || el.contains(window.getSelection()?.anchorNode ?? null)) {
+                savedCursorRef.current = getSel(el).start;
+              }
             }
-            setSyntaxHighlight(v => !v);
+            restoreEditorFocusRef.current = true;
+            setSyntaxHighlight(!syntaxHighlight);
           }}
           title={syntaxHighlight ? 'Disable syntax highlighting' : 'Enable syntax highlighting'}
         >
@@ -1456,6 +1473,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
               defaultValue={liveEditorText}
               onChange={handleChange}
               onKeyDown={handleKeyDown}
+              onKeyUp={handleCursorUpdate}
               onClick={handleCursorUpdate}
               onScroll={handleScroll}
               spellCheck={false}
@@ -1475,6 +1493,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
             suppressContentEditableWarning
             onInput={handleInput}
             onKeyDown={handleKeyDown}
+            onKeyUp={handleCursorUpdate}
             onClick={handleCursorUpdate}
             onScroll={handleScroll}
             spellCheck={false}

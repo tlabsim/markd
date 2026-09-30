@@ -13,6 +13,7 @@ interface SettingsModalProps {
   open: boolean;
   onClose: () => void;
   initialTab?: Tab;
+  onSyntaxHighlightChange?: (enabled: boolean) => void;
 }
 
 // ----- Keyboard shortcuts list -----
@@ -148,7 +149,7 @@ const TabBar: React.FC<{ activeTab: Tab; onTab: (t: Tab) => void }> = ({ activeT
   );
 };
 
-const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab }) => {
+const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab, onSyntaxHighlightChange }) => {
   const [tab, setTab] = useState<Tab>(initialTab || 'settings');
   const [multiInstance, setMultiInstance] = useState(false);
   const [appVersion, setAppVersion] = useState<string>('');
@@ -369,7 +370,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
               <SettingRow label="Syntax Highlighting">
                 <ToggleSwitch
                   checked={syntaxHighlight}
-                  onChange={() => setSyntaxHighlight(!syntaxHighlight)}
+                  onChange={() => (onSyntaxHighlightChange ?? setSyntaxHighlight)(!syntaxHighlight)}
                 />
               </SettingRow>
 

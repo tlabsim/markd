@@ -202,6 +202,16 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
 
       {/* Right: Window controls */}
       <div className="flex items-center gap-1 z-10">
+        {distractionFree && onEditDocument && !isMaximized && (
+          <button
+            className="titlebar-button w-auto px-3 h-[18px] flex items-center justify-center rounded text-[12px] font-semibold bg-slate-700/10 hover:bg-blue-700 hover:text-white dark:bg-white/10  dark:hover:bg-blue-400 text-slate-500 dark:text-gray-300 dark:hover:text-white transition-colors duration-150"
+            onClick={onEditDocument}
+            title="Edit document — exit distraction-free and open in split view"
+          >
+            Edit
+          </button>
+        )}
+
         <button
           className="titlebar-button w-8 h-8 flex items-center justify-center rounded hover:bg-gray-700/10 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
@@ -228,16 +238,6 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
               <svg className="w-[18px] h-[18px]" viewBox="0 0 28 28"><path fill="currentColor" d="M3 6a3 3 0 0 1 3-3h3.5a1 1 0 1 1 0 2H6a1 1 0 0 0-1 1v3.5a1 1 0 1 1-2 0zm14.5-2a1 1 0 0 1 1-1H22a3 3 0 0 1 3 3v3.5a1 1 0 1 1-2 0V6a1 1 0 0 0-1-1h-3.5a1 1 0 0 1-1-1M4 17.5a1 1 0 0 1 1 1V22a1 1 0 0 0 1 1h3.5a1 1 0 1 1 0 2H6a3 3 0 0 1-3-3v-3.5a1 1 0 0 1 1-1m20 0a1 1 0 0 1 1 1V22a3 3 0 0 1-3 3h-3.5a1 1 0 1 1 0-2H22a1 1 0 0 0 1-1v-3.5a1 1 0 0 1 1-1"/></svg>
             </button>
           </>
-        )}
-
-        {distractionFree && onEditDocument && !isMaximized && (
-          <button
-            className="titlebar-button w-auto px-3 h-[18px] flex items-center justify-center rounded text-[12px] font-semibold bg-slate-700/10 hover:bg-blue-700 hover:text-white dark:bg-white/10  dark:hover:bg-blue-400 text-slate-500 dark:text-gray-300 dark:hover:text-white transition-colors duration-150"
-            onClick={onEditDocument}
-            title="Edit document — exit distraction-free and open in split view"
-          >
-            Edit
-          </button>
         )}
 
         <div className="w-px h-4 bg-gray-300 dark:bg-gray-700 mx-1" />
