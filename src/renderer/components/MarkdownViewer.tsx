@@ -12,7 +12,6 @@ import rehypeKatex from 'rehype-katex';
 import rehypeHighlight from 'rehype-highlight';
 import rehypeRaw from 'rehype-raw';
 import { useStore } from '../store';
-import mermaid from 'mermaid';
 import { CircleAlert, FileText, Info, Lightbulb, ListTree, OctagonAlert, TriangleAlert, type LucideIcon } from 'lucide-react';
 
 const SvgBackgroundImage = React.lazy(() => import('./SvgBackgroundImage'));
@@ -27,19 +26,15 @@ const CALLOUT_ICONS = new Map<string, LucideIcon>([
   ['important', CircleAlert],
 ]);
 
-mermaid.initialize({
-  startOnLoad: false,
-  theme: 'default',
-  securityLevel: 'loose',
-  fontFamily: 'inherit',
-});
-
-let mermaidTheme: 'default' | 'dark' = 'default';
+let mermaidPromise: Promise<typeof import('mermaid')['default']> | null = null;
+let mermaidTheme: 'default' | 'dark' | null = null;
 let mermaidRenderQueue = Promise.resolve();
 
 function renderMermaid(id: string, code: string, dark: boolean) {
   const theme = dark ? 'dark' : 'default';
-  const render = mermaidRenderQueue.then(() => {
+  mermaidPromise ??= import('mermaid').then(module => module.default);
+  const render = mermaidRenderQueue.then(async () => {
+    const mermaid = await mermaidPromise!;
     if (mermaidTheme !== theme) {
       mermaid.initialize({ startOnLoad: false, theme, securityLevel: 'loose', fontFamily: 'inherit' });
       mermaidTheme = theme;

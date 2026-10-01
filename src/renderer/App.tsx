@@ -5,15 +5,24 @@ import { useShallow } from 'zustand/react/shallow';
 import { PALETTE_OPTIONS } from './palettes';
 import TitleBar from './components/TitleBar';
 import Sidebar from './components/Sidebar';
-import MarkdownViewer from './components/MarkdownViewer';
-import MarkdownEditor, { type MarkdownEditorSearchApi } from './components/MarkdownEditor';
+import type { MarkdownEditorSearchApi } from './components/MarkdownEditor';
 import ConfirmModal from './components/ConfirmModal';
 import SearchBar from './components/SearchBar';
 import WelcomeScreen from './components/WelcomeScreen';
 import StatusBar from './components/StatusBar';
-import SettingsModal from './components/SettingsModal';
 import { FontSelector, PaletteSelector } from './components/ToolbarSelectors';
 import { ListTree } from 'lucide-react';
+
+const loadMarkdownEditor = () => import('./components/MarkdownEditor');
+const loadMarkdownViewer = () => import('./components/MarkdownViewer');
+const loadSettingsModal = () => import('./components/SettingsModal');
+const MarkdownEditor = React.lazy(loadMarkdownEditor);
+const MarkdownViewer = React.lazy(loadMarkdownViewer);
+const SettingsModal = React.lazy(loadSettingsModal);
+
+const DocumentPanelFallback: React.FC = () => (
+  <div className="h-full w-full animate-pulse bg-gray-100/40 dark:bg-white/[0.02]" aria-label="Loading document view" />
+);
 
 const PALETTE_KEYS = [
   '--pal-viewer-bg', '--pal-editor-bg', '--pal-editor-toolbar-bg', '--pal-panel-bg', '--pal-border-soft',
@@ -238,6 +247,7 @@ const App: React.FC = () => {
   const flushEditorRef = useRef<(() => void) | null>(null);
   const documentContentRef = useRef<HTMLDivElement>(null);
   const [documentRevealVersion, setDocumentRevealVersion] = useState(0);
+  const [settingsModuleMounted, setSettingsModuleMounted] = useState(false);
   const [showFontMenu, setShowFontMenu] = useState(false);
   const [showPaletteMenu, setShowPaletteMenu] = useState(false);
   const [showToc, setShowToc] = useState(false);
@@ -958,6 +968,24 @@ const App: React.FC = () => {
   const renderEditor = visibleEditor || (sameDocumentMounted && mountedPanes.editor);
   const renderViewer = visibleViewer || (sameDocumentMounted && mountedPanes.viewer);
 
+  useEffect(() => {
+    if (settingsOpen) setSettingsModuleMounted(true);
+  }, [settingsOpen]);
+
+  // Keep first paint light, then warm the document chunks while Welcome is idle.
+  useEffect(() => {
+    if (currentFile) return;
+    const preloadDocumentUi = () => {
+      void Promise.all([loadMarkdownEditor(), loadMarkdownViewer()]);
+    };
+    if ('requestIdleCallback' in window) {
+      const idle = window.requestIdleCallback(preloadDocumentUi, { timeout: 2500 });
+      return () => window.cancelIdleCallback(idle);
+    }
+    const timer = globalThis.setTimeout(preloadDocumentUi, 1000);
+    return () => globalThis.clearTimeout(timer);
+  }, [currentFile]);
+
   return (
     <div
       className={`h-screen flex flex-col overflow-hidden ${activeDistractionFree ? 'relative' : ''}`}
@@ -1180,21 +1208,23 @@ const App: React.FC = () => {
                       ? (viewMode === 'split' ? { width: `${splitRatio}%` } : { flex: 1 })
                       : { position: 'absolute', inset: 0, width: '100%', height: '100%', visibility: 'hidden', pointerEvents: 'none' }}
                   >
-                    <MarkdownEditor
-                      isActive={visibleEditor}
-                      isSplitView={viewMode === 'split'}
-                      scrollSyncMode={scrollSyncMode}
-                      onScrollSyncModeChange={setScrollSyncMode}
-                      onScrollRef={registerEditorScroll}
-                      onSearchApiRef={(api) => { editorSearchApiRef.current = api; }}
-                      wordWrap={wordWrap}
-                      onToggleWordWrap={() => setWordWrap(!wordWrap)}
-                      onFlushRef={(fn) => { flushEditorRef.current = fn; }}
-                      onSave={handleSave}
-                      matchPalette={matchToolbarPalette}
-                      paletteBg={PALETTE_OPTIONS.find(o => o.value === previewPalette)?.bg}
-                      paletteBgDark={PALETTE_OPTIONS.find(o => o.value === previewPalette)?.bgDark}
-                    />
+                    <React.Suspense fallback={<DocumentPanelFallback />}>
+                      <MarkdownEditor
+                        isActive={visibleEditor}
+                        isSplitView={viewMode === 'split'}
+                        scrollSyncMode={scrollSyncMode}
+                        onScrollSyncModeChange={setScrollSyncMode}
+                        onScrollRef={registerEditorScroll}
+                        onSearchApiRef={(api) => { editorSearchApiRef.current = api; }}
+                        wordWrap={wordWrap}
+                        onToggleWordWrap={() => setWordWrap(!wordWrap)}
+                        onFlushRef={(fn) => { flushEditorRef.current = fn; }}
+                        onSave={handleSave}
+                        matchPalette={matchToolbarPalette}
+                        paletteBg={PALETTE_OPTIONS.find(o => o.value === previewPalette)?.bg}
+                        paletteBgDark={PALETTE_OPTIONS.find(o => o.value === previewPalette)?.bgDark}
+                      />
+                    </React.Suspense>
                   </div>
                 )}
                 {viewMode === 'split' && (
@@ -1226,7 +1256,9 @@ const App: React.FC = () => {
                       ? { flex: 1 }
                       : { position: 'absolute', inset: 0, width: '100%', height: '100%', visibility: 'hidden', pointerEvents: 'none' }}
                   >
-                    <MarkdownViewer showToc={showToc} onToggleToc={() => setShowToc(false)} onOpenToc={() => setShowToc(true)} onScrollRef={registerViewerScroll} distractionFree={activeDistractionFree} />
+                    <React.Suspense fallback={<DocumentPanelFallback />}>
+                      <MarkdownViewer showToc={showToc} onToggleToc={() => setShowToc(false)} onOpenToc={() => setShowToc(true)} onScrollRef={registerViewerScroll} distractionFree={activeDistractionFree} />
+                    </React.Suspense>
                     {/* Welcome back toast — minimal, right-side, translucent */}
                     {welcomeBackFile && (
                       <div
@@ -1304,15 +1336,19 @@ const App: React.FC = () => {
       />
 
       {/* Settings modal */}
-      <SettingsModal
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        initialTab={settingsTab}
-        onSyntaxHighlightChange={(enabled) => {
-          flushEditorRef.current?.();
-          useStore.getState().setSyntaxHighlight(enabled);
-        }}
-      />
+      {(settingsOpen || settingsModuleMounted) && (
+        <React.Suspense fallback={null}>
+          <SettingsModal
+            open={settingsOpen}
+            onClose={() => setSettingsOpen(false)}
+            initialTab={settingsTab}
+            onSyntaxHighlightChange={(enabled) => {
+              flushEditorRef.current?.();
+              useStore.getState().setSyntaxHighlight(enabled);
+            }}
+          />
+        </React.Suspense>
+      )}
     </div>
   );
 };
