@@ -842,6 +842,21 @@ mark {
 .scroll-sync-tooltip-muted {
   color: #6b7280;
 }
+.scroll-sync-tooltip-card {
+  border: 1px solid #d1d5db;
+  background: rgba(100, 116, 139, 0.04);
+}
+.scroll-sync-tooltip-badge {
+  border: 1px solid #b8c2cf;
+  background: rgba(100, 116, 139, 0.09);
+}
+.scroll-sync-tooltip-card[data-active] {
+  border-color: #6b8db9;
+  background: rgba(59, 130, 246, 0.1);
+}
+.scroll-sync-tooltip-card[data-active] .scroll-sync-tooltip-badge {
+  border-color: #6b8db9;
+}
 .dark .scroll-sync-tooltip {
   color: #d1d5db;
   --popup-bg: #30353d;
@@ -849,11 +864,41 @@ mark {
 .dark .scroll-sync-tooltip-muted {
   color: #9ca3af;
 }
+.dark .scroll-sync-tooltip-card {
+  border-color: #4b5563;
+  background: rgba(255, 255, 255, 0.03);
+}
+.dark .scroll-sync-tooltip-badge {
+  border-color: #68717d;
+  background: rgba(255, 255, 255, 0.08);
+}
+.dark .scroll-sync-tooltip-card[data-active] {
+  border-color: #8296b2;
+  background: rgba(130, 150, 178, 0.13);
+}
+.dark .scroll-sync-tooltip-card[data-active] .scroll-sync-tooltip-badge {
+  border-color: #8296b2;
+}
 .scroll-sync-tooltip[data-palette] {
   color: var(--pal-text);
 }
 .scroll-sync-tooltip[data-palette] .scroll-sync-tooltip-muted {
   color: var(--pal-muted);
+}
+.scroll-sync-tooltip[data-palette] .scroll-sync-tooltip-card {
+  border-color: var(--pal-border);
+  background: color-mix(in srgb, var(--pal-muted) 4%, transparent);
+}
+.scroll-sync-tooltip[data-palette] .scroll-sync-tooltip-badge {
+  border-color: var(--pal-border);
+  background: color-mix(in srgb, var(--pal-muted) 10%, transparent);
+}
+.scroll-sync-tooltip[data-palette] .scroll-sync-tooltip-card[data-active] {
+  border-color: var(--pal-link);
+  background: color-mix(in srgb, var(--pal-link) 11%, transparent);
+}
+.scroll-sync-tooltip[data-palette] .scroll-sync-tooltip-card[data-active] .scroll-sync-tooltip-badge {
+  border-color: var(--pal-link);
 }
 .scroll-sync-tooltip[data-palette] .scroll-sync-tooltip-divider {
   border-color: var(--pal-border);

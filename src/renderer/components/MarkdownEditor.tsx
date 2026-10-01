@@ -1477,7 +1477,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
             id="scroll-sync-tooltip"
             ref={syncTooltipRef}
             role="tooltip"
-            className="editor-popup scroll-sync-tooltip pointer-events-none w-64 max-w-[calc(100vw-1rem)] rounded-md border border-gray-200 bg-white p-3 shadow-xl dark:border-gray-600 dark:bg-[#30353d]"
+            className="editor-popup scroll-sync-tooltip pointer-events-none w-[21rem] max-w-[calc(100vw-1rem)] rounded-md border border-gray-200 bg-white p-3 shadow-xl dark:border-gray-600 dark:bg-[#30353d]"
             data-palette={matchPalette ? '' : undefined}
             data-placement={syncTooltipPlacement}
             style={{ zIndex: 9999, ...syncTooltipStyle, ...(matchPalette ? { backgroundColor: 'var(--pal-panel-bg)', borderColor: 'var(--pal-border)', ['--popup-bg' as string]: 'var(--pal-panel-bg)', ['--popup-border' as string]: 'var(--pal-border)' } : {}) }}
@@ -1486,12 +1486,20 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
               <span className="text-[11px] font-semibold uppercase tracking-wide">Scroll sync</span>
               <span className="text-xs font-semibold">Current: {scrollSyncMode === 'heading' ? 'Content' : scrollSyncMode === 'position' ? 'Position' : 'Off'}</span>
             </div>
-            <div className="space-y-2 pt-2 text-xs">
-              <div className={scrollSyncMode === 'heading' ? 'font-semibold' : ''}><span className="inline-block w-7 font-bold">C</span> Content <span className="scroll-sync-tooltip-muted block pl-7 font-normal">Align matching headings and sections.</span></div>
-              <div className={scrollSyncMode === 'position' ? 'font-semibold' : ''}><span className="inline-block w-7 font-bold">P</span> Position <span className="scroll-sync-tooltip-muted block pl-7 font-normal">Match relative scroll progress.</span></div>
-              <div className={scrollSyncMode === 'off' ? 'font-semibold' : ''}><span className="inline-block w-7 font-bold">OFF</span> Off <span className="scroll-sync-tooltip-muted block pl-7 font-normal">Scroll each panel independently.</span></div>
+            <div className="grid grid-cols-3 gap-1.5 pt-2">
+              {([
+                { mode: 'heading', code: 'C', label: 'Content', detail: 'Aligns headings' },
+                { mode: 'position', code: 'P', label: 'Position', detail: 'Matches scroll progress' },
+                { mode: 'off', code: 'OFF', label: 'Off', detail: 'Scrolls independently' },
+              ] as const).map(option => (
+                <div key={option.mode} className="scroll-sync-tooltip-card min-w-0 rounded-md p-2" data-active={scrollSyncMode === option.mode ? '' : undefined}>
+                  <span className="scroll-sync-tooltip-badge inline-flex h-5 min-w-5 items-center justify-center rounded-[4px] px-1 text-[11px] font-bold leading-none">{option.code}</span>
+                  <strong className="mt-1 block text-[11px] leading-tight">{option.label}</strong>
+                  <span className="scroll-sync-tooltip-muted mt-1 block text-[11px] leading-snug">{option.detail}</span>
+                </div>
+              ))}
             </div>
-            <div className="scroll-sync-tooltip-muted mt-2 border-t border-gray-200 pt-2 text-[11px] dark:border-gray-600 scroll-sync-tooltip-divider">Click to cycle through modes</div>
+            <div className="scroll-sync-tooltip-muted mt-2 text-[11px]">Click to cycle through modes</div>
           </div>,
           document.body
         )}
