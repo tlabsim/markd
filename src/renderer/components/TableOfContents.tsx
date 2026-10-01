@@ -281,7 +281,7 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ content, onClose, pin
           </button>
         </div>
       </div>
-      <nav className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+      <nav className="min-h-0 flex-1 overflow-y-auto px-3 pb-3 pt-2">
         {tree.map((node, i) => (
           <TreeNode
             key={node.item.id || i}
