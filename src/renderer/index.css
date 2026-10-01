@@ -113,9 +113,10 @@ textarea,
 
   .scroll-sync-control {
     color: #64748b;
+    border: 1px solid #94a3b8;
   }
   .scroll-sync-control:hover {
-    background: rgba(100, 116, 139, 0.1);
+    background: rgba(100, 116, 139, 0.08);
   }
   .scroll-sync-control:focus-visible {
     outline: 2px solid #3b82f6;
@@ -123,22 +124,26 @@ textarea,
   }
   .dark .scroll-sync-control {
     color: #b6bec9;
+    border-color: #68717d;
   }
-  .scroll-sync-pill {
-    border: 1.5px solid currentColor;
-    background: rgba(255, 255, 255, 0.28);
+  .scroll-sync-mode {
+    border-left: 1px solid #94a3b8;
+    background: rgba(100, 116, 139, 0.1);
   }
-  .dark .scroll-sync-pill {
-    background: rgba(0, 0, 0, 0.13);
+  .dark .scroll-sync-mode {
+    border-left-color: #68717d;
+    background: rgba(255, 255, 255, 0.05);
   }
   html[data-match-palette] .scroll-sync-control {
     color: var(--pal-muted);
+    border-color: var(--pal-border);
   }
   html[data-match-palette] .scroll-sync-control:hover {
     background: color-mix(in srgb, var(--pal-muted) 12%, transparent);
   }
-  html[data-match-palette] .scroll-sync-pill {
-    background: var(--pal-editor-toolbar-bg);
+  html[data-match-palette] .scroll-sync-mode {
+    border-left-color: var(--pal-border);
+    background: color-mix(in srgb, var(--pal-muted) 10%, transparent);
   }
 
   .panel {
@@ -830,6 +835,28 @@ mark {
 }
 .editor-popup[data-palette] button {
   color: var(--pal-text);
+}
+.scroll-sync-tooltip {
+  color: #374151;
+}
+.scroll-sync-tooltip-muted {
+  color: #6b7280;
+}
+.dark .scroll-sync-tooltip {
+  color: #d1d5db;
+  --popup-bg: #30353d;
+}
+.dark .scroll-sync-tooltip-muted {
+  color: #9ca3af;
+}
+.scroll-sync-tooltip[data-palette] {
+  color: var(--pal-text);
+}
+.scroll-sync-tooltip[data-palette] .scroll-sync-tooltip-muted {
+  color: var(--pal-muted);
+}
+.scroll-sync-tooltip[data-palette] .scroll-sync-tooltip-divider {
+  border-color: var(--pal-border);
 }
 
 /* Recent file strikethrough animation */

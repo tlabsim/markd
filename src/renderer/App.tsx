@@ -104,6 +104,8 @@ function editorHeadingTops(editor: HTMLElement, content: string, starts: number[
 }
 
 function headingScrollAnchors(editor: HTMLElement, viewer: HTMLElement, content: string): Array<{ editor: number; viewer: number }> {
+  // Both textarea values and rendered contentEditable text use LF line endings.
+  const editorContent = content.replace(/\r\n?/g, '\n');
   const rendered = Array.from(viewer.querySelectorAll<HTMLElement>('.markdown-body h1[id], .markdown-body h2[id], .markdown-body h3[id], .markdown-body h4[id], .markdown-body h5[id], .markdown-body h6[id]'));
   const viewerTop = viewer.getBoundingClientRect().top;
   const matches: Array<{ start: number; line: number; viewer: HTMLElement }> = [];
@@ -111,7 +113,7 @@ function headingScrollAnchors(editor: HTMLElement, viewer: HTMLElement, content:
   let fence: string | null = null;
   let lineStart = 0;
 
-  content.split('\n').forEach((line, index) => {
+  editorContent.split('\n').forEach((line, index) => {
     const start = lineStart;
     lineStart += line.length + 1;
     const fenceMatch = line.match(/^\s*(`{3,}|~{3,})/);
@@ -130,7 +132,7 @@ function headingScrollAnchors(editor: HTMLElement, viewer: HTMLElement, content:
     renderedIndex = found + 1;
     matches.push({ start, line: index, viewer: rendered[found] });
   });
-  const tops = editorHeadingTops(editor, content, matches.map(match => match.start), matches.map(match => match.line));
+  const tops = editorHeadingTops(editor, editorContent, matches.map(match => match.start), matches.map(match => match.line));
   return matches.map((match, index) => ({
     editor: tops[index],
     viewer: match.viewer.getBoundingClientRect().top - viewerTop + viewer.scrollTop,
@@ -232,7 +234,6 @@ const App: React.FC = () => {
     matchToolbarPalette: state.matchToolbarPalette,
   })));
 
-  const editorRef = useRef<HTMLTextAreaElement>(null);
   const flushEditorRef = useRef<(() => void) | null>(null);
   const documentContentRef = useRef<HTMLDivElement>(null);
   const [documentRevealVersion, setDocumentRevealVersion] = useState(0);
@@ -351,6 +352,7 @@ const App: React.FC = () => {
   const loadFileIntoEditor = useCallback((name: string | null, filePath: string | null, content: string) => {
     const state = useStore.getState();
     const isNewDocument = state.currentFilePath !== filePath || state.currentFile !== name;
+    const shouldRestoreScroll = isNewDocument || documentScrollVersion.current === 0;
     // Save current scroll position before switching files.
     if (state.currentFilePath && state.rememberScrollPosition && viewerScrollRef.current) {
       state.setScrollPosition(state.currentFilePath, viewerScrollRef.current.scrollTop);
@@ -365,12 +367,14 @@ const App: React.FC = () => {
     setCurrentFile(name);
     setCurrentFilePath(filePath);
     setOriginalContent(content);
-    // Restore scroll position if available (any file re-open)
-    if (filePath && state.rememberScrollPosition) {
+    // A same-file reload keeps its current position instead of restoring an older saved one.
+    if (shouldRestoreScroll && filePath && state.rememberScrollPosition) {
       const saved = state.scrollPositions[filePath];
       if (saved && saved > 800) {
+        const restoreVersion = documentScrollVersion.current;
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
+            if (documentScrollVersion.current !== restoreVersion || useStore.getState().currentFilePath !== filePath) return;
             if (viewerScrollRef.current) {
               viewerScrollRef.current.scrollTop = saved;
               setTimeout(() => setWelcomeBackFile(name), 500);

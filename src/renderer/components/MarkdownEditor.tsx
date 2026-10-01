@@ -297,6 +297,11 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
   const morePanelRef = useRef<HTMLDivElement>(null);
   const [morePanelStyle, setMorePanelStyle] = useState<React.CSSProperties>({});
   const [morePanelPlacement, setMorePanelPlacement] = useState<'top' | 'bottom'>('bottom');
+  const [syncTooltipOpen, setSyncTooltipOpen] = useState(false);
+  const syncButtonRef = useRef<HTMLButtonElement>(null);
+  const syncTooltipRef = useRef<HTMLDivElement>(null);
+  const [syncTooltipStyle, setSyncTooltipStyle] = useState<React.CSSProperties>({});
+  const [syncTooltipPlacement, setSyncTooltipPlacement] = useState<'top' | 'bottom'>('bottom');
   const toolbarRef = useRef<HTMLDivElement>(null);
   const [toolbarMode, setToolbarMode] = useState<'compact' | 'medium'>('compact');
   const searchHighlightOptions = useMemo<SearchHighlightOptions | null>(() => {
@@ -413,6 +418,36 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
     window.addEventListener('resize', positionMorePanel);
     return () => window.removeEventListener('resize', positionMorePanel);
   }, [moreOpen, positionMorePanel]);
+
+  const positionSyncTooltip = useCallback(() => {
+    const button = syncButtonRef.current;
+    const panel = syncTooltipRef.current;
+    if (!button || !panel) return;
+
+    const margin = 8;
+    const gap = 8;
+    const buttonRect = button.getBoundingClientRect();
+    const panelRect = panel.getBoundingClientRect();
+    const centeredLeft = buttonRect.left + buttonRect.width / 2 - panelRect.width / 2;
+    const left = Math.min(Math.max(centeredLeft, margin), Math.max(margin, window.innerWidth - panelRect.width - margin));
+    const fitsBelow = buttonRect.bottom + gap + panelRect.height <= window.innerHeight - margin;
+    const top = fitsBelow ? buttonRect.bottom + gap : Math.max(margin, buttonRect.top - panelRect.height - gap);
+    const arrowLeft = Math.min(Math.max(buttonRect.left + buttonRect.width / 2 - left, 12), panelRect.width - 12);
+
+    setSyncTooltipPlacement(fitsBelow ? 'bottom' : 'top');
+    setSyncTooltipStyle({ position: 'fixed', left, top, ['--popup-arrow-left' as string]: `${arrowLeft}px` });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!syncTooltipOpen || !isSplitView) return;
+    positionSyncTooltip();
+    window.addEventListener('resize', positionSyncTooltip);
+    window.addEventListener('scroll', positionSyncTooltip, true);
+    return () => {
+      window.removeEventListener('resize', positionSyncTooltip);
+      window.removeEventListener('scroll', positionSyncTooltip, true);
+    };
+  }, [syncTooltipOpen, isSplitView, positionSyncTooltip]);
 
   // ResizeObserver: compact ↔ medium with hysteresis (~3 tool widths)
   useEffect(() => {
@@ -1410,25 +1445,56 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
         </button>
         <div className="flex-1" />
         {isSplitView && <button
+          ref={syncButtonRef}
           type="button"
-          className="scroll-sync-control flex shrink-0 items-center gap-1.5 h-8 px-1 rounded-md transition-colors"
+          className="scroll-sync-control flex h-8 shrink-0 items-stretch overflow-hidden rounded-lg transition-colors"
           aria-label={`Split scroll sync: ${scrollSyncMode === 'heading' ? 'Content' : scrollSyncMode === 'position' ? 'Position' : 'Off'}. Click to change mode.`}
-          title={`Split scroll sync: ${scrollSyncMode === 'heading' ? 'Content' : scrollSyncMode === 'position' ? 'Position' : 'Off'} (click to change)`}
+          aria-describedby={syncTooltipOpen ? 'scroll-sync-tooltip' : undefined}
+          onMouseEnter={() => setSyncTooltipOpen(true)}
+          onMouseLeave={() => setSyncTooltipOpen(false)}
+          onFocus={() => setSyncTooltipOpen(true)}
+          onBlur={() => setSyncTooltipOpen(false)}
           onClick={() => onScrollSyncModeChange(scrollSyncMode === 'heading' ? 'position' : scrollSyncMode === 'position' ? 'off' : 'heading')}
         >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="shrink-0" aria-hidden="true">
-            {[-5.4805783, 5.2304042].map(offset => (
-              <g key={offset} transform={`translate(${offset}, -7.5)`}>
-                <rect x="9" y="7.5" width="6.2794652" height="24" rx="3.1397326" fill="currentColor" opacity="0.36" />
-                <path d="m10.824 12.103 1.315-1.316 1.316 1.316M10.824 27.496l1.315 1.316 1.316-1.316" stroke="currentColor" strokeWidth="0.675" strokeLinecap="round" strokeLinejoin="round" />
-                <rect x="9" y="15.105632" width="6.2794652" height="8.7887373" rx="3.1397326" fill="currentColor" opacity="0.8" />
-              </g>
-            ))}
-          </svg>
-          <span className="scroll-sync-pill flex h-6 min-w-9 items-center justify-center rounded-full px-1.5 text-xs font-bold leading-none" aria-hidden="true">
+          <span className="scroll-sync-icon flex items-center justify-center px-1.5" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+              {[0, 10.922749].map(offset => (
+                <g key={offset} transform={`translate(${offset})`}>
+                  <rect x="3.5194218" y="0" width="6.2794652" height="24" ry="3.627907" opacity="0.28" />
+                  <path d="M 6.6591538,3.2185456 4.9031717,4.9745277 Q 4.7793572,5.0983422 4.587996,5.0983422 q -0.1913572,0 -0.3151757,-0.1238145 Q 4.1490058,4.8507132 4.1490058,4.659352 q 0,-0.1913572 0.1238145,-0.3151757 L 6.3439781,2.2730172 q 0.1350747,-0.1350757 0.3151757,-0.1350757 0.180101,0 0.315177,0.1350757 l 2.0711578,2.0711591 q 0.1238145,0.1238145 0.1238145,0.3151757 0,0.1913572 -0.1238145,0.3151757 -0.1238145,0.1238145 -0.3151757,0.1238145 -0.1913572,0 -0.315177,-0.1238145 z" />
+                  <path d="m 6.6591544,20.781454 1.755983,-1.755982 q 0.123814,-0.123814 0.315175,-0.123814 0.191357,0 0.315176,0.123814 0.123814,0.123815 0.123814,0.315176 0,0.191357 -0.123814,0.315176 l -2.071158,2.071159 q -0.135075,0.135075 -0.315176,0.135075 -0.180101,0 -0.315177,-0.135075 l -2.071157,-2.071159 q -0.123814,-0.123815 -0.123814,-0.315176 0,-0.191357 0.123814,-0.315176 0.123815,-0.123814 0.315175,-0.123814 0.191358,0 0.315177,0.123814 z" />
+                  <rect x="3.5194218" y="7.6056314" width="6.2794652" height="8.7887373" ry="3.1397326" opacity="0.62" />
+                </g>
+              ))}
+            </svg>
+          </span>
+          <span className="scroll-sync-mode flex min-w-10 items-center justify-center px-2 text-[13px] font-bold leading-none" aria-hidden="true">
             {scrollSyncMode === 'heading' ? 'C' : scrollSyncMode === 'position' ? 'P' : 'OFF'}
           </span>
         </button>}
+        {isSplitView && syncTooltipOpen && createPortal(
+          <div
+            id="scroll-sync-tooltip"
+            ref={syncTooltipRef}
+            role="tooltip"
+            className="editor-popup scroll-sync-tooltip pointer-events-none w-64 max-w-[calc(100vw-1rem)] rounded-md border border-gray-200 bg-white p-3 shadow-xl dark:border-gray-600 dark:bg-[#30353d]"
+            data-palette={matchPalette ? '' : undefined}
+            data-placement={syncTooltipPlacement}
+            style={{ zIndex: 9999, ...syncTooltipStyle, ...(matchPalette ? { backgroundColor: 'var(--pal-panel-bg)', borderColor: 'var(--pal-border)', ['--popup-bg' as string]: 'var(--pal-panel-bg)', ['--popup-border' as string]: 'var(--pal-border)' } : {}) }}
+          >
+            <div className="flex items-center justify-between gap-2 border-b border-gray-200 pb-2 dark:border-gray-600 scroll-sync-tooltip-divider">
+              <span className="text-[11px] font-semibold uppercase tracking-wide">Scroll sync</span>
+              <span className="text-xs font-semibold">Current: {scrollSyncMode === 'heading' ? 'Content' : scrollSyncMode === 'position' ? 'Position' : 'Off'}</span>
+            </div>
+            <div className="space-y-2 pt-2 text-xs">
+              <div className={scrollSyncMode === 'heading' ? 'font-semibold' : ''}><span className="inline-block w-7 font-bold">C</span> Content <span className="scroll-sync-tooltip-muted block pl-7 font-normal">Align matching headings and sections.</span></div>
+              <div className={scrollSyncMode === 'position' ? 'font-semibold' : ''}><span className="inline-block w-7 font-bold">P</span> Position <span className="scroll-sync-tooltip-muted block pl-7 font-normal">Match relative scroll progress.</span></div>
+              <div className={scrollSyncMode === 'off' ? 'font-semibold' : ''}><span className="inline-block w-7 font-bold">OFF</span> Off <span className="scroll-sync-tooltip-muted block pl-7 font-normal">Scroll each panel independently.</span></div>
+            </div>
+            <div className="scroll-sync-tooltip-muted mt-2 border-t border-gray-200 pt-2 text-[11px] dark:border-gray-600 scroll-sync-tooltip-divider">Click to cycle through modes</div>
+          </div>,
+          document.body
+        )}
       </div>
 
 
