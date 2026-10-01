@@ -19,7 +19,7 @@
 
 ## Features
 
-- **Live Preview** — side-by-side editor and rendered HTML preview with synchronized scrolling
+- **Live Preview** — side-by-side editor and rendered HTML preview with independent scroll positions
 - **Syntax Highlighting** — toggleable syntax highlighting in the editor and viewer
 - **Smart Editing** — automatic list continuation, task list toggling, bracket wrapping, and tab/shift-tab indentation
 - **Search & Replace** — regex and case-sensitive search with replace and replace-all

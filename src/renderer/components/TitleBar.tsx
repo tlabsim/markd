@@ -43,6 +43,7 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
   const title = currentFile
     ? `${isModified ? '● ' : ''}${currentFile} — Markd`
     : 'Markd';
+  const hasDocumentActions = Boolean(currentFile && (!distractionFree || onEditDocument || onReloadFile || onCloseFile));
 
   // Close menu on click outside
   useEffect(() => {
@@ -136,17 +137,21 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
             {menuItem('New File', 'Ctrl+N', onNewFile)}
             {menuItem('Open File...', 'Ctrl+O', onOpenFile)}
             {menuItem('Open Folder...', 'Ctrl+Shift+O', onOpenFolder)}
-            <div className="border-t border-gray-200 dark:border-gray-600 my-1" />
-            {distractionFree ? (
-              currentFile && onEditDocument && menuItem('Edit Document', null, onEditDocument)
-            ) : (
+            {hasDocumentActions && (
               <>
-                {menuItem('Save', 'Ctrl+S', onSaveFile)}
-                {menuItem('Save As...', 'Ctrl+Shift+S', onSaveFileAs)}
+                <div className="border-t border-gray-200 dark:border-gray-600 my-1" />
+                {distractionFree ? (
+                  onEditDocument && menuItem('Edit Document', null, onEditDocument)
+                ) : (
+                  <>
+                    {menuItem('Save', 'Ctrl+S', onSaveFile)}
+                    {menuItem('Save As...', 'Ctrl+Shift+S', onSaveFileAs)}
+                  </>
+                )}
+                {onReloadFile && menuItem('Reload from Disk', null, onReloadFile)}
+                {onCloseFile && menuItem('Close File', 'Ctrl+W', onCloseFile)}
               </>
             )}
-            {currentFile && onReloadFile && menuItem('Reload from Disk', null, onReloadFile)}
-            {currentFile && onCloseFile && menuItem('Close File', 'Ctrl+W', onCloseFile)}
             <div className="border-t border-gray-200 dark:border-gray-600 my-1" />
             {/* Recent Files — CSS-driven submenu */}
             <div className="relative group">

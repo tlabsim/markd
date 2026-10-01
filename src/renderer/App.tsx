@@ -24,6 +24,153 @@ const PALETTE_KEYS = [
   '--pal-cb-lang-bg', '--pal-cb-lang-text', '--pal-cb-btn-bg', '--pal-cb-btn-hover', '--pal-cb-btn-text',
 ];
 
+type ScrollSyncMode = 'heading' | 'position' | 'off';
+
+function scrollRange(element: HTMLElement): number {
+  return Math.max(0, element.scrollHeight - element.clientHeight);
+}
+
+const textareaHeadingCache = new WeakMap<HTMLElement, { content: string; signature: string; tops: number[] }>();
+const richEditorHeadingCache = new WeakMap<HTMLElement, { content: string; signature: string; starts: string; tops: number[] }>();
+
+function editorHeadingTops(editor: HTMLElement, content: string, starts: number[], lines: number[]): number[] {
+  const style = getComputedStyle(editor);
+  const lineHeight = parseFloat(style.lineHeight) || 24;
+  const paddingTop = parseFloat(style.paddingTop) || 0;
+  const fallback = lines.map(line => line * lineHeight + paddingTop);
+  if (style.whiteSpace === 'pre') return fallback;
+
+  if (editor instanceof HTMLTextAreaElement) {
+    const signature = [editor.clientWidth, style.fontFamily, style.fontSize, style.fontWeight, style.lineHeight,
+      style.letterSpacing, style.padding, style.whiteSpace, style.overflowWrap, style.wordBreak, style.tabSize].join('|');
+    const cached = textareaHeadingCache.get(editor);
+    if (cached?.content === content && cached.signature === signature) return cached.tops;
+
+    const mirror = document.createElement('textarea');
+    mirror.rows = 1;
+    mirror.wrap = editor.wrap;
+    mirror.tabIndex = -1;
+    mirror.setAttribute('aria-hidden', 'true');
+    Object.assign(mirror.style, {
+      position: 'fixed', left: '-100000px', top: '0', visibility: 'hidden', pointerEvents: 'none',
+      boxSizing: 'border-box', width: `${editor.clientWidth}px`, height: '0', minHeight: '0',
+      border: '0', overflow: 'hidden', resize: 'none', padding: style.padding,
+      fontFamily: style.fontFamily, fontSize: style.fontSize, fontWeight: style.fontWeight,
+      fontStyle: style.fontStyle, lineHeight: style.lineHeight, letterSpacing: style.letterSpacing,
+      whiteSpace: style.whiteSpace, overflowWrap: style.overflowWrap, wordBreak: style.wordBreak,
+      tabSize: style.tabSize, direction: style.direction,
+    });
+    document.body.appendChild(mirror);
+    const paddingBottom = parseFloat(style.paddingBottom) || 0;
+    const tops = starts.map((start, index) => {
+      mirror.value = content.slice(0, start);
+      const measured = mirror.scrollHeight - paddingBottom - lineHeight;
+      return Number.isFinite(measured) && measured >= 0 ? measured : fallback[index];
+    });
+    mirror.remove();
+    textareaHeadingCache.set(editor, { content, signature, tops });
+    return tops;
+  }
+
+  const signature = [editor.clientWidth, editor.scrollHeight, style.fontFamily, style.fontSize, style.fontWeight,
+    style.lineHeight, style.letterSpacing, style.padding, style.whiteSpace].join('|');
+  const renderedContent = editor.textContent || '';
+  const startsKey = starts.join(',');
+  const cached = richEditorHeadingCache.get(editor);
+  if (cached?.content === renderedContent && cached.signature === signature && cached.starts === startsKey) return cached.tops;
+
+  const tops = [...fallback];
+  const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
+  const range = document.createRange();
+  const editorTop = editor.getBoundingClientRect().top;
+  let node = walker.nextNode();
+  let offset = 0;
+  let heading = 0;
+  while (node && heading < starts.length) {
+    const length = node.textContent?.length || 0;
+    while (length && heading < starts.length && starts[heading] >= offset && starts[heading] < offset + length) {
+      const local = starts[heading] - offset;
+      range.setStart(node, local);
+      range.setEnd(node, Math.min(length, local + 1));
+      const rect = range.getBoundingClientRect();
+      if (rect.height) tops[heading] = rect.top - editorTop + editor.scrollTop;
+      heading++;
+    }
+    offset += length;
+    node = walker.nextNode();
+  }
+  richEditorHeadingCache.set(editor, { content: renderedContent, signature, starts: startsKey, tops });
+  return tops;
+}
+
+function headingScrollAnchors(editor: HTMLElement, viewer: HTMLElement, content: string): Array<{ editor: number; viewer: number }> {
+  const rendered = Array.from(viewer.querySelectorAll<HTMLElement>('.markdown-body h1[id], .markdown-body h2[id], .markdown-body h3[id], .markdown-body h4[id], .markdown-body h5[id], .markdown-body h6[id]'));
+  const viewerTop = viewer.getBoundingClientRect().top;
+  const matches: Array<{ start: number; line: number; viewer: HTMLElement }> = [];
+  let renderedIndex = 0;
+  let fence: string | null = null;
+  let lineStart = 0;
+
+  content.split('\n').forEach((line, index) => {
+    const start = lineStart;
+    lineStart += line.length + 1;
+    const fenceMatch = line.match(/^\s*(`{3,}|~{3,})/);
+    if (fenceMatch) {
+      if (!fence) fence = fenceMatch[1][0];
+      else if (fence === fenceMatch[1][0]) fence = null;
+      return;
+    }
+    if (fence) return;
+    const match = line.match(/^\s{0,3}#{1,6}\s+(.+?)(?:\s+#+)?\s*$/);
+    if (!match) return;
+    const text = match[1].replace(/!?(?:\[([^\]]+)\])\([^)]*\)/g, '$1').replace(/[`*_~]/g, '');
+    const id = text.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').trim();
+    const found = rendered.findIndex((heading, position) => position >= renderedIndex && heading.id === id);
+    if (found < 0) return;
+    renderedIndex = found + 1;
+    matches.push({ start, line: index, viewer: rendered[found] });
+  });
+  const tops = editorHeadingTops(editor, content, matches.map(match => match.start), matches.map(match => match.line));
+  return matches.map((match, index) => ({
+    editor: tops[index],
+    viewer: match.viewer.getBoundingClientRect().top - viewerTop + viewer.scrollTop,
+  }));
+}
+
+function mappedScrollTop(source: HTMLElement, target: HTMLElement, anchors: Array<{ editor: number; viewer: number }>, from: 'editor' | 'viewer'): number {
+  const sourceMax = scrollRange(source);
+  const targetMax = scrollRange(target);
+  if (!sourceMax || !targetMax) return 0;
+  const top = Math.min(sourceMax, Math.max(0, source.scrollTop));
+  if (!anchors.length) return top / sourceMax * targetMax;
+  if (top === 0) return 0;
+  if (top >= sourceMax) return targetMax;
+
+  const to = from === 'editor' ? 'viewer' : 'editor';
+  const points = [{ source: 0, target: 0 }, ...anchors.map(anchor => ({ source: anchor[from], target: anchor[to] }))
+    .filter(point => point.source > 0 && point.source < sourceMax && point.target > 0 && point.target < targetMax),
+  { source: sourceMax, target: targetMax }]
+    .sort((a, b) => a.source - b.source);
+  for (let index = 1; index < points.length; index++) {
+    const end = points[index];
+    if (top > end.source) continue;
+    const start = points[index - 1];
+    const span = end.source - start.source;
+    let mapped = start.target + (span ? (top - start.source) / span * (end.target - start.target) : 0);
+    const approaching = anchors.find(anchor => anchor[from] >= top && anchor[from] - top < 96 && anchor[to] < targetMax);
+    if (approaching) {
+      const distance = approaching[from] - top;
+      const visibleTop = approaching[to] - distance;
+      if (mapped > visibleTop) mapped -= (mapped - visibleTop) * (1 - distance / 96);
+    }
+    mapped = Math.min(targetMax, Math.max(0, mapped));
+    // Leave a small safety margin when Preview drives the editor.
+    if (from === 'viewer') mapped -= Math.min(32, mapped, targetMax - mapped);
+    return mapped;
+  }
+  return targetMax;
+}
+
 const App: React.FC = () => {
   const {
     currentFile,
@@ -93,6 +240,7 @@ const App: React.FC = () => {
   const [showPaletteMenu, setShowPaletteMenu] = useState(false);
   const [showToc, setShowToc] = useState(false);
   const [splitRatio, setSplitRatio] = useState(50); // percentage
+  const [scrollSyncMode, setScrollSyncMode] = useState<ScrollSyncMode>('heading');
   const [distractionFree, setDistractionFree] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDropPath, setPendingDropPath] = useState<string | null>(null);
@@ -105,17 +253,59 @@ const App: React.FC = () => {
   const [searchShowReplace, setSearchShowReplace] = useState(false);
   const pendingOpenAction = useRef<(() => void) | null>(null);
   const pendingFilePath = useRef<string | null>(null);
-  const [syncScroll, setSyncScroll] = useState<'off' | 'position' | 'content'>('off');
   const fontMenuRef = useRef<HTMLDivElement>(null);
   const paletteMenuRef = useRef<HTMLDivElement>(null);
   const tocButtonRef = useRef<HTMLButtonElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
-  const isSyncing = useRef(false); // prevent scroll feedback loop
+  const paneScrollPositions = useRef<{ view?: number; edit?: number; splitEditor?: number; splitViewer?: number }>({});
+  const lastPaneScrollIntent = useRef({ editor: -Infinity, viewer: -Infinity });
+  const documentScrollVersion = useRef(0);
+  const [mountedPanes, setMountedPanes] = useState({ version: 0, editor: false, viewer: false });
+  const changeViewModeRef = useRef<(mode: 'view' | 'edit' | 'split') => void>(() => {});
   const editorScrollRef = useRef<HTMLElement | null>(null);
   const editorSearchApiRef = useRef<MarkdownEditorSearchApi | null>(null);
   const viewerScrollRef = useRef<HTMLElement | null>(null);
   const dragRatio = useRef(50); // ref for instant drag updates
+
+  const rememberPanePositions = useCallback(() => {
+    const mode = useStore.getState().viewMode;
+    if (mode !== 'view' && editorScrollRef.current) {
+      const key = mode === 'split' ? 'splitEditor' : 'edit';
+      paneScrollPositions.current[key] ??= editorScrollRef.current.scrollTop;
+    }
+    if (mode !== 'edit' && viewerScrollRef.current) {
+      const key = mode === 'split' ? 'splitViewer' : 'view';
+      paneScrollPositions.current[key] ??= viewerScrollRef.current.scrollTop;
+    }
+  }, []);
+
+  const notePaneScrollIntent = useCallback((pane: 'editor' | 'viewer') => {
+    lastPaneScrollIntent.current[pane] = performance.now();
+  }, []);
+
+  const syncSplitScroll = useCallback((pane: 'editor' | 'viewer') => {
+    if (scrollSyncMode === 'off' || useStore.getState().viewMode !== 'split') return;
+    const editor = editorScrollRef.current;
+    const viewer = viewerScrollRef.current;
+    if (!editor || !viewer) return;
+    const source = pane === 'editor' ? editor : viewer;
+    const target = pane === 'editor' ? viewer : editor;
+    lastPaneScrollIntent.current[pane === 'editor' ? 'viewer' : 'editor'] = -Infinity;
+    const anchors = scrollSyncMode === 'heading' ? headingScrollAnchors(editor, viewer, useStore.getState().fileContent) : [];
+    target.scrollTop = mappedScrollTop(source, target, anchors, pane);
+    paneScrollPositions.current[pane === 'editor' ? 'splitViewer' : 'splitEditor'] = target.scrollTop;
+  }, [scrollSyncMode]);
+
+  const capturePaneScroll = useCallback((pane: 'editor' | 'viewer', event: React.UIEvent<HTMLDivElement>) => {
+    const element = pane === 'editor' ? editorScrollRef.current : viewerScrollRef.current;
+    const mode = useStore.getState().viewMode;
+    if (!element || event.target !== element || (pane === 'editor' ? mode === 'view' : mode === 'edit')) return;
+    if (performance.now() - lastPaneScrollIntent.current[pane] > 1500) return;
+    const key = pane === 'editor' ? (mode === 'split' ? 'splitEditor' : 'edit') : (mode === 'split' ? 'splitViewer' : 'view');
+    paneScrollPositions.current[key] = element.scrollTop;
+    if (mode === 'split') syncSplitScroll(pane);
+  }, [syncSplitScroll]);
 
   useLayoutEffect(() => {
     if (!documentRevealVersion || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -161,9 +351,16 @@ const App: React.FC = () => {
   const loadFileIntoEditor = useCallback((name: string | null, filePath: string | null, content: string) => {
     const state = useStore.getState();
     const isNewDocument = state.currentFilePath !== filePath || state.currentFile !== name;
-    // Save current scroll position before switching files
+    // Save current scroll position before switching files.
     if (state.currentFilePath && state.rememberScrollPosition && viewerScrollRef.current) {
       state.setScrollPosition(state.currentFilePath, viewerScrollRef.current.scrollTop);
+    }
+    if (isNewDocument || filePath === null || documentScrollVersion.current === 0) {
+      paneScrollPositions.current = {};
+      lastPaneScrollIntent.current = { editor: -Infinity, viewer: -Infinity };
+      documentScrollVersion.current++;
+      if (editorScrollRef.current) editorScrollRef.current.scrollTop = 0;
+      if (viewerScrollRef.current) viewerScrollRef.current.scrollTop = 0;
     }
     setCurrentFile(name);
     setCurrentFilePath(filePath);
@@ -279,6 +476,9 @@ const App: React.FC = () => {
 
   const handleCloseFile = useCallback(() => {
     openWithDirtyCheck(() => {
+      paneScrollPositions.current = {};
+      lastPaneScrollIntent.current = { editor: -Infinity, viewer: -Infinity };
+      documentScrollVersion.current++;
       // Save scroll position before clearing
       const state = useStore.getState();
       if (state.currentFilePath && state.rememberScrollPosition && viewerScrollRef.current) {
@@ -293,7 +493,7 @@ const App: React.FC = () => {
 
   const handleEditDocument = useCallback(() => {
     setDistractionFree(false);
-    setViewMode('split');
+    changeViewModeRef.current('split');
   }, []);
 
   const handleToggleDF = useCallback(() => {
@@ -301,7 +501,7 @@ const App: React.FC = () => {
     setDistractionFree(v => {
       if (!v && viewMode === 'split') {
         // Enabling DF from split → switch to preview first
-        setViewMode('view');
+        changeViewModeRef.current('view');
       }
       return !v;
     });
@@ -331,102 +531,49 @@ const App: React.FC = () => {
     });
   }, [openWithDirtyCheck, loadFileIntoEditor, currentFilePath, reloadFileFromDisk]);
 
-  // Shared slugify — must match the one in MarkdownViewer
-  const syncSlugify = (text: string) =>
-    text.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').trim();
+  const changeViewMode = useCallback((mode: 'view' | 'edit' | 'split') => {
+    if (mode === viewMode) return;
+    if (viewMode !== 'split' && viewMode !== 'view') flushEditorRef.current?.();
+    rememberPanePositions();
+    lastPaneScrollIntent.current = { editor: -Infinity, viewer: -Infinity };
+    setViewMode(mode);
+  }, [viewMode, setViewMode, rememberPanePositions]);
+  changeViewModeRef.current = changeViewMode;
 
-  // Sync scroll handlers
-  const handleEditorScroll = useCallback(() => {
-    if (syncScroll === 'off' || isSyncing.current || !editorScrollRef.current || !viewerScrollRef.current) return;
-    isSyncing.current = true;
-    const editor = editorScrollRef.current;
-    const viewer = viewerScrollRef.current;
+  const activeDocumentVersion = documentScrollVersion.current;
 
-    if (syncScroll === 'position') {
-      const pct = editor.scrollTop / (editor.scrollHeight - editor.clientHeight);
-      viewer.scrollTop = pct * (viewer.scrollHeight - viewer.clientHeight);
-    } else if (syncScroll === 'content') {
-      // Use actual line height from computed style
-      const cs = getComputedStyle(editor);
-      const lineHeight = parseInt(cs.lineHeight) || 24;
-      const padTop = parseInt(cs.paddingTop) || 0;
-      const effectiveScroll = Math.max(0, editor.scrollTop - padTop);
-      const topLine = Math.floor(effectiveScroll / lineHeight);
-      const content = useStore.getState().fileContent;
-      const lines = content.split('\n');
+  useLayoutEffect(() => {
+    if (!currentFile) return;
+    setMountedPanes(previous => {
+      const sameDocument = previous.version === activeDocumentVersion;
+      const editor = (sameDocument && previous.editor) || viewMode !== 'view';
+      const viewer = (sameDocument && previous.viewer) || viewMode !== 'edit';
+      return sameDocument && previous.editor === editor && previous.viewer === viewer
+        ? previous
+        : { version: activeDocumentVersion, editor, viewer };
+    });
+  }, [activeDocumentVersion, currentFile, viewMode]);
 
-      // Find the nearest heading above or at topLine
-      let headingId: string | null = null;
-      for (let i = Math.min(topLine, lines.length - 1); i >= 0; i--) {
-        const match = lines[i].match(/^(#{1,6})\s+(.+)/);
-        if (match) {
-          headingId = syncSlugify(match[2]);
-          break;
-        }
-      }
-
-      if (headingId) {
-        const el = viewer.querySelector(`[id="${headingId}"]`);
-        if (el) {
-          el.scrollIntoView({ block: 'start', behavior: 'auto' });
-        } else {
-          // Fallback: position-based if heading not found in preview
-          const pct = editor.scrollTop / (editor.scrollHeight - editor.clientHeight);
-          viewer.scrollTop = pct * (viewer.scrollHeight - viewer.clientHeight);
-        }
-      }
+  useLayoutEffect(() => {
+    if (!currentFile) return;
+    const positions = paneScrollPositions.current;
+    if (viewMode === 'view' && viewerScrollRef.current && positions.view !== undefined) {
+      viewerScrollRef.current.scrollTop = positions.view;
+    } else if (viewMode === 'edit' && editorScrollRef.current && positions.edit !== undefined) {
+      editorScrollRef.current.scrollTop = positions.edit;
+    } else if (viewMode === 'split') {
+      if (editorScrollRef.current && positions.splitEditor !== undefined) editorScrollRef.current.scrollTop = positions.splitEditor;
+      if (viewerScrollRef.current && positions.splitViewer !== undefined) viewerScrollRef.current.scrollTop = positions.splitViewer;
     }
+  }, [activeDocumentVersion, viewMode]);
 
-    requestAnimationFrame(() => { isSyncing.current = false; });
-  }, [syncScroll]);
+  const registerScrollPane = useCallback((pane: 'editor' | 'viewer', el: HTMLElement | null) => {
+    if (pane === 'editor') editorScrollRef.current = el;
+    else viewerScrollRef.current = el;
+  }, []);
 
-  const handleViewerScroll = useCallback(() => {
-    if (syncScroll === 'off' || isSyncing.current || !editorScrollRef.current || !viewerScrollRef.current) return;
-    isSyncing.current = true;
-    const editor = editorScrollRef.current;
-    const viewer = viewerScrollRef.current;
-
-    if (syncScroll === 'position') {
-      const pct = viewer.scrollTop / (viewer.scrollHeight - viewer.clientHeight);
-      editor.scrollTop = pct * (editor.scrollHeight - editor.clientHeight);
-    } else if (syncScroll === 'content') {
-      // Find the nearest heading above the viewport
-      const headings = viewer.querySelectorAll<HTMLElement>('h1[id],h2[id],h3[id],h4[id],h5[id],h6[id]');
-      let matchedId: string | null = null;
-      const viewTop = viewer.scrollTop + 40;
-      for (const h of headings) {
-        if (h.offsetTop <= viewTop) {
-          matchedId = h.id;
-        } else {
-          break;
-        }
-      }
-
-      if (matchedId) {
-        const content = useStore.getState().fileContent;
-        const contentLines = content.split('\n');
-        let found = false;
-        for (let i = 0; i < contentLines.length; i++) {
-          const match = contentLines[i].match(/^(#{1,6})\s+(.+)/);
-          if (match && syncSlugify(match[2]) === matchedId) {
-            const cs = getComputedStyle(editor);
-            const lineHeight = parseInt(cs.lineHeight) || 24;
-            const padTop = parseInt(cs.paddingTop) || 0;
-            editor.scrollTop = Math.max(0, i * lineHeight - padTop);
-            found = true;
-            break;
-          }
-        }
-        if (!found) {
-          // Fallback to position-based
-          const pct = viewer.scrollTop / (viewer.scrollHeight - viewer.clientHeight);
-          editor.scrollTop = pct * (editor.scrollHeight - editor.clientHeight);
-        }
-      }
-    }
-
-    requestAnimationFrame(() => { isSyncing.current = false; });
-  }, [syncScroll]);
+  const registerEditorScroll = useCallback((el: HTMLElement | null) => registerScrollPane('editor', el), [registerScrollPane]);
+  const registerViewerScroll = useCallback((el: HTMLElement | null) => registerScrollPane('viewer', el), [registerScrollPane]);
 
   // Use refs so effects always get the latest handler without stale closures
   const handlersRef = useRef({ handleOpen, handleOpenFolder, handleSave, handleSaveAs, handleNewFile, handleCloseFile });
@@ -800,6 +947,11 @@ const App: React.FC = () => {
   }, []);
 
   const activeDistractionFree = distractionFree && Boolean(currentFile);
+  const visibleEditor = viewMode !== 'view';
+  const visibleViewer = viewMode !== 'edit';
+  const sameDocumentMounted = mountedPanes.version === activeDocumentVersion;
+  const renderEditor = visibleEditor || (sameDocumentMounted && mountedPanes.editor);
+  const renderViewer = visibleViewer || (sameDocumentMounted && mountedPanes.viewer);
 
   return (
     <div
@@ -899,7 +1051,7 @@ const App: React.FC = () => {
               <div className="flex rounded-md border border-slate-300 dark:border-gray-600 overflow-hidden mr-1 shrink-0">
                 <button
                   className={`px-2.5 py-1 text-xs font-medium transition-colors border-r border-slate-300 dark:border-gray-600 ${viewMode === 'view' ? 'bg-slate-600/10 dark:bg-white/10 text-slate-800 dark:text-gray-100' : 'text-slate-600 dark:text-gray-400 hover:bg-slate-500/10 dark:hover:bg-slate-100/10'}`}
-                  onClick={() => setViewMode('view')}
+                  onClick={() => changeViewMode('view')}
                   title="Preview mode"
                 >
                   {/* <svg className="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
@@ -912,14 +1064,14 @@ const App: React.FC = () => {
                 </button>
                 <button
                   className={`px-2.5 py-1 text-xs font-medium transition-colors border-r border-slate-300 dark:border-gray-600 ${viewMode === 'edit' ? 'bg-slate-600/10 dark:bg-white/10 text-slate-800 dark:text-gray-100' : 'text-slate-600 dark:text-gray-400 hover:bg-slate-500/10 dark:hover:bg-slate-100/10'}`}
-                  onClick={() => setViewMode('edit')}
+                  onClick={() => changeViewMode('edit')}
                   title="Edit mode"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-[18px] h-[18px] shrink-0" viewBox="0 0 24 24"><path fill="currentColor" d="M16.443 7.328a.75.75 0 0 1 1.059-.056l1.737 1.564c.737.663 1.347 1.212 1.767 1.71c.44.525.754 1.088.754 1.784c0 .695-.313 1.258-.754 1.782c-.42.499-1.03 1.049-1.767 1.711l-1.737 1.564a.75.75 0 1 1-1.004-1.115l1.697-1.527c.788-.709 1.319-1.19 1.663-1.598c.33-.393.402-.622.402-.817c0-.196-.072-.425-.402-.818c-.344-.409-.875-.889-1.663-1.598l-1.697-1.527a.75.75 0 0 1-.056-1.06m-8.94 1.06a.75.75 0 0 0-1.004-1.115L4.761 8.836c-.737.663-1.347 1.212-1.767 1.71c-.44.525-.754 1.088-.754 1.784c0 .695.313 1.258.754 1.782c.42.499 1.03 1.049 1.767 1.711l1.737 1.564a.75.75 0 1 0 1.004-1.115l-1.697-1.527c-.788-.709-1.319-1.19-1.663-1.598c-.33-.393-.402-.622-.402-.817c0-.196.072-.425.402-.818c.344-.409.875-.889 1.663-1.598z"/><path fill="currentColor" d="M14.182 4.276a.75.75 0 0 1 .53.918l-3.974 14.83a.75.75 0 1 1-1.449-.389l3.974-14.83a.75.75 0 0 1 .919-.53" opacity=".5"/></svg>
                 </button>
                 <button
                   className={`px-2.5 py-1 text-xs font-medium transition-colors ${viewMode === 'split' ? 'bg-slate-600/10 dark:bg-white/10 text-slate-800 dark:text-gray-100' : 'text-slate-600 dark:text-gray-400 hover:bg-slate-500/10 dark:hover:bg-slate-100/10'}`}
-                  onClick={() => setViewMode('split')}
+                  onClick={() => changeViewMode('split')}
                   title="Split mode"
                 >
                   <svg className="w-[18px] h-[18px] shrink-0" fill="currentColor" viewBox="0 0 18 18">
@@ -999,7 +1151,7 @@ const App: React.FC = () => {
                 />
               </div>
             )}
-            <div key="document-content" ref={documentContentRef} className="flex-1 overflow-hidden flex">
+            <div key="document-content" ref={documentContentRef} className="relative flex-1 min-w-0 overflow-hidden flex">
             {!currentFile ? (
               <WelcomeScreen
                 onOpen={handleOpen}
@@ -1009,18 +1161,27 @@ const App: React.FC = () => {
               />
             ) : (
               <>
-                {(viewMode === 'edit' || viewMode === 'split') && (
+                {renderEditor && (
                   <div
                     data-panel="editor"
                     className="flex flex-col min-w-0 relative z-10"
-                    style={viewMode === 'split' ? { width: `${splitRatio}%` } : { flex: 1 }}
+                    onWheelCapture={() => notePaneScrollIntent('editor')}
+                    onPointerDownCapture={() => notePaneScrollIntent('editor')}
+                    onPointerMoveCapture={(event) => { if (event.buttons) notePaneScrollIntent('editor'); }}
+                    onTouchStartCapture={() => notePaneScrollIntent('editor')}
+                    onKeyDownCapture={() => notePaneScrollIntent('editor')}
+                    onScrollCapture={(event) => capturePaneScroll('editor', event)}
+                    style={visibleEditor
+                      ? (viewMode === 'split' ? { width: `${splitRatio}%` } : { flex: 1 })
+                      : { position: 'absolute', inset: 0, width: '100%', height: '100%', visibility: 'hidden', pointerEvents: 'none' }}
                   >
                     <MarkdownEditor
-                      syncScroll={viewMode === 'edit' ? undefined : syncScroll}
-                      onScrollRef={(el) => { editorScrollRef.current = el; }}
+                      isActive={visibleEditor}
+                      isSplitView={viewMode === 'split'}
+                      scrollSyncMode={scrollSyncMode}
+                      onScrollSyncModeChange={setScrollSyncMode}
+                      onScrollRef={registerEditorScroll}
                       onSearchApiRef={(api) => { editorSearchApiRef.current = api; }}
-                      onEditorScroll={handleEditorScroll}
-                      onToggleSync={viewMode === 'edit' ? undefined : () => setSyncScroll(v => v === 'off' ? 'content' : v === 'content' ? 'position' : 'off')}
                       wordWrap={wordWrap}
                       onToggleWordWrap={() => setWordWrap(!wordWrap)}
                       onFlushRef={(fn) => { flushEditorRef.current = fn; }}
@@ -1046,13 +1207,21 @@ const App: React.FC = () => {
                     <div className="w-full h-full" />
                   </div>
                 )}
-                {(viewMode === 'view' || viewMode === 'split') && (
+                {renderViewer && (
                   <div
                     data-panel="viewer"
                     className="overflow-hidden relative"
-                    style={viewMode === 'split' ? { flex: 1 } : { flex: 1 }}
+                    onWheelCapture={() => notePaneScrollIntent('viewer')}
+                    onPointerDownCapture={() => notePaneScrollIntent('viewer')}
+                    onPointerMoveCapture={(event) => { if (event.buttons) notePaneScrollIntent('viewer'); }}
+                    onTouchStartCapture={() => notePaneScrollIntent('viewer')}
+                    onKeyDownCapture={() => notePaneScrollIntent('viewer')}
+                    onScrollCapture={(event) => capturePaneScroll('viewer', event)}
+                    style={visibleViewer
+                      ? { flex: 1 }
+                      : { position: 'absolute', inset: 0, width: '100%', height: '100%', visibility: 'hidden', pointerEvents: 'none' }}
                   >
-                    <MarkdownViewer showToc={showToc} onToggleToc={() => setShowToc(false)} onOpenToc={() => setShowToc(true)} syncScroll={syncScroll} onScrollRef={(el) => { viewerScrollRef.current = el; }} onViewerScroll={handleViewerScroll} distractionFree={activeDistractionFree} />
+                    <MarkdownViewer showToc={showToc} onToggleToc={() => setShowToc(false)} onOpenToc={() => setShowToc(true)} onScrollRef={registerViewerScroll} distractionFree={activeDistractionFree} />
                     {/* Welcome back toast — minimal, right-side, translucent */}
                     {welcomeBackFile && (
                       <div
@@ -1085,6 +1254,7 @@ const App: React.FC = () => {
           {/* Status Bar */}
           {currentFile && !activeDistractionFree && (
             <StatusBar
+              onViewModeChange={changeViewMode}
               matchPalette={matchToolbarPalette}
               paletteBg={PALETTE_OPTIONS.find(o => o.value === previewPalette)?.bg}
               paletteBgDark={PALETTE_OPTIONS.find(o => o.value === previewPalette)?.bgDark}

@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useEffect, useState, useCallback } from 'react';
+import React, { useMemo, useRef, useEffect, useLayoutEffect, useState, useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -457,9 +457,7 @@ interface MarkdownViewerProps {
   showToc?: boolean;
   onToggleToc?: () => void;
   onOpenToc?: () => void;
-  syncScroll?: 'off' | 'position' | 'content';
   onScrollRef?: (el: HTMLElement | null) => void;
-  onViewerScroll?: () => void;
   distractionFree?: boolean;
 }
 
@@ -683,7 +681,7 @@ function cacheBustLocalFileUrl(src: string, token: number): string {
   return `${src}${separator}markdReload=${token}`;
 }
 
-const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, onOpenToc, syncScroll, onScrollRef, onViewerScroll, distractionFree = false }) => {
+const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, onOpenToc, onScrollRef, distractionFree = false }) => {
   const {
     fileContent,
     currentFilePath,
@@ -739,8 +737,6 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, o
     contentRef.current?.classList.remove('scrollbar-hover');
   }, []);
 
-  useEffect(() => { if (contentRef.current) contentRef.current.scrollTop = 0; }, [currentFilePath]);
-
   useEffect(() => {
     if (viewMode !== 'view' || !isSearchOpen || !searchQuery.trim()) return;
     requestAnimationFrame(() => {
@@ -784,18 +780,11 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, o
     return () => el.removeEventListener('wheel', onWheel);
   }, [zoomIn, zoomOut]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = contentRef.current;
     if (el && onScrollRef) onScrollRef(el);
     return () => { if (onScrollRef) onScrollRef(null); };
   }, [onScrollRef]);
-
-  useEffect(() => {
-    const el = contentRef.current;
-    if (!el || syncScroll === 'off' || !onViewerScroll) return;
-    el.addEventListener('scroll', onViewerScroll, { passive: true });
-    return () => el.removeEventListener('scroll', onViewerScroll);
-  }, [syncScroll, onViewerScroll]);
 
 
   const useResolvedMediaSrc = (src?: string | null) => {

@@ -111,6 +111,36 @@ textarea,
     @apply text-gray-600 dark:text-gray-300;
   }
 
+  .scroll-sync-control {
+    color: #64748b;
+  }
+  .scroll-sync-control:hover {
+    background: rgba(100, 116, 139, 0.1);
+  }
+  .scroll-sync-control:focus-visible {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+  }
+  .dark .scroll-sync-control {
+    color: #b6bec9;
+  }
+  .scroll-sync-pill {
+    border: 1.5px solid currentColor;
+    background: rgba(255, 255, 255, 0.28);
+  }
+  .dark .scroll-sync-pill {
+    background: rgba(0, 0, 0, 0.13);
+  }
+  html[data-match-palette] .scroll-sync-control {
+    color: var(--pal-muted);
+  }
+  html[data-match-palette] .scroll-sync-control:hover {
+    background: color-mix(in srgb, var(--pal-muted) 12%, transparent);
+  }
+  html[data-match-palette] .scroll-sync-pill {
+    background: var(--pal-editor-toolbar-bg);
+  }
+
   .panel {
     @apply bg-md-surface dark:bg-md-surface-dark rounded-lg border border-md-border dark:border-md-border-dark;
   }

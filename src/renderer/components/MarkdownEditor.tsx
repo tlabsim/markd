@@ -211,11 +211,12 @@ function getLineCol(el: EditorEl): { line: number; col: number; total: number } 
 }
 
 interface MarkdownEditorProps {
-  syncScroll?: 'off' | 'position' | 'content';
+  isActive: boolean;
+  isSplitView: boolean;
+  scrollSyncMode: 'heading' | 'position' | 'off';
+  onScrollSyncModeChange: (mode: 'heading' | 'position' | 'off') => void;
   onScrollRef?: (el: HTMLElement | null) => void;
   onSearchApiRef?: (api: MarkdownEditorSearchApi | null) => void;
-  onEditorScroll?: () => void;
-  onToggleSync?: () => void;
   wordWrap?: boolean;
   onToggleWordWrap?: () => void;
   onFlushRef?: (fn: () => void) => void;
@@ -232,7 +233,7 @@ export interface MarkdownEditorSearchApi {
   getContent: () => string;
 }
 
-const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef, onSearchApiRef, onEditorScroll, onToggleSync, wordWrap, onToggleWordWrap, onFlushRef, onSave, matchPalette, paletteBg, paletteBgDark }) => {
+const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, scrollSyncMode, onScrollSyncModeChange, onScrollRef, onSearchApiRef, wordWrap, onToggleWordWrap, onFlushRef, onSave, matchPalette, paletteBg, paletteBgDark }) => {
   const {
     fileContent,
     currentFilePath,
@@ -889,23 +890,11 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
     return () => observer.disconnect();
   }, [syntaxHighlight, syncTextareaViewport]);
 
-  // Auto-focus on mount
-  useEffect(() => { editorRef.current?.focus(); }, []);
-
-  // Register scroll container for sync
+  // Focus only while the editor pane is visible.
   useEffect(() => {
-    const el = editorRef.current;
-    if (el && onScrollRef) onScrollRef(el);
-    return () => { if (onScrollRef) onScrollRef(null); };
-  }, [onScrollRef]);
-
-  // Sync scroll: listen to editor scroll
-  useEffect(() => {
-    const el = editorRef.current;
-    if (!el || syncScroll === 'off' || !onEditorScroll) return;
-    el.addEventListener('scroll', onEditorScroll, { passive: true });
-    return () => el.removeEventListener('scroll', onEditorScroll);
-  }, [syncScroll, onEditorScroll]);
+    if (isActive) editorRef.current?.focus({ preventScroll: true });
+    else if (document.activeElement === editorRef.current) editorRef.current?.blur();
+  }, [isActive]);
 
   const updateCursorPosition = useCallback(() => {
     const el = editorRef.current;
@@ -941,6 +930,13 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
       setTimeout(() => { syncGuard.current = false; }, 100);
     }
   }, [fileContent, syntaxHighlight, searchHighlightOptions]);
+
+  // Register after the highlighted editor has its content and scroll range.
+  useLayoutEffect(() => {
+    const el = editorRef.current;
+    if (el && onScrollRef) onScrollRef(el);
+    return () => { if (onScrollRef) onScrollRef(null); };
+  }, [onScrollRef, syntaxHighlight]);
 
   // Input handler: push undo, debounce store, schedule highlighting
   const handleInput = useCallback(() => {
@@ -1413,21 +1409,26 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
           </svg>
         </button>
         <div className="flex-1" />
-        {/* Sync scroll toggle */}
-        {syncScroll !== undefined && (
-          <button
-            className={`btn-icon flex items-center gap-1 ${syncScroll !== 'off' ? 'selected' : ''}`}
-            onClick={onToggleSync}
-            title={`Sync scroll: ${syncScroll === 'off' ? 'Off' : syncScroll === 'content' ? 'Content (H)' : 'Position (P)'}`}
-          >
-            <svg className="w-[24px] h-[20px] shrink-0" fill="currentColor" viewBox="0 0 30 24">
-              <path fill="currentColor" d="m 11.557955,2 c 1.242641,0 2.25,1.0073593 2.25,2.25 v 15.5 c 0,1.242641 -1.007359,2.25 -2.25,2.25 H 3.1522946 C 1.9096539,22 0.90229465,20.992641 0.90229465,19.75 V 4.25 C 0.90229465,3.0073593 1.9096539,2 3.1522946,2 Z m 0,1.5 H 3.1522946 c -0.4142136,0 -0.75,0.3357864 -0.75,0.75 v 15.5 c 0,0.414 0.336,0.75 0.75,0.75 h 8.4056604 c 0.414214,0 0.75,-0.335786 0.75,-0.75 V 4.25 c 0,-0.4142136 -0.335786,-0.75 -0.75,-0.75 m -1.397641,9.964 c 0.265315,0.26011 0.300195,0.675267 0.082,0.976 l -0.071,0.085 -2.2500005,2.296 c -0.2637141,0.269069 -0.6861129,0.300739 -0.987,0.074 l -0.084,-0.074 -2.253,-2.296 c -0.6499436,-0.662627 0.2459247,-1.682846 0.987,-1.124 l 0.083,0.074 1.718,1.75 1.714,-1.75 c 0.2901616,-0.295899 0.7653131,-0.300377 1.0610005,-0.01 M 7.9203135,7.226 10.170314,9.522 c 0.749316,0.713375 -0.3708894,1.812641 -1.0700005,1.05 l -1.715,-1.752 -1.718,1.75 c -0.7000468,0.66647 -1.7231439,-0.337504 -1.07,-1.05 l 2.253,-2.296 c 0.293929,-0.2991751 0.776071,-0.2991751 1.07,0 M 26.934795,2 c 1.242641,0 2.25,1.0073593 2.25,2.25 v 15.499999 c 0,1.242641 -1.007359,2.25 -2.25,2.25 h -8.40566 c -1.24264,0 -2.25,-1.007359 -2.25,-2.25 V 4.25 c 0,-1.2426407 1.00736,-2.25 2.25,-2.25 z m 0,1.5 h -8.40566 c -0.414214,0 -0.75,0.3357864 -0.75,0.75 v 15.499999 c 0,0.414 0.336,0.75 0.75,0.75 h 8.40566 c 0.414214,0 0.75,-0.335786 0.75,-0.75 V 4.25 c 0,-0.4142136 -0.335786,-0.75 -0.75,-0.75 m -1.397641,9.964 c 0.265315,0.26011 0.300195,0.675267 0.082,0.976 l -0.071,0.085 -2.25,2.296 c -0.263714,0.269069 -0.686113,0.300739 -0.987,0.074 l -0.084,-0.074 -2.253,-2.296 c -0.649944,-0.662626 0.245925,-1.682845 0.987,-1.123999 l 0.083,0.074 1.718,1.749999 1.714,-1.749999 c 0.290161,-0.295899 0.765313,-0.300377 1.061,-0.01 m -2.24,-6.2390001 2.25,2.2959999 c 0.749316,0.7133752 -0.370889,1.8126412 -1.07,1.0500002 l -1.715,-1.7520002 -1.718,1.7500002 c -0.700047,0.66647 -1.723144,-0.337504 -1.07,-1.0500002 l 2.253,-2.2959999 c 0.293929,-0.2991751 0.776071,-0.2991751 1.07,0"/>
-            </svg>
-            {syncScroll !== 'off' && (
-              <span className="text-[11px] font-medium">{syncScroll === 'content' ? 'H' : 'P'}</span>
-            )}
-          </button>
-        )}
+        {isSplitView && <button
+          type="button"
+          className="scroll-sync-control flex shrink-0 items-center gap-1.5 h-8 px-1 rounded-md transition-colors"
+          aria-label={`Split scroll sync: ${scrollSyncMode === 'heading' ? 'Content' : scrollSyncMode === 'position' ? 'Position' : 'Off'}. Click to change mode.`}
+          title={`Split scroll sync: ${scrollSyncMode === 'heading' ? 'Content' : scrollSyncMode === 'position' ? 'Position' : 'Off'} (click to change)`}
+          onClick={() => onScrollSyncModeChange(scrollSyncMode === 'heading' ? 'position' : scrollSyncMode === 'position' ? 'off' : 'heading')}
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="shrink-0" aria-hidden="true">
+            {[-5.4805783, 5.2304042].map(offset => (
+              <g key={offset} transform={`translate(${offset}, -7.5)`}>
+                <rect x="9" y="7.5" width="6.2794652" height="24" rx="3.1397326" fill="currentColor" opacity="0.36" />
+                <path d="m10.824 12.103 1.315-1.316 1.316 1.316M10.824 27.496l1.315 1.316 1.316-1.316" stroke="currentColor" strokeWidth="0.675" strokeLinecap="round" strokeLinejoin="round" />
+                <rect x="9" y="15.105632" width="6.2794652" height="8.7887373" rx="3.1397326" fill="currentColor" opacity="0.8" />
+              </g>
+            ))}
+          </svg>
+          <span className="scroll-sync-pill flex h-6 min-w-9 items-center justify-center rounded-full px-1.5 text-xs font-bold leading-none" aria-hidden="true">
+            {scrollSyncMode === 'heading' ? 'C' : scrollSyncMode === 'position' ? 'P' : 'OFF'}
+          </span>
+        </button>}
       </div>
 
 

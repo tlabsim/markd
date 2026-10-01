@@ -1,13 +1,13 @@
 import React, { useMemo } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
+import type { ViewMode } from '../types';
 
-const StatusBar: React.FC<{ matchPalette?: boolean; paletteBg?: string; paletteBgDark?: string }> = ({ matchPalette, paletteBg, paletteBgDark }) => {
-  const { fileContent, currentFile, viewMode, setViewMode } = useStore(useShallow((state) => ({
+const StatusBar: React.FC<{ matchPalette?: boolean; paletteBg?: string; paletteBgDark?: string; onViewModeChange: (mode: ViewMode) => void }> = ({ matchPalette, paletteBg, paletteBgDark, onViewModeChange }) => {
+  const { fileContent, currentFile, viewMode } = useStore(useShallow((state) => ({
     fileContent: state.fileContent,
     currentFile: state.currentFile,
     viewMode: state.viewMode,
-    setViewMode: state.setViewMode,
   })));
 
   const stats = useMemo(() => {
@@ -68,7 +68,7 @@ const StatusBar: React.FC<{ matchPalette?: boolean; paletteBg?: string; paletteB
                 ? (matchPalette ? 'var(--pal-text)' : undefined)
                 : (matchPalette ? 'var(--pal-muted)' : undefined),
             }}
-            onClick={() => setViewMode('view')}
+            onClick={() => onViewModeChange('view')}
             title="Preview mode"
           >
             Preview
@@ -84,7 +84,7 @@ const StatusBar: React.FC<{ matchPalette?: boolean; paletteBg?: string; paletteB
                 ? (matchPalette ? 'var(--pal-text)' : undefined)
                 : (matchPalette ? 'var(--pal-muted)' : undefined),
             }}
-            onClick={() => setViewMode('edit')}
+            onClick={() => onViewModeChange('edit')}
             title="Edit mode"
           >
             Edit
@@ -100,7 +100,7 @@ const StatusBar: React.FC<{ matchPalette?: boolean; paletteBg?: string; paletteB
                 ? (matchPalette ? 'var(--pal-text)' : undefined)
                 : (matchPalette ? 'var(--pal-muted)' : undefined),
             }}
-            onClick={() => setViewMode('split')}
+            onClick={() => onViewModeChange('split')}
             title="Split mode"
           >
             Split
