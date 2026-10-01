@@ -241,10 +241,10 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ content, onClose, pin
   return (
     <div
       ref={tocRef}
-      className="toc-panel p-3 shadow-xl h-full overflow-y-auto rounded-lg border border-gray-200/50 dark:border-gray-700/50 bg-white/75 dark:bg-[#222c36]/85 backdrop-blur-md"
+      className="toc-panel flex h-full flex-col overflow-hidden shadow-xl rounded-lg border border-gray-200/50 dark:border-gray-700/50 bg-white/75 dark:bg-[#222c36]/85 backdrop-blur-md"
       style={{ fontSize: tocFontSize, ...(matchPalette ? { backgroundColor: 'color-mix(in srgb, var(--pal-panel-bg) var(--toc-background-opacity), transparent)', borderColor: 'var(--pal-border-soft)' } : {}) }}
     >
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex shrink-0 items-center justify-between border-b border-gray-200/60 px-3 pb-2 pt-3 dark:border-gray-700/50" style={matchPalette ? { borderColor: 'var(--pal-border-soft)' } : undefined}>
         <h3 className="font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400" style={{ fontSize: `${tocFontSize * 0.833}px` }}>
           Contents
         </h3>
@@ -281,7 +281,7 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ content, onClose, pin
           </button>
         </div>
       </div>
-      <nav>
+      <nav className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
         {tree.map((node, i) => (
           <TreeNode
             key={node.item.id || i}
