@@ -201,6 +201,49 @@ html[data-match-palette] .splitter:hover {
   background-color: var(--splitter-hover) !important;
 }
 
+.viewer-layout { container-type: inline-size; }
+.viewer-toc--overlay {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  width: min(300px, calc(100% - 24px));
+  z-index: 50;
+}
+.viewer-toc--pinned {
+  flex: 0 0 300px;
+  width: 300px;
+  height: 100%;
+  min-width: 0;
+  z-index: 20;
+}
+.viewer-toc--pinned:empty { display: none; }
+.viewer-toc--pinned .toc-panel {
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+@container (max-width: 700px) {
+  .viewer-toc .toc-pin-button { display: none; }
+  .viewer-toc--pinned {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    bottom: 12px;
+    width: min(300px, calc(100% - 24px));
+    height: auto;
+    flex: none;
+    z-index: 50;
+  }
+  .viewer-toc--pinned .toc-panel {
+    border: 1px solid;
+    border-radius: 0.5rem;
+    box-shadow: 0 10px 24px rgb(0 0 0 / 0.18);
+  }
+}
+
 /* Markdown Content Styles */
 .markdown-body {
   @apply text-md-text dark:text-md-text-dark leading-relaxed;

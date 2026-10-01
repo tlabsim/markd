@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useEffect, useState, useCallback } from 'react';
+import { Pin, PinOff } from 'lucide-react';
 
 interface TocItem {
   id: string;
@@ -14,6 +15,8 @@ interface TocNode {
 interface TableOfContentsProps {
   content: string;
   onClose: () => void;
+  pinned: boolean;
+  onPinToggle: () => void;
   matchPalette?: boolean;
   zoomLevel?: number;
   scrollContainerRef?: React.RefObject<HTMLElement | null>;
@@ -70,12 +73,12 @@ const TreeNode: React.FC<{
   return (
     <div className="relative">
       {!isRoot && !isLastSibling && (
-        <span aria-hidden="true" className="pointer-events-none absolute -left-px top-0 bottom-0 w-px bg-slate-200 dark:bg-slate-700" />
+        <span aria-hidden="true" className="pointer-events-none absolute -left-px top-0 bottom-0 w-[1px] bg-slate-300 dark:bg-slate-600" />
       )}
       {/* Item row */}
       <div className="flex items-center group relative">
         {!isRoot && isLastSibling && (
-          <span aria-hidden="true" className="pointer-events-none absolute -left-px top-0 h-1/2 w-px bg-slate-200 dark:bg-slate-700" />
+          <span aria-hidden="true" className="pointer-events-none absolute -left-px top-0 h-1/2 w-[1px] bg-slate-300 dark:bg-slate-600" />
         )}
         {/* Horizontal connector: touches the border */}
         {!isRoot && (
@@ -140,7 +143,7 @@ const TreeNode: React.FC<{
   );
 };
 
-const TableOfContents: React.FC<TableOfContentsProps> = ({ content, onClose, matchPalette, zoomLevel = 100, scrollContainerRef }) => {
+const TableOfContents: React.FC<TableOfContentsProps> = ({ content, onClose, pinned, onPinToggle, matchPalette, zoomLevel = 100, scrollContainerRef }) => {
   // Scale TOC font: +0.25px per 10% zoom above 100%
   const tocFontSize = 12 + Math.max(0, (zoomLevel - 100) / 10) * 0.25;
   const tocRef = useRef<HTMLDivElement>(null);
@@ -148,7 +151,7 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ content, onClose, mat
 
   const headings = useMemo(() => {
     const items: TocItem[] = [];
-    const lines = content.split('\n');
+    const lines = content.replace(/^\uFEFF/, '').split(/\r\n|\r|\n/);
     let inFence = false;
     for (const line of lines) {
       if (/^```/.test(line)) { inFence = !inFence; continue; }
@@ -176,6 +179,7 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ content, onClose, mat
 
   // Close on click outside
   useEffect(() => {
+    if (pinned) return;
     const handleClickOutside = (e: MouseEvent) => {
       if (tocRef.current && !tocRef.current.contains(e.target as Node)) {
         onClose();
@@ -188,7 +192,7 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ content, onClose, mat
       clearTimeout(timer);
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [onClose]);
+  }, [onClose, pinned]);
 
   const toggleCollapse = useCallback((id: string) => {
     setCollapsed((prev) => {
@@ -244,6 +248,15 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ content, onClose, mat
           Contents
         </h3>
         <div className="flex items-center gap-0.5">
+          <button
+            className={`toc-pin-button btn-icon p-0.5 ${pinned ? 'text-blue-500 dark:text-blue-400' : ''}`}
+            title={pinned ? 'Unpin contents' : 'Pin contents'}
+            aria-label={pinned ? 'Unpin contents' : 'Pin contents'}
+            aria-pressed={pinned}
+            onClick={onPinToggle}
+          >
+            {pinned ? <PinOff className="w-3.5 h-3.5" strokeWidth={1.75} style={{ color: 'var(--pal-link)' }} /> : <Pin className="w-3.5 h-3.5" strokeWidth={1.75} />}
+          </button>
           {/* Collapse/Expand all */}
           <button
             className="btn-icon p-0.5"

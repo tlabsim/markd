@@ -689,6 +689,8 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, s
     fontFamily,
     zoomLevel,
     previewPalette,
+    tocPinned,
+    setTocPinned,
     theme,
     showSvgBackgroundToggle,
     zoomIn,
@@ -707,6 +709,8 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, s
     fontFamily: state.fontFamily,
     zoomLevel: state.zoomLevel,
     previewPalette: state.previewPalette,
+    tocPinned: state.tocPinned,
+    setTocPinned: state.setTocPinned,
     theme: state.theme,
     showSvgBackgroundToggle: state.showSvgBackgroundToggle,
     zoomIn: state.zoomIn,
@@ -1049,7 +1053,8 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, s
   }] as any, [viewMode, isSearchOpen, searchQuery, searchCurrentIndex, searchUseRegex, searchCaseSensitive]);
 
   return (
-    <div className="h-full flex flex-col relative">
+    <div className="viewer-layout h-full flex relative min-w-0">
+      <div className="viewer-preview min-w-0 flex-1 flex flex-col relative">
       <div ref={contentRef}
         className={`flex-1 overflow-y-auto p-6 lg:p-8 xl:p-10 scrollbar-expand ${previewPalette !== 'default' ? `preview-${previewPalette}` : ''}`}
         style={{ background: 'var(--pal-viewer-bg)' }}
@@ -1071,8 +1076,17 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, s
       </div>
       <BackToTop containerRef={contentRef} />
       <ZoomIndicator enabled={distractionFree} zoomLevel={zoomLevel} />
-      <div className={`absolute top-3 right-3 bottom-3 w-[300px] max-w-[calc(100%-1.5rem)] z-50 transition-opacity ${showToc ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
-        <TableOfContents content={fileContent} onClose={() => onToggleToc?.()} matchPalette={matchToolbarPalette} zoomLevel={zoomLevel} scrollContainerRef={contentRef} />
+      </div>
+      <div className={`viewer-toc ${showToc && tocPinned ? 'viewer-toc--pinned' : 'viewer-toc--overlay'} ${showToc ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+        <TableOfContents
+          content={fileContent}
+          onClose={() => onToggleToc?.()}
+          pinned={tocPinned}
+          onPinToggle={() => setTocPinned(!tocPinned)}
+          matchPalette={matchToolbarPalette}
+          zoomLevel={zoomLevel}
+          scrollContainerRef={contentRef}
+        />
       </div>
     </div>
   );

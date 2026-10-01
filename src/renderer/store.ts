@@ -34,6 +34,7 @@ interface EditorState {
   fontFamily: string;
   zoomLevel: number;
   previewPalette: string;
+  tocPinned: boolean;
   assetReloadToken: number;
   showSvgBackgroundToggle: boolean;
 
@@ -75,6 +76,7 @@ interface EditorState {
   setFontFamily: (font: string) => void;
   setZoomLevel: (zoom: number) => void;
   setPreviewPalette: (palette: string) => void;
+  setTocPinned: (pinned: boolean) => void;
   refreshLinkedAssets: () => void;
   setShowSvgBackgroundToggle: (on: boolean) => void;
   addRecentFile: (path: string) => void;
@@ -135,6 +137,7 @@ export const useStore = create<EditorState>()(
       fontFamily: 'system',
       zoomLevel: 100,
       previewPalette: 'default',
+      tocPinned: false,
       assetReloadToken: 0,
       showSvgBackgroundToggle: true,
       recentFiles: [],
@@ -182,6 +185,7 @@ export const useStore = create<EditorState>()(
       setFontFamily: (font) => set({ fontFamily: font }),
       setZoomLevel: (zoom) => set({ zoomLevel: Math.max(50, Math.min(200, zoom)) }),
       setPreviewPalette: (palette) => set({ previewPalette: palette }),
+      setTocPinned: (pinned) => set({ tocPinned: pinned }),
       refreshLinkedAssets: () => set((s) => ({ assetReloadToken: s.assetReloadToken + 1 })),
       setShowSvgBackgroundToggle: (on) => set({ showSvgBackgroundToggle: on }),
       addRecentFile: (filePath) =>
@@ -217,6 +221,7 @@ export const useStore = create<EditorState>()(
         fontFamily: state.fontFamily,
         zoomLevel: state.zoomLevel,
         previewPalette: state.previewPalette,
+        tocPinned: state.tocPinned,
         showSvgBackgroundToggle: state.showSvgBackgroundToggle,
         recentFiles: state.recentFiles,
         wordWrap: state.wordWrap,
