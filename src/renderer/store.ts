@@ -103,13 +103,14 @@ const FONT_OPTIONS = [
   { label: 'IBM Plex Mono', value: "'IBM Plex Mono', Consolas, 'Courier New', monospace" },
   { label: 'Geist Mono', value: "'Geist Mono', 'SF Mono', 'Fira Code', monospace" },
   { label: 'Source Code Pro', value: "'Source Code Pro', 'Fira Code', Consolas, monospace" },
-  { label: 'Merriweather', value: 'Merriweather, Georgia, serif' },
-  { label: 'Crimson Pro', value: "'Crimson Pro', 'Times New Roman', Georgia, serif" },
-  { label: 'Open Sans', value: "'Open Sans', Arial, sans-serif" },
-  { label: 'Source Sans Pro', value: "'Source Sans Pro', Arial, sans-serif" },
-  { label: 'Lora', value: 'Lora, Georgia, serif' },
-  { label: 'Nunito', value: 'Nunito, Arial, sans-serif' },
   { label: 'Inter', value: "'Inter', 'Segoe UI', Arial, sans-serif" },
+  { label: 'Source Sans 3', value: "'Source Sans 3', Arial, sans-serif" },
+  { label: 'Atkinson Hyperlegible Next', value: "'Atkinson Hyperlegible Next', Arial, sans-serif" },
+  { label: 'Merriweather', value: 'Merriweather, Georgia, serif' },
+  { label: 'Source Serif 4', value: "'Source Serif 4', Georgia, serif" },
+  { label: 'Crimson Pro', value: "'Crimson Pro', 'Times New Roman', Georgia, serif" },
+  { label: 'Lora', value: 'Lora, Georgia, serif' },
+  { label: 'Literata', value: 'Literata, Georgia, serif' },
 ];
 
 export { FONT_OPTIONS, PALETTE_OPTIONS };
@@ -211,11 +212,20 @@ export const useStore = create<EditorState>()(
     }),
     {
       name: 'markd-preferences',
-      version: 1,
-      migrate: (persistedState) => ({
-        ...(persistedState as EditorState),
-        showSvgBackgroundToggle: true,
-      }),
+      version: 2,
+      migrate: (persistedState) => {
+        const state = persistedState as EditorState;
+        const fontReplacements: Record<string, string> = {
+          "'Open Sans', Arial, sans-serif": "'Inter', 'Segoe UI', Arial, sans-serif",
+          "'Source Sans Pro', Arial, sans-serif": "'Source Sans 3', Arial, sans-serif",
+          'Nunito, Arial, sans-serif': "'Atkinson Hyperlegible Next', Arial, sans-serif",
+        };
+        return {
+          ...state,
+          fontFamily: fontReplacements[state.fontFamily] ?? state.fontFamily,
+          showSvgBackgroundToggle: true,
+        };
+      },
       partialize: (state) => ({
         theme: state.theme,
         fontFamily: state.fontFamily,

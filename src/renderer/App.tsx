@@ -1,4 +1,5 @@
 import React, { useEffect, useCallback, useRef, useState, useLayoutEffect } from 'react';
+import './fonts';
 import { useStore, FONT_OPTIONS } from './store';
 import { useShallow } from 'zustand/react/shallow';
 import { PALETTE_OPTIONS } from './palettes';

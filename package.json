@@ -28,6 +28,17 @@
     "generate-store-assets": "node scripts/generate-store-assets.mjs"
   },
   "devDependencies": {
+    "@fontsource/atkinson-hyperlegible-next": "^5.3.0",
+    "@fontsource/crimson-pro": "^5.3.0",
+    "@fontsource/geist-mono": "^5.3.0",
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@fontsource/inter": "^5.3.0",
+    "@fontsource/literata": "^5.3.0",
+    "@fontsource/lora": "^5.3.0",
+    "@fontsource/merriweather": "^5.3.0",
+    "@fontsource/source-code-pro": "^5.3.0",
+    "@fontsource/source-sans-3": "^5.3.0",
+    "@fontsource/source-serif-4": "^5.3.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
