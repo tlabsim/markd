@@ -6,6 +6,8 @@ let mainWindow: BrowserWindow | null = null;
 let currentFilePath: string | null = null;
 
 const isDev = !app.isPackaged;
+const startupStartedAt = Date.now() - process.uptime() * 1000;
+const startupTraceEnabled = isDev || process.argv.includes('--trace-startup') || process.env.MARKD_STARTUP_TRACE === '1';
 
 // Required on Windows for proper taskbar grouping, notifications, and file association display name
 app.setAppUserModelId('com.markd.app');
@@ -18,6 +20,16 @@ if (!isDev && process.platform === 'win32') {
 
 // ---- Settings file (JSON in user data) ----
 const settingsPath = path.join(app.getPath('userData'), 'settings.json');
+const startupTracePath = path.join(app.getPath('userData'), 'startup-timing.log');
+
+function traceStartup(milestone: string): void {
+  if (!startupTraceEnabled) return;
+  const line = `[startup] ${milestone}: ${Math.round(Date.now() - startupStartedAt)}ms`;
+  console.info(line);
+  if (!isDev) void fs.promises.appendFile(startupTracePath, `${new Date().toISOString()} ${line}\n`).catch(() => {});
+}
+
+traceStartup('main module loaded');
 
 function readSettings(): Record<string, unknown> {
   try {
@@ -76,7 +88,7 @@ if (multiInstance) {
 
 // Path to the dist/renderer directory
 const rendererDir = isDev
-  ? path.join(__dirname, '../../dist/renderer')
+  ? path.join(__dirname, '../../renderer')
   : path.join(process.resourcesPath, 'renderer');
 
 // Register privileged protocol so ES modules work (unlike file://)
@@ -127,13 +139,13 @@ function registerLocalFileProtocol(): void {
     '.html': 'text/html',
     '.htm': 'text/html',
   };
-  protocol.handle('local-file', (request) => {
+  protocol.handle('local-file', async (request) => {
     try {
       const url = new URL(request.url);
       let filePath = decodeURIComponent(url.pathname);
       if (/^\/[A-Za-z]:\//.test(filePath)) filePath = filePath.slice(1);
       const resolved = path.resolve(filePath);
-      const data = fs.readFileSync(resolved);
+      const data = await fs.promises.readFile(resolved);
       const ext = path.extname(resolved).toLowerCase();
       return new Response(data, {
         headers: { 'Content-Type': mimeTypes[ext] || 'application/octet-stream' },
@@ -146,14 +158,13 @@ function registerLocalFileProtocol(): void {
 
 // Serve built renderer files via app:// protocol
 function registerAppProtocol(): void {
-  protocol.handle('app', (request) => {
+  protocol.handle('app', async (request) => {
     try {
       const url = new URL(request.url);
       let reqPath = decodeURIComponent(url.pathname).replace(/^\/+/, '');
       if (!reqPath || reqPath.endsWith('/')) reqPath = 'index.html';
       const filePath = path.join(rendererDir, reqPath);
-      // Use fs.readFileSync — works reliably inside ASAR in production
-      const data = fs.readFileSync(filePath);
+      const data = await fs.promises.readFile(filePath);
       const ext = path.extname(reqPath).toLowerCase();
       const mime: Record<string, string> = {
         '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css',
@@ -169,6 +180,7 @@ function registerAppProtocol(): void {
 }
 
 function createWindow(filePath?: string): void {
+  traceStartup('creating browser window');
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -208,6 +220,8 @@ function createWindow(filePath?: string): void {
     win.loadURL(loadUrl('app://index.html'));
   }
 
+  win.webContents.once('did-finish-load', () => traceStartup('renderer load finished'));
+
   win.on('closed', () => {
     if (win === mainWindow) mainWindow = null;
   });
@@ -235,6 +249,7 @@ app.on('open-file', (_event, filePath) => {
 });
 
 app.whenReady().then(() => {
+  traceStartup('electron ready');
   registerAppProtocol();
   registerLocalFileProtocol();
 
@@ -477,6 +492,10 @@ ipcMain.handle('get-app-path', () => {
 
 ipcMain.handle('get-app-version', () => {
   return app.getVersion();
+});
+
+ipcMain.on('startup-renderer-painted', () => {
+  traceStartup('renderer first paint');
 });
 
 // Settings IPC

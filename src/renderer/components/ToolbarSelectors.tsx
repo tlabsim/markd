@@ -42,6 +42,7 @@ export const FontSelector: React.FC<SelectorProps & {
     if (!open) {
       positionPanel();
       onCloseOther();
+      void import('../fonts').then(({ preloadAllFonts }) => preloadAllFonts());
     }
     onOpenChange(!open);
   };

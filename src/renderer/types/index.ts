@@ -29,6 +29,7 @@ export interface MarkdAPI {
   readDirectory: (dirPath: string) => Promise<DirectoryResult>;
   getAppPath: () => Promise<string>;
   getAppVersion?: () => Promise<string>;
+  reportStartupPainted?: () => void;
   minimizeWindow: () => Promise<void>;
   maximizeWindow: () => Promise<void>;
   closeWindow: () => Promise<void>;

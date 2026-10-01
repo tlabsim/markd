@@ -1,5 +1,4 @@
 import React, { useEffect, useCallback, useRef, useState, useLayoutEffect } from 'react';
-import './fonts';
 import { useStore, FONT_OPTIONS } from './store';
 import { useShallow } from 'zustand/react/shallow';
 import { PALETTE_OPTIONS } from './palettes';
@@ -971,6 +970,10 @@ const App: React.FC = () => {
   useEffect(() => {
     if (settingsOpen) setSettingsModuleMounted(true);
   }, [settingsOpen]);
+
+  useEffect(() => {
+    if (currentFile) void import('./fonts').then(({ loadFontFamily }) => loadFontFamily(fontFamily));
+  }, [currentFile, fontFamily]);
 
   // Keep first paint light, then warm the document chunks while Welcome is idle.
   useEffect(() => {

@@ -55,6 +55,7 @@ const api = {
   readDirectory: (dirPath: string): Promise<DirectoryResult> => ipcRenderer.invoke('read-directory', dirPath),
   getAppPath: (): Promise<string> => ipcRenderer.invoke('get-app-path'),
   getAppVersion: (): Promise<string> => ipcRenderer.invoke('get-app-version'),
+  reportStartupPainted: (): void => ipcRenderer.send('startup-renderer-painted'),
   minimizeWindow: (): Promise<void> => ipcRenderer.invoke('window-minimize'),
   maximizeWindow: (): Promise<void> => ipcRenderer.invoke('window-maximize'),
   closeWindow: (): Promise<void> => ipcRenderer.invoke('window-close'),

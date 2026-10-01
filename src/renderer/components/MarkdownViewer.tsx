@@ -11,6 +11,8 @@ import remarkDirective from 'remark-directive';
 import rehypeKatex from 'rehype-katex';
 import rehypeHighlight from 'rehype-highlight';
 import rehypeRaw from 'rehype-raw';
+import 'highlight.js/styles/github.css';
+import 'katex/dist/katex.min.css';
 import { useStore } from '../store';
 import { CircleAlert, FileText, Info, Lightbulb, ListTree, OctagonAlert, TriangleAlert, type LucideIcon } from 'lucide-react';
 
