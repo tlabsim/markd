@@ -1,0 +1,37 @@
+/* Snapshot of the original Sepia dark tokens from src/renderer/tokens.css.
+   Reference only: this file is not imported by the app.
+   Original picker: bgDark #26211a; swatchesDark #26211a, #d4c8b8, #c4a87c. */
+html.dark[data-palette="sepia"],
+html[data-palette="sepia"].dark {
+  --pal-viewer-bg: #26211a;
+  --pal-editor-bg: #2a241c;
+  --pal-editor-toolbar-bg: rgba(42, 36, 28, 0.6);
+  --pal-panel-bg: #1f1b15;
+  --pal-border-soft: rgba(74, 64, 48, 0.5);
+  --pal-bg: #26211a;
+  --pal-text: #e8dcc8;
+  --pal-link: #d4b88c;
+  --pal-border: #4a4030;
+  --pal-muted: #c8b8a8;
+  --pal-blockquote-border: #4a4035;
+  --pal-blockquote-text: #c8b8a8;
+  --pal-code-bg: rgba(58, 48, 40, 0.6);
+  --pal-code-text: #d4b88c;
+  --pal-pre-bg: rgba(42, 36, 28, 0.6);
+  --pal-pre-border: #4a4030;
+  --pal-th-bg: rgba(42, 36, 28, 0.5);
+  --pal-th-border: #4a4030;
+  --pal-td-border: #4a4030;
+  --pal-tr-even-bg: rgba(42, 36, 28, 0.3);
+  --pal-hr: #4a4030;
+  --pal-h6-text: #b0a090;
+  --pal-selection: rgba(196, 168, 124, 0.28);
+  --pal-heading-border: #4a4030;
+  --pal-cb-bg: rgba(49, 43, 34, 0.6);
+  --pal-cb-border: #4a4030;
+  --pal-cb-lang-bg: #4a4030;
+  --pal-cb-lang-text: #c8b8a8;
+  --pal-cb-btn-bg: rgba(74, 64, 48, 0.6);
+  --pal-cb-btn-hover: #4a4030;
+  --pal-cb-btn-text: #c8b8a8;
+}

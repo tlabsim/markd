@@ -1083,7 +1083,12 @@ const App: React.FC = () => {
             )}
             <div key="document-content" className="flex-1 overflow-hidden flex">
             {!currentFile ? (
-              <WelcomeScreen onOpen={handleOpen} onOpenFolder={handleOpenFolder} onNew={handleNewFile} />
+              <WelcomeScreen
+                onOpen={handleOpen}
+                onOpenFolder={handleOpenFolder}
+                onNew={handleNewFile}
+                onOpenSidebar={!isSidebarOpen && !distractionFree ? toggleSidebar : undefined}
+              />
             ) : (
               <>
                 {(viewMode === 'edit' || viewMode === 'split') && (
@@ -1132,7 +1137,12 @@ const App: React.FC = () => {
                     <MarkdownViewer showToc={showToc} onToggleToc={() => setShowToc(false)} syncScroll={syncScroll} onScrollRef={(el) => { viewerScrollRef.current = el; }} onViewerScroll={handleViewerScroll} distractionFree={distractionFree} />
                     {/* Welcome back toast — minimal, right-side, translucent */}
                     {welcomeBackFile && (
-                      <div className="absolute bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl bg-white/75 dark:bg-black/75 backdrop-blur-sm text-[13px] text-emerald-600 dark:text-emerald-400 shadow-lg animate-slide-in-right">
+                      <div
+                        className="absolute bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl backdrop-blur-sm text-[13px] text-emerald-600 dark:text-emerald-400 shadow-lg animate-slide-in-right"
+                        style={{ backgroundColor: theme === 'dark'
+                          ? 'color-mix(in srgb, rgba(0, 0, 0, 0.78) 88%, var(--pal-viewer-bg) 12%)'
+                          : 'color-mix(in srgb, rgba(255, 255, 255, 0.78) 88%, var(--pal-viewer-bg) 12%)' }}
+                      >
                         <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5"><path d="M20.5 15.8V8.2a1.91 1.91 0 0 0-.944-1.645l-6.612-3.8a1.88 1.88 0 0 0-1.888 0l-6.612 3.8A1.9 1.9 0 0 0 3.5 8.2v7.602a1.91 1.91 0 0 0 .944 1.644l6.612 3.8a1.88 1.88 0 0 0 1.888 0l6.612-3.8A1.9 1.9 0 0 0 20.5 15.8"/><path d="m8.667 12.633l1.505 1.721a1 1 0 0 0 1.564-.073L15.333 9.3"/></g></svg>
                         <span>Picked up where you left off</span>
                         <button

@@ -1163,11 +1163,11 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
   };
 
   return (
-    <div className="h-full flex flex-col bg-white dark:bg-[#1c2733]" style={matchPalette ? { background: 'var(--pal-editor-bg)' } : undefined}>
+    <div className="h-full flex flex-col bg-white dark:bg-[#23262c]" style={matchPalette ? { background: 'var(--pal-editor-bg)' } : undefined}>
       {/* Editor toolbar — darker than editor area */}
       <div
         ref={toolbarRef}
-        className="flex items-center gap-0.5 px-3 py-1.5 border-b border-gray-200/60 dark:border-gray-700/50 bg-gray-50/85 dark:bg-[#181e26]/85 backdrop-blur-md flex-wrap"
+        className="flex items-center gap-0.5 px-3 py-1.5 border-b border-gray-200/60 dark:border-gray-700/50 bg-gray-50/85 dark:bg-[#30353d]/85 backdrop-blur-md flex-wrap"
         style={matchPalette ? {
           backgroundColor: 'var(--pal-editor-toolbar-bg)',
         } : undefined}
@@ -1217,7 +1217,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
             const hMatch = cl.match(/^(#{1,6})\s/);
             return (
             <div
-              className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-white dark:bg-[#28323e] border border-gray-200 dark:border-gray-600 rounded-md shadow-xl z-40 py-0.5 w-36 editor-popup"
+              className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-white dark:bg-[#30353d] border border-gray-200 dark:border-gray-600 rounded-md shadow-xl z-40 py-0.5 w-36 editor-popup"
               data-palette={matchPalette ? '' : undefined}
               style={matchPalette ? { backgroundColor: 'var(--pal-panel-bg)', borderColor: 'var(--pal-border)', ['--popup-bg' as any]: 'var(--pal-panel-bg)', ['--popup-border' as any]: 'var(--pal-border)' } : undefined}
             >
@@ -1327,7 +1327,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
           {moreOpen && createPortal(
             <div
               ref={morePanelRef}
-              className="bg-white dark:bg-[#28323e] border border-gray-200 dark:border-gray-600 rounded-md shadow-xl py-1 w-44 editor-popup"
+              className="bg-white dark:bg-[#30353d] border border-gray-200 dark:border-gray-600 rounded-md shadow-xl py-1 w-44 editor-popup"
               data-palette={matchPalette ? '' : undefined}
               data-placement={morePanelPlacement}
               style={{ zIndex: 9999, maxWidth: 'calc(100vw - 1rem)', ...morePanelStyle, ...(matchPalette ? { backgroundColor: 'var(--pal-panel-bg)', borderColor: 'var(--pal-border)', ['--popup-bg' as any]: 'var(--pal-panel-bg)', ['--popup-border' as any]: 'var(--pal-border)' } : {}) }}
@@ -1437,7 +1437,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ syncScroll, onScrollRef
         {/* Line numbers */}
         <div
           ref={lineNumbersRef}
-          className="select-none text-right px-3 py-3 text-sm leading-6 font-mono text-gray-400 dark:text-gray-600 bg-gray-50 dark:bg-[#141c24] border-r border-gray-200 dark:border-gray-700/50 overflow-hidden"
+          className="select-none text-right px-3 py-3 text-sm leading-6 font-mono text-gray-400 dark:text-gray-600 bg-gray-50 dark:bg-[#202329] border-r border-gray-200 dark:border-gray-700/50 overflow-hidden"
           style={{
             minWidth: '3.5rem',
             scrollbarWidth: 'none',

@@ -5,11 +5,26 @@ interface WelcomeScreenProps {
   onOpen: () => void;
   onOpenFolder: () => void;
   onNew: () => void;
+  onOpenSidebar?: () => void;
 }
 
-const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onOpen, onOpenFolder, onNew }) => {
+const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onOpen, onOpenFolder, onNew, onOpenSidebar }) => {
   return (
-    <div className="flex-1 flex items-center justify-center select-none transition-colors" style={{ backgroundColor: 'var(--pal-viewer-bg)' }}>
+    <div className="relative flex-1 flex items-center justify-center select-none transition-colors" style={{ backgroundColor: 'var(--pal-viewer-bg)' }}>
+      {onOpenSidebar && (
+        <button
+          type="button"
+          onClick={onOpenSidebar}
+          title="Open sidebar (Ctrl+B)"
+          aria-label="Open sidebar"
+          className="absolute left-0 top-1 z-10 flex h-8 w-6 items-center justify-center rounded-r-md border border-l-0 bg-transparent opacity-70 transition-[background-color,opacity] hover:bg-[var(--pal-panel-bg)] hover:opacity-100 focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--pal-link)]"
+          style={{ color: 'var(--pal-muted)', borderColor: 'var(--pal-border-soft)' }}
+        >
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="m9 6 6 6-6 6" />
+          </svg>
+        </button>
+      )}
       <div className="text-center max-w-md px-8">
         {/* Logo */}
         <div className="mb-6">

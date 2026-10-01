@@ -1,0 +1,42 @@
+/* Snapshot of the original default dark tokens from src/renderer/tokens.css.
+   Reference only: this file is not imported by the app.
+   Original fixed shell colors: titlebar/sidebar #222c36, editor/status #1c2733,
+   editor toolbar #181e26, line gutter/search bar #141c24, menus #28323e,
+   settings panel #252f3b.
+   Original picker: bgDark #1a222b; swatchesDark #d0d7de, #58a6ff, #9cccd8. */
+/* Original Tailwind md-* dark colors: bg hsl(212,18%,16%),
+   surface hsl(212,18%,13%), border hsl(212,12%,25%),
+   text hsl(212,20%,85%), muted hsl(212,12%,55%), accent #58a6ff. */
+.dark {
+  --pal-viewer-bg: #1a222b;
+  --pal-editor-bg: #1c2733;
+  --pal-editor-toolbar-bg: rgb(31, 36, 42);
+  --pal-panel-bg: #1c2733;
+  --pal-border-soft: hsla(212, 12%, 25%, 0.5);
+  --pal-bg: #1a222b;
+  --pal-text: #d0d7de;
+  --pal-link: #58a6ff;
+  --pal-border: hsl(212, 12%, 25%);
+  --pal-muted: hsl(212, 12%, 55%);
+  --pal-blockquote-border: hsl(212, 12%, 25%);
+  --pal-blockquote-text: hsl(212, 12%, 55%);
+  --pal-code-bg: #1e2733;
+  --pal-code-text: #9cccd8;
+  --pal-pre-bg: #181e26;
+  --pal-pre-border: hsl(212, 12%, 25%);
+  --pal-th-bg: #1c2733;
+  --pal-th-border: hsl(212, 12%, 25%);
+  --pal-td-border: hsl(212, 12%, 25%);
+  --pal-tr-even-bg: rgba(30, 42, 56, 0.3);
+  --pal-hr: hsl(212, 12%, 25%);
+  --pal-h6-text: hsl(212, 12%, 55%);
+  --pal-selection: rgba(88, 166, 255, 0.2);
+  --pal-heading-border: hsl(212, 12%, 25%);
+  --pal-cb-bg: #181e26;
+  --pal-cb-border: hsl(212, 12%, 25%);
+  --pal-cb-lang-bg: hsl(212, 12%, 25%);
+  --pal-cb-lang-text: hsl(211, 22%, 79%);
+  --pal-cb-btn-bg: rgba(55, 65, 81, 0.6);
+  --pal-cb-btn-hover: #374151;
+  --pal-cb-btn-text: #9ca3af;
+}

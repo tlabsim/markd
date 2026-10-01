@@ -70,7 +70,7 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
     <div className={`titlebar flex items-center justify-between px-3 transition-colors duration-300 select-none relative
       ${distractionFree
         ? 'absolute top-0 left-0 right-0 z-50'
-        : `z-20 bg-white dark:bg-[#222c36] border-b ${matchToolbarPalette ? 'border-gray-300/40 dark:border-gray-600/40' : 'border-gray-200 dark:border-gray-700/50'}`
+        : `z-20 bg-white dark:bg-[#181a1f] border-b ${matchToolbarPalette ? 'border-gray-300/40 dark:border-gray-600/40' : 'border-gray-200 dark:border-gray-700/50'}`
       }`}
       style={{
         height: 40,
@@ -101,7 +101,7 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
         {/* Context Menu */}
         {menuOpen && (
           <div
-            className="absolute top-full left-0 mt-1 w-56 bg-white dark:bg-[#28323e] border border-gray-200 dark:border-gray-600 rounded-md shadow-2xl z-[60] py-1"
+            className="absolute top-full left-0 mt-1 w-56 bg-white dark:bg-[#30353d] border border-gray-200 dark:border-gray-600 rounded-md shadow-2xl z-[60] py-1"
             style={{
               ...(matchToolbarPalette ? { backgroundColor: 'var(--pal-panel-bg)', borderColor: 'var(--pal-border)' } : {}),
               filter: 'brightness(1.04) saturate(1.08)',
@@ -137,7 +137,7 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
               </button>
               {/* Submenu flyout — CSS hover, no gap */}
               <div
-                className="absolute left-full top-0 w-56 bg-white dark:bg-[#28323e] border border-gray-200 dark:border-gray-600 rounded-md shadow-2xl py-1 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity duration-75 -translate-y-2"
+                className="absolute left-full top-0 w-56 bg-white dark:bg-[#30353d] border border-gray-200 dark:border-gray-600 rounded-md shadow-2xl py-1 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity duration-75 -translate-y-2"
                 style={matchToolbarPalette ? { backgroundColor: 'var(--pal-panel-bg)', borderColor: 'var(--pal-border)' } : undefined}
               >
                 {recentFiles && recentFiles.length > 0 ? (

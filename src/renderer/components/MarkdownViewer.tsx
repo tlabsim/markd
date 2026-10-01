@@ -13,8 +13,19 @@ import rehypeHighlight from 'rehype-highlight';
 import rehypeRaw from 'rehype-raw';
 import { useStore } from '../store';
 import mermaid from 'mermaid';
+import { CircleAlert, FileText, Info, Lightbulb, OctagonAlert, TriangleAlert, type LucideIcon } from 'lucide-react';
 
 const SvgBackgroundImage = React.lazy(() => import('./SvgBackgroundImage'));
+
+const CALLOUT_ICONS = new Map<string, LucideIcon>([
+  ['note', Info],
+  ['info', Info],
+  ['tip', Lightbulb],
+  ['warning', TriangleAlert],
+  ['caution', TriangleAlert],
+  ['danger', OctagonAlert],
+  ['important', CircleAlert],
+]);
 
 mermaid.initialize({
   startOnLoad: false,
@@ -22,6 +33,22 @@ mermaid.initialize({
   securityLevel: 'loose',
   fontFamily: 'inherit',
 });
+
+let mermaidTheme: 'default' | 'dark' = 'default';
+let mermaidRenderQueue = Promise.resolve();
+
+function renderMermaid(id: string, code: string, dark: boolean) {
+  const theme = dark ? 'dark' : 'default';
+  const render = mermaidRenderQueue.then(() => {
+    if (mermaidTheme !== theme) {
+      mermaid.initialize({ startOnLoad: false, theme, securityLevel: 'loose', fontFamily: 'inherit' });
+      mermaidTheme = theme;
+    }
+    return mermaid.render(id, code);
+  });
+  mermaidRenderQueue = render.then(() => undefined, () => undefined);
+  return render;
+}
 
 function reactNodeToText(node: React.ReactNode): string {
   if (typeof node === 'string' || typeof node === 'number') return String(node);
@@ -321,11 +348,6 @@ function remarkHighlight() {
 // ---- Remark plugin: callouts (:::type ... :::) ----
 function remarkCallouts() {
   return (tree: any) => {
-    const icons: Record<string, string> = {
-      note: 'ℹ️', tip: '💡', info: 'ℹ️', warning: '⚠️',
-      caution: '⚠️', danger: '🚨', important: '❗',
-    };
-
     const preserveSoftBreaks = (node: any) => {
       if (!Array.isArray(node.children)) return;
       const children: any[] = [];
@@ -364,8 +386,8 @@ function remarkCallouts() {
           children: [
             {
               type: 'emphasis',
-              data: { hName: 'span', hProperties: { className: ['admonition-icon'] } },
-              children: [{ type: 'text', value: icons[type] || '📝' }],
+              data: { hName: 'span', hProperties: { className: ['admonition-icon'], 'data-callout-icon': type } },
+              children: [{ type: 'text', value: type }],
             },
             {
               type: 'strong',
@@ -511,7 +533,7 @@ function rehypeSearchHighlight(options: {
 }
 
 // ---- Mermaid diagram renderer ----
-const MermaidBlock: React.FC<{ code: string }> = ({ code }) => {
+const MermaidBlock: React.FC<{ code: string; dark: boolean }> = ({ code, dark }) => {
   const [svg, setSvg] = useState<string | null>(null);
   const [error, setError] = useState(false);
   const idRef = useRef(`m-${Math.random().toString(36).slice(2, 9)}`);
@@ -521,12 +543,12 @@ const MermaidBlock: React.FC<{ code: string }> = ({ code }) => {
     setError(false); setSvg(null);
     (async () => {
       try {
-        const { svg: rendered } = await mermaid.render(`${idRef.current}-svg`, code);
+        const { svg: rendered } = await renderMermaid(`${idRef.current}-svg`, code, dark);
         if (!cancelled) setSvg(rendered);
       } catch { if (!cancelled) setError(true); }
     })();
     return () => { cancelled = true; };
-  }, [code]);
+  }, [code, dark]);
 
   if (error) return (
     <div className="my-6 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-4">
@@ -941,6 +963,13 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, s
   const components = useMemo(() => ({
     h1: makeHeading('h1'), h2: makeHeading('h2'), h3: makeHeading('h3'),
     h4: makeHeading('h4'), h5: makeHeading('h5'), h6: makeHeading('h6'),
+    span: ({ className, children, ...props }: any) => {
+      if (className === 'admonition-icon') {
+        const Icon = CALLOUT_ICONS.get(props['data-callout-icon']) || FileText;
+        return <span className={className} aria-hidden="true"><Icon size={17} strokeWidth={2.2} /></span>;
+      }
+      return <span className={className} {...props}>{children}</span>;
+    },
     a: ({ href, children, ...props }: any) => (
       <a href={href} onClick={(e) => { if (href?.startsWith('http://') || href?.startsWith('https://')) { e.preventDefault(); window.markd?.openExternal(href); } }} {...props}>{children}</a>
     ),
@@ -983,7 +1012,7 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, s
       const langMatch = langClass.match(/language-(\w+)/);
       const lang = langMatch ? langMatch[1] : null;
       const codeText = reactNodeToText(codeChild?.props?.children);
-      if (lang === 'mermaid') return <MermaidBlock code={codeText} />;
+      if (lang === 'mermaid') return <MermaidBlock code={codeText} dark={theme === 'dark'} />;
       const isDiff = lang === 'diff';
       const [copied, setCopied] = useState(false);
       const copyCode = useCallback((e: React.MouseEvent) => {
@@ -1026,7 +1055,7 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, s
         style={{ background: 'var(--pal-viewer-bg)' }}
         onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}>
         <div className="max-w-4xl mx-auto markdown-body"
-          data-palette={previewPalette !== 'default' ? previewPalette : undefined}
+          data-palette={previewPalette !== 'default' || theme === 'dark' ? previewPalette : undefined}
           style={{ fontFamily: computedFont, zoom: `${zoomLevel}%` }}>
           {fileContent ? (
             <ReactMarkdown

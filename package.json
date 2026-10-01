@@ -27,7 +27,6 @@
     "generate-icons": "node scripts/generate-icons.mjs",
     "generate-store-assets": "node scripts/generate-store-assets.mjs"
   },
-  "dependencies": {},
   "devDependencies": {
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
@@ -38,6 +37,7 @@
     "electron": "^31.0.0",
     "electron-builder": "^24.13.3",
     "katex": "^0.16.9",
+    "lucide-react": "1.49.0",
     "mermaid": "^11.15.0",
     "postcss": "^8.4.38",
     "react": "^18.3.1",

@@ -451,6 +451,13 @@ h1, h2, h3, h4, h5, h6 {
   gap: 0.5rem;
   margin-bottom: 0.35rem;
 }
+.admonition-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 17px;
+  height: 17px;
+}
 .admonition-type {
   font-size: 0.9em;
   font-weight: 700;
@@ -487,6 +494,28 @@ h1, h2, h3, h4, h5, h6 {
   color: #7f1d1d;
 }
 .dark .admonition-danger, .dark .admonition-important { background: rgba(239, 68, 68, 0.1); color: #fca5a5; }
+
+html[data-palette="contrast"] .admonition {
+  --callout-outline: #d1d5db;
+  border-top: 1px solid var(--callout-outline);
+  border-right: 1px solid var(--callout-outline);
+  border-bottom: 1px solid var(--callout-outline);
+}
+html.dark[data-palette="contrast"] .admonition { --callout-outline: #6b7280; }
+html[data-palette="contrast"] .admonition-note { --callout-outline: #bfdbfe; }
+html[data-palette="contrast"] .admonition-tip,
+html[data-palette="contrast"] .admonition-info { --callout-outline: #a7f3d0; }
+html[data-palette="contrast"] .admonition-warning,
+html[data-palette="contrast"] .admonition-caution { --callout-outline: #fde68a; }
+html[data-palette="contrast"] .admonition-danger,
+html[data-palette="contrast"] .admonition-important { --callout-outline: #fecaca; }
+html.dark[data-palette="contrast"] .admonition-note { --callout-outline: #3e5f8f; }
+html.dark[data-palette="contrast"] .admonition-tip,
+html.dark[data-palette="contrast"] .admonition-info { --callout-outline: #2b745f; }
+html.dark[data-palette="contrast"] .admonition-warning,
+html.dark[data-palette="contrast"] .admonition-caution { --callout-outline: #95702e; }
+html.dark[data-palette="contrast"] .admonition-danger,
+html.dark[data-palette="contrast"] .admonition-important { --callout-outline: #99464a; }
 
 /* ---- <mark> highlight ---- */
 mark {

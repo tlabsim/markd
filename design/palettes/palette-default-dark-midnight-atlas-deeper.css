@@ -1,0 +1,40 @@
+/* Snapshot before Graphite Fog Slate Swapped replaced the default dark palette.
+   Reference only: this file is not imported by the app.
+   Fixed shell: titlebar #0d1520, sidebar/status #111e2c, editor #172537,
+   toolbar/menus/settings #1d3044, editor gutter #111e2c.
+   Tailwind md-* dark: bg #132132, surface #111e2c, border #30475c,
+   text #dfeaf5, muted #9fb4c7, accent #82befb.
+   Picker: bgDark #132132; swatchesDark #dfeaf5, #82befb, #abcff7. */
+.dark {
+  --pal-viewer-bg: #132132;
+  --pal-editor-bg: #172537;
+  --pal-editor-toolbar-bg: #1d3044;
+  --pal-panel-bg: #1d3044;
+  --pal-border-soft: rgba(48, 71, 92, 0.55);
+  --pal-bg: #132132;
+  --pal-text: #dfeaf5;
+  --pal-link: #82befb;
+  --pal-border: #30475c;
+  --pal-muted: #9fb4c7;
+  --pal-blockquote-border: #52748d;
+  --pal-blockquote-text: #abc7dc;
+  --pal-code-bg: #0e1b2a;
+  --pal-code-text: #abcff7;
+  --pal-pre-bg: #0e1b2a;
+  --pal-pre-border: #30475c;
+  --pal-th-bg: #1d3044;
+  --pal-th-border: #30475c;
+  --pal-td-border: #30475c;
+  --pal-tr-even-bg: rgba(29, 48, 68, 0.45);
+  --pal-hr: #30475c;
+  --pal-h6-text: #9fb4c7;
+  --pal-selection: rgba(130, 190, 251, 0.22);
+  --pal-heading-border: #30475c;
+  --pal-cb-bg: #0e1b2a;
+  --pal-cb-border: #30475c;
+  --pal-cb-lang-bg: #263f56;
+  --pal-cb-lang-text: #bdcee0;
+  --pal-cb-btn-bg: rgba(39, 63, 84, 0.78);
+  --pal-cb-btn-hover: #30475c;
+  --pal-cb-btn-text: #9fb4c7;
+}

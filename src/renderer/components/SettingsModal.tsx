@@ -126,7 +126,7 @@ const TabBar: React.FC<{ activeTab: Tab; onTab: (t: Tab) => void }> = ({ activeT
   ];
   return (
     <div
-      className="flex border-b border-gray-700/10 dark:border-white/5 bg-gray-50 dark:bg-[#1a222b]"
+      className="flex border-b border-gray-700/10 dark:border-white/5 bg-gray-50 dark:bg-[#202329]"
       style={matchToolbarPalette ? { backgroundColor: 'var(--pal-editor-toolbar-bg)', borderColor: 'var(--pal-border)' } : undefined}
     >
       {tabs.map((tab) => (
@@ -242,7 +242,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
       />
       {/* Modal */}
       <div
-        className="relative w-[520px] max-w-[92vw] max-h-[85vh] bg-white dark:bg-[#252f3b] rounded-xl shadow-2xl border border-gray-200 dark:border-gray-600 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150"
+        className="relative w-[520px] max-w-[92vw] max-h-[85vh] bg-white dark:bg-[#30353d] rounded-xl shadow-2xl border border-gray-200 dark:border-gray-600 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150"
         style={matchToolbarPalette ? { backgroundColor: 'var(--pal-panel-bg)', borderColor: 'var(--pal-border)' } : undefined}
       >
         {/* Header */}

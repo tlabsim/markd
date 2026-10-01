@@ -7,27 +7,27 @@ export default {
       colors: {
         'md-bg': {
           DEFAULT: '#ffffff',
-          dark: 'hsl(212, 18%, 16%)',
+          dark: '#292d35',
         },
         'md-surface': {
           DEFAULT: '#f6f8fa',
-          dark: 'hsl(212, 18%, 13%)',
+          dark: '#202329',
         },
         'md-border': {
           DEFAULT: '#d0d7de',
-          dark: 'hsl(212, 12%, 25%)',
+          dark: '#424952',
         },
         'md-text': {
           DEFAULT: '#1f2328',
-          dark: 'hsl(212, 20%, 85%)',
+          dark: '#dbe1e7',
         },
         'md-muted': {
           DEFAULT: '#656d76',
-          dark: 'hsl(212, 12%, 55%)',
+          dark: '#a4adb7',
         },
         'md-accent': {
           DEFAULT: '#0969da',
-          dark: '#58a6ff',
+          dark: '#aab5c4',
         },
         'md-green': {
           DEFAULT: '#1a7f37',

@@ -27,7 +27,7 @@ const StatusBar: React.FC<{ matchPalette?: boolean; paletteBg?: string; paletteB
         matchPalette
           ? 'border-t border-gray-300/40 dark:border-gray-600/40'
           : 'border-t border-gray-200 dark:border-gray-700/50'
-      } bg-gray-100 dark:bg-[#1c2733]`}
+      } bg-gray-100 dark:bg-[#202329]`}
       style={{
         paddingBottom: 6,
         paddingTop: 4,
