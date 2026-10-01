@@ -95,7 +95,7 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
         ...(distractionFree ? {
           backgroundColor: 'var(--pal-viewer-bg)',
         } : matchToolbarPalette ? {
-          backgroundColor: 'var(--pal-panel-bg)',
+          backgroundColor: 'var(--pal-titlebar-bg, var(--pal-panel-bg))',
           borderColor: 'var(--pal-border)',
         } : {}),
       }}
@@ -138,7 +138,7 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
             {menuItem('Open Folder...', 'Ctrl+Shift+O', onOpenFolder)}
             <div className="border-t border-gray-200 dark:border-gray-600 my-1" />
             {distractionFree ? (
-              onEditDocument && menuItem('Edit Document', null, onEditDocument)
+              currentFile && onEditDocument && menuItem('Edit Document', null, onEditDocument)
             ) : (
               <>
                 {menuItem('Save', 'Ctrl+S', onSaveFile)}
@@ -225,7 +225,7 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
 
       {/* Right: Window controls */}
       <div className="flex items-center gap-1 z-10">
-        {distractionFree && onEditDocument && !isMaximized && (
+        {distractionFree && currentFile && onEditDocument && !isMaximized && (
           <button
             className="titlebar-button w-auto px-3 h-[18px] flex items-center justify-center rounded text-[12px] font-semibold bg-slate-700/10 hover:bg-blue-700 hover:text-white dark:bg-white/10  dark:hover:bg-blue-400 text-slate-500 dark:text-gray-300 dark:hover:text-white transition-colors duration-150"
             onClick={onEditDocument}

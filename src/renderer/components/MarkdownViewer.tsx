@@ -13,7 +13,7 @@ import rehypeHighlight from 'rehype-highlight';
 import rehypeRaw from 'rehype-raw';
 import { useStore } from '../store';
 import mermaid from 'mermaid';
-import { CircleAlert, FileText, Info, Lightbulb, OctagonAlert, TriangleAlert, type LucideIcon } from 'lucide-react';
+import { CircleAlert, FileText, Info, Lightbulb, ListTree, OctagonAlert, TriangleAlert, type LucideIcon } from 'lucide-react';
 
 const SvgBackgroundImage = React.lazy(() => import('./SvgBackgroundImage'));
 
@@ -456,6 +456,7 @@ import TableOfContents from './TableOfContents';
 interface MarkdownViewerProps {
   showToc?: boolean;
   onToggleToc?: () => void;
+  onOpenToc?: () => void;
   syncScroll?: 'off' | 'position' | 'content';
   onScrollRef?: (el: HTMLElement | null) => void;
   onViewerScroll?: () => void;
@@ -682,7 +683,7 @@ function cacheBustLocalFileUrl(src: string, token: number): string {
   return `${src}${separator}markdReload=${token}`;
 }
 
-const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, syncScroll, onScrollRef, onViewerScroll, distractionFree = false }) => {
+const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, onOpenToc, syncScroll, onScrollRef, onViewerScroll, distractionFree = false }) => {
   const {
     fileContent,
     currentFilePath,
@@ -1052,6 +1053,8 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, s
     caseSensitive: searchCaseSensitive,
   }] as any, [viewMode, isSearchOpen, searchQuery, searchCurrentIndex, searchUseRegex, searchCaseSensitive]);
 
+  const tocIsPinned = tocPinned && !distractionFree;
+
   return (
     <div className="viewer-layout h-full flex relative min-w-0">
       <div className="viewer-preview min-w-0 flex-1 flex flex-col relative">
@@ -1077,12 +1080,30 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, s
       <BackToTop containerRef={contentRef} />
       <ZoomIndicator enabled={distractionFree} zoomLevel={zoomLevel} />
       </div>
-      <div className={`viewer-toc ${showToc && tocPinned ? 'viewer-toc--pinned' : 'viewer-toc--overlay'} ${showToc ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+      {distractionFree && !showToc && (
+        <button
+          type="button"
+          className="absolute right-3 top-3 z-30 flex h-8 w-8 items-center justify-center rounded-md border shadow-sm opacity-50 transition-opacity duration-200 hover:opacity-100 focus-visible:opacity-100"
+          style={{
+            backgroundColor: 'color-mix(in srgb, var(--pal-panel-bg) 82%, transparent)',
+            borderColor: 'var(--pal-border-soft)',
+            color: 'var(--pal-muted)',
+            backdropFilter: 'blur(6px)',
+          }}
+          title="Show table of contents (Ctrl+T)"
+          aria-label="Show table of contents"
+          onClick={onOpenToc}
+        >
+          <ListTree className="h-4 w-4" strokeWidth={1.75} />
+        </button>
+      )}
+      <div className={`viewer-toc ${showToc && tocIsPinned ? 'viewer-toc--pinned' : 'viewer-toc--overlay'} ${showToc ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
         <TableOfContents
           content={fileContent}
           onClose={() => onToggleToc?.()}
-          pinned={tocPinned}
+          pinned={tocIsPinned}
           onPinToggle={() => setTocPinned(!tocPinned)}
+          canPin={!distractionFree}
           matchPalette={matchToolbarPalette}
           zoomLevel={zoomLevel}
           scrollContainerRef={contentRef}

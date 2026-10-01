@@ -1,7 +1,6 @@
 /* ========================================
    Markd Design Tokens
-   CSS custom properties set via JavaScript (App.tsx).
-   This file: CSS-driven overrides needing attribute selectors.
+   Palette variables are shared by the app and palette swatches.
    ======================================== */
 
 html[data-match-palette] [class*="border-b"] { border-color: var(--pal-border); }
@@ -19,7 +18,7 @@ html[data-match-palette] [class*="text-gray-500"] { color: var(--pal-muted); }
 html[data-match-palette] .btn-icon svg { color: var(--pal-muted); }
 html[data-match-palette] [class*="px-2.5 py-1 text-xs"] { color: var(--pal-muted); }
 /* ---- Default (no palette) — Light ---- */
-:root {
+:root, .palette-preview[data-palette="default"] {
   --pal-viewer-bg: #ffffff;
   --pal-editor-bg: rgb(247, 249, 251);
   --pal-editor-toolbar-bg: #eceef1;
@@ -55,38 +54,109 @@ html[data-match-palette] [class*="px-2.5 py-1 text-xs"] { color: var(--pal-muted
 }
 
 /* ---- Default — Dark ---- */
-.dark {
-  --pal-viewer-bg: #292d35;
-  --pal-editor-bg: #23262c;
-  --pal-editor-toolbar-bg: #30353d;
-  --pal-panel-bg: #30353d;
-  --pal-border-soft: rgba(66, 73, 82, 0.55);
-  --pal-bg: #292d35;
-  --pal-text: #dbe1e7;
-  --pal-link: #aab5c4;
-  --pal-border: #424952;
-  --pal-muted: #a4adb7;
-  --pal-blockquote-border: #737e8d;
-  --pal-blockquote-text: #c1cad6;
-  --pal-code-bg: #1c2026;
-  --pal-code-text: #c1cad6;
-  --pal-pre-bg: #1c2026;
-  --pal-pre-border: #424952;
-  --pal-th-bg: #30353d;
-  --pal-th-border: #424952;
-  --pal-td-border: #424952;
-  --pal-tr-even-bg: rgba(48, 53, 61, 0.5);
-  --pal-hr: #424952;
-  --pal-h6-text: #a4adb7;
-  --pal-selection: rgba(170, 181, 196, 0.25);
-  --pal-heading-border: #424952;
-  --pal-cb-bg: #1c2026;
-  --pal-cb-border: #424952;
-  --pal-cb-lang-bg: #3b4654;
-  --pal-cb-lang-text: #d1d8e0;
-  --pal-cb-btn-bg: rgba(66, 73, 82, 0.75);
-  --pal-cb-btn-hover: #4b535e;
-  --pal-cb-btn-text: #a4adb7;
+.dark, .palette-preview.palette-preview--dark[data-palette="default"] {
+  --pal-viewer-bg: #22252b;
+  --pal-editor-bg: #1c1f24;
+  --pal-editor-toolbar-bg: #292d34;
+  --pal-panel-bg: #292d34;
+  --pal-border-soft: rgba(57, 64, 73, 0.55);
+  --pal-bg: #22252b;
+  --pal-text: #d5dce3;
+  --pal-link: #a5b0be;
+  --pal-border: #394049;
+  --pal-muted: #9ca7b2;
+  --pal-blockquote-border: #687584;
+  --pal-blockquote-text: #b9c4d0;
+  --pal-code-bg: #171a1f;
+  --pal-code-text: #b9c4d0;
+  --pal-pre-bg: #171a1f;
+  --pal-pre-border: #394049;
+  --pal-th-bg: #292d34;
+  --pal-th-border: #394049;
+  --pal-td-border: #394049;
+  --pal-tr-even-bg: rgba(41, 45, 52, 0.5);
+  --pal-hr: #394049;
+  --pal-h6-text: #9ca7b2;
+  --pal-selection: rgba(165, 176, 190, 0.25);
+  --pal-heading-border: #394049;
+  --pal-cb-bg: #171a1f;
+  --pal-cb-border: #394049;
+  --pal-cb-lang-bg: #343e4b;
+  --pal-cb-lang-text: #cbd3dc;
+  --pal-cb-btn-bg: rgba(57, 64, 73, 0.75);
+  --pal-cb-btn-hover: #424a54;
+  --pal-cb-btn-text: #9ca7b2;
+}
+
+/* ---- Graphite — Light ---- */
+html[data-palette="graphite"], .palette-preview[data-palette="graphite"] {
+  --pal-viewer-bg: #f1f1f0;
+  --pal-editor-bg: #e8e8e7;
+  --pal-editor-toolbar-bg: #eaeae9;
+  --pal-panel-bg: #e5e5e4;
+  --pal-border-soft: rgba(201, 201, 200, 0.6);
+  --pal-bg: #f1f1f0;
+  --pal-text: #292929;
+  --pal-link: #355f75;
+  --pal-border: #c9c9c8;
+  --pal-muted: #5c5c5c;
+  --pal-blockquote-border: #a9a9a7;
+  --pal-blockquote-text: #555555;
+  --pal-code-bg: #e4e4e3;
+  --pal-code-text: #3b4b55;
+  --pal-pre-bg: #e8e8e7;
+  --pal-pre-border: #c9c9c8;
+  --pal-th-bg: #e5e5e4;
+  --pal-th-border: #c9c9c8;
+  --pal-td-border: #c9c9c8;
+  --pal-tr-even-bg: rgba(229, 229, 228, 0.5);
+  --pal-hr: #c9c9c8;
+  --pal-h6-text: #5c5c5c;
+  --pal-selection: rgba(53, 95, 117, 0.2);
+  --pal-heading-border: #c9c9c8;
+  --pal-cb-bg: #e8e8e7;
+  --pal-cb-border: #c9c9c8;
+  --pal-cb-lang-bg: #d6d6d5;
+  --pal-cb-lang-text: #555555;
+  --pal-cb-btn-bg: rgba(201, 201, 200, 0.5);
+  --pal-cb-btn-hover: #d6d6d5;
+  --pal-cb-btn-text: #555555;
+}
+
+/* ---- Graphite — Dark ---- */
+html.dark[data-palette="graphite"], .palette-preview.palette-preview--dark[data-palette="graphite"] {
+  --pal-viewer-bg: #18191a;
+  --pal-editor-bg: #18191a;
+  --pal-editor-toolbar-bg: #1f2021;
+  --pal-panel-bg: #1f2021;
+  --pal-titlebar-bg: #18191a;
+  --pal-border-soft: rgba(48, 49, 50, 0.65);
+  --pal-bg: #18191a;
+  --pal-text: #c9cacb;
+  --pal-link: #9fb8cf;
+  --pal-border: #303132;
+  --pal-muted: #9d9e9f;
+  --pal-blockquote-border: #555657;
+  --pal-blockquote-text: #bcbdbe;
+  --pal-code-bg: #252627;
+  --pal-code-text: #d2d3d4;
+  --pal-pre-bg: #1b1c1d;
+  --pal-pre-border: #303132;
+  --pal-th-bg: #202122;
+  --pal-th-border: #303132;
+  --pal-td-border: #303132;
+  --pal-tr-even-bg: rgba(32, 33, 34, 0.5);
+  --pal-hr: #303132;
+  --pal-h6-text: #9d9e9f;
+  --pal-selection: rgba(102, 153, 194, 0.26);
+  --pal-heading-border: #303132;
+  --pal-cb-bg: #1b1c1d;
+  --pal-cb-border: #303132;
+  --pal-cb-lang-bg: #292a2b;
+  --pal-cb-lang-text: #c3c4c5;
+  --pal-cb-btn-bg: rgba(48, 49, 50, 0.75);
+  --pal-cb-btn-hover: #3a3b3c;
+  --pal-cb-btn-text: #9d9e9f;
 }
 
 /* ---- Sepia — Light ---- */
@@ -120,7 +190,7 @@ html[data-match-palette] [class*="px-2.5 py-1 text-xs"] { color: var(--pal-muted
   --pal-cb-btn-text: #5c5044;
 } */
 
-html[data-palette="sepia"] {
+html[data-palette="sepia"], .palette-preview[data-palette="sepia"] {
   --pal-viewer-bg: #f6f2ef;
   --pal-editor-bg: #ede9e2;
   --pal-editor-toolbar-bg: #f1eee9;
@@ -156,43 +226,42 @@ html[data-palette="sepia"] {
 }
 
 /* ---- Sepia — Dark ---- */
-html.dark[data-palette="sepia"],
-html[data-palette="sepia"].dark {
-  --pal-viewer-bg: #2a2624;
-  --pal-editor-bg: #302b28;
-  --pal-editor-toolbar-bg: #39322e;
-  --pal-panel-bg: #39322e;
-  --pal-border-soft: rgba(83, 71, 65, 0.55);
-  --pal-bg: #2a2624;
-  --pal-text: #eee6df;
-  --pal-link: #e6ac7b;
-  --pal-border: #534741;
-  --pal-muted: #baa9a0;
-  --pal-blockquote-border: #9e6f50;
-  --pal-blockquote-text: #d4b9a3;
-  --pal-code-bg: #231f1d;
-  --pal-code-text: #eac5a1;
-  --pal-pre-bg: #231f1d;
-  --pal-pre-border: #534741;
-  --pal-th-bg: #39322e;
-  --pal-th-border: #534741;
-  --pal-td-border: #534741;
-  --pal-tr-even-bg: rgba(57, 50, 46, 0.48);
-  --pal-hr: #534741;
-  --pal-h6-text: #baa9a0;
-  --pal-selection: rgba(230, 172, 123, 0.25);
-  --pal-heading-border: #534741;
-  --pal-cb-bg: #231f1d;
-  --pal-cb-border: #534741;
-  --pal-cb-lang-bg: #493d36;
-  --pal-cb-lang-text: #d8c2b1;
-  --pal-cb-btn-bg: rgba(83, 71, 65, 0.7);
-  --pal-cb-btn-hover: #534741;
-  --pal-cb-btn-text: #baa9a0;
+html.dark[data-palette="sepia"], .palette-preview.palette-preview--dark[data-palette="sepia"] {
+  --pal-viewer-bg: #292522;
+  --pal-editor-bg: #24201e;
+  --pal-editor-toolbar-bg: #312b27;
+  --pal-panel-bg: #312b27;
+  --pal-border-soft: rgba(72, 61, 52, 0.6);
+  --pal-bg: #292522;
+  --pal-text: #ded4c9;
+  --pal-link: #cba983;
+  --pal-border: #483d34;
+  --pal-muted: #aa9b8d;
+  --pal-blockquote-border: #8f7562;
+  --pal-blockquote-text: #ccb8a6;
+  --pal-code-bg: #1e1a18;
+  --pal-code-text: #d5bea9;
+  --pal-pre-bg: #1e1a18;
+  --pal-pre-border: #483d34;
+  --pal-th-bg: #312b27;
+  --pal-th-border: #483d34;
+  --pal-td-border: #483d34;
+  --pal-tr-even-bg: rgba(49, 43, 39, 0.5);
+  --pal-hr: #483d34;
+  --pal-h6-text: #aa9b8d;
+  --pal-selection: rgba(203, 169, 131, 0.26);
+  --pal-heading-border: #483d34;
+  --pal-cb-bg: #1e1a18;
+  --pal-cb-border: #483d34;
+  --pal-cb-lang-bg: #3e342d;
+  --pal-cb-lang-text: #d0bfae;
+  --pal-cb-btn-bg: rgba(72, 61, 52, 0.7);
+  --pal-cb-btn-hover: #55483e;
+  --pal-cb-btn-text: #c3b3a5;
 }
 
 /* ---- High Contrast — Light ---- */
-html[data-palette="contrast"] {
+html[data-palette="contrast"], .palette-preview[data-palette="contrast"] {
   --pal-viewer-bg: #ffffff;
   --pal-editor-bg: #ffffff;
   --pal-editor-toolbar-bg: #f3f4f6;
@@ -228,8 +297,7 @@ html[data-palette="contrast"] {
 }
 
 /* ---- High Contrast — Dark ---- */
-html.dark[data-palette="contrast"],
-html[data-palette="contrast"].dark {
+html.dark[data-palette="contrast"], .palette-preview.palette-preview--dark[data-palette="contrast"] {
   --pal-viewer-bg: #0a0a0a;
   --pal-editor-bg: #111;
   --pal-editor-toolbar-bg: #17191c;
@@ -264,7 +332,7 @@ html[data-palette="contrast"].dark {
 }
 
 /* ---- Cool Blue — Light ---- */
-html[data-palette="cool"] {
+html[data-palette="cool"], .palette-preview[data-palette="cool"] {
   --pal-viewer-bg: #f0f4f8;
   --pal-editor-bg: #f0f4f8;
   --pal-editor-toolbar-bg: #f8fafc;
@@ -300,8 +368,7 @@ html[data-palette="cool"] {
 }
 
 /* ---- Cool Blue — Dark ---- */
-html.dark[data-palette="cool"],
-html[data-palette="cool"].dark {
+html.dark[data-palette="cool"], .palette-preview.palette-preview--dark[data-palette="cool"] {
   --pal-viewer-bg: #121a28;
   --pal-editor-bg: #161f30;
   --pal-editor-toolbar-bg: rgba(30, 41, 59, 0.5);

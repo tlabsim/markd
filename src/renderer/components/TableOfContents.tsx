@@ -17,6 +17,7 @@ interface TableOfContentsProps {
   onClose: () => void;
   pinned: boolean;
   onPinToggle: () => void;
+  canPin: boolean;
   matchPalette?: boolean;
   zoomLevel?: number;
   scrollContainerRef?: React.RefObject<HTMLElement | null>;
@@ -73,17 +74,17 @@ const TreeNode: React.FC<{
   return (
     <div className="relative">
       {!isRoot && !isLastSibling && (
-        <span aria-hidden="true" className="pointer-events-none absolute -left-px top-0 bottom-0 w-[1px] bg-slate-300 dark:bg-slate-600" />
+        <span aria-hidden="true" className="toc-connector pointer-events-none absolute -left-px top-0 bottom-0 w-[1px]" />
       )}
       {/* Item row */}
       <div className="flex items-center group relative">
         {!isRoot && isLastSibling && (
-          <span aria-hidden="true" className="pointer-events-none absolute -left-px top-0 h-1/2 w-[1px] bg-slate-300 dark:bg-slate-600" />
+          <span aria-hidden="true" className="toc-connector pointer-events-none absolute -left-px top-0 h-1/2 w-[1px]" />
         )}
         {/* Horizontal connector: touches the border */}
         {!isRoot && (
           <span
-            className="absolute top-1/2 -translate-y-1/2 h-px bg-slate-300 dark:bg-slate-600"
+            className="toc-connector absolute top-1/2 -translate-y-1/2 h-px"
             style={{ left: `${-1}px`, width: `${connectorW}px` }}
           />
         )}
@@ -143,7 +144,7 @@ const TreeNode: React.FC<{
   );
 };
 
-const TableOfContents: React.FC<TableOfContentsProps> = ({ content, onClose, pinned, onPinToggle, matchPalette, zoomLevel = 100, scrollContainerRef }) => {
+const TableOfContents: React.FC<TableOfContentsProps> = ({ content, onClose, pinned, onPinToggle, canPin, matchPalette, zoomLevel = 100, scrollContainerRef }) => {
   // Scale TOC font: +0.25px per 10% zoom above 100%
   const tocFontSize = 12 + Math.max(0, (zoomLevel - 100) / 10) * 0.25;
   const tocRef = useRef<HTMLDivElement>(null);
@@ -248,15 +249,17 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ content, onClose, pin
           Contents
         </h3>
         <div className="flex items-center gap-0.5">
-          <button
-            className={`toc-pin-button btn-icon p-0.5 ${pinned ? 'text-blue-500 dark:text-blue-400' : ''}`}
-            title={pinned ? 'Unpin contents' : 'Pin contents'}
-            aria-label={pinned ? 'Unpin contents' : 'Pin contents'}
-            aria-pressed={pinned}
-            onClick={onPinToggle}
-          >
-            {pinned ? <PinOff className="w-3.5 h-3.5" strokeWidth={1.75} style={{ color: 'var(--pal-link)' }} /> : <Pin className="w-3.5 h-3.5" strokeWidth={1.75} />}
-          </button>
+          {canPin && (
+            <button
+              className={`toc-pin-button btn-icon p-0.5 ${pinned ? 'text-blue-500 dark:text-blue-400' : ''}`}
+              title={pinned ? 'Unpin contents' : 'Pin contents'}
+              aria-label={pinned ? 'Unpin contents' : 'Pin contents'}
+              aria-pressed={pinned}
+              onClick={onPinToggle}
+            >
+              {pinned ? <PinOff className="w-3.5 h-3.5" strokeWidth={1.75} style={{ color: 'var(--pal-link)' }} /> : <Pin className="w-3.5 h-3.5" strokeWidth={1.75} />}
+            </button>
+          )}
           {/* Collapse/Expand all */}
           <button
             className="btn-icon p-0.5"

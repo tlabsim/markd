@@ -130,13 +130,15 @@ export const PaletteSelector: React.FC<SelectorProps & {
                 className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 transition-colors ${selected ? 'text-blue-500 bg-blue-500/10' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5'}`}
                 onClick={() => { onPaletteChange(option.value); onOpenChange(false); }}
               >
-                <span className="flex gap-0.5 shrink-0">
-                  <span className="w-2.5 h-2.5 rounded-full inline dark:hidden ring-1 ring-black/10" style={{ backgroundColor: option.swatches[0] }} />
-                  <span className="w-2.5 h-2.5 rounded-full inline dark:hidden" style={{ backgroundColor: option.swatches[1] }} />
-                  <span className="w-2.5 h-2.5 rounded-full inline dark:hidden" style={{ backgroundColor: option.swatches[2] }} />
-                  <span className="w-2.5 h-2.5 rounded-full hidden dark:inline ring-1 ring-white/10" style={{ backgroundColor: option.swatchesDark[0] }} />
-                  <span className="w-2.5 h-2.5 rounded-full hidden dark:inline" style={{ backgroundColor: option.swatchesDark[1] }} />
-                  <span className="w-2.5 h-2.5 rounded-full hidden dark:inline" style={{ backgroundColor: option.swatchesDark[2] }} />
+                <span className="palette-preview flex gap-0.5 shrink-0 dark:hidden" data-palette={option.value}>
+                  <span className="w-2.5 h-2.5 rounded-full ring-1 ring-black/10" style={{ backgroundColor: 'var(--pal-viewer-bg)' }} />
+                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: 'var(--pal-text)' }} />
+                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: 'var(--pal-link)' }} />
+                </span>
+                <span className="palette-preview palette-preview--dark hidden gap-0.5 shrink-0 dark:flex" data-palette={option.value}>
+                  <span className="w-2.5 h-2.5 rounded-full ring-1 ring-white/10" style={{ backgroundColor: 'var(--pal-viewer-bg)' }} />
+                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: 'var(--pal-text)' }} />
+                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: 'var(--pal-link)' }} />
                 </span>
                 <span className="flex-1">{option.label}</span>
                 {selected && <svg className="w-3.5 h-3.5 text-blue-500 shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="m9.55 15.15l8.475-8.475q.3-.3.7-.3t.7.3t.3.713t-.3.712l-9.175 9.2q-.3.3-.7.3t-.7-.3L4.55 13q-.3-.3-.288-.712t.313-.713t.713-.3t.712.3z"/></svg>}
