@@ -476,7 +476,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
                   Markd
                 </h3>
                 <p className="text-[12px] text-gray-500 dark:text-gray-400">
-                  v{appVersion || '1.0.3'} — A beautiful, feature-rich desktop markdown viewer and editor
+                  v{appVersion || '1.0.4'} — A beautiful, feature-rich desktop markdown viewer and editor
                 </p>
               </div>
 
