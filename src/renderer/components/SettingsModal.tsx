@@ -126,7 +126,7 @@ const TabBar: React.FC<{ activeTab: Tab; onTab: (t: Tab) => void }> = ({ activeT
   ];
   return (
     <div
-      className="flex border-b border-gray-700/10 dark:border-white/5 bg-gray-50 dark:bg-[#202329]"
+      className="relative flex border-b border-gray-700/10 dark:border-white/5 bg-gray-50 dark:bg-[#202329]"
       style={matchToolbarPalette ? { backgroundColor: 'var(--pal-editor-toolbar-bg)', borderColor: 'var(--pal-border)' } : undefined}
     >
       {tabs.map((tab) => (
@@ -140,17 +140,22 @@ const TabBar: React.FC<{ activeTab: Tab; onTab: (t: Tab) => void }> = ({ activeT
           }`}
         >
           {tab.label}
-          {activeTab === tab.id && (
-            <span className="absolute bottom-0 left-1/4 right-1/4 h-0.5 bg-blue-500 rounded-full" />
-          )}
         </button>
       ))}
+      <span
+        className="settings-tab-indicator pointer-events-none absolute bottom-0 left-0 w-1/3 h-0.5"
+        style={{ transform: `translateX(${tabs.findIndex(item => item.id === activeTab) * 100}%)` }}
+        aria-hidden="true"
+      >
+        <span className="absolute inset-y-0 left-1/4 right-1/4 bg-blue-500 rounded-full" />
+      </span>
     </div>
   );
 };
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab, onSyntaxHighlightChange }) => {
   const [tab, setTab] = useState<Tab>(initialTab || 'settings');
+  const [mounted, setMounted] = useState(open);
   const [multiInstance, setMultiInstance] = useState(false);
   const [appVersion, setAppVersion] = useState<string>('');
 
@@ -158,6 +163,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
   useEffect(() => {
     if (open) setTab(initialTab || 'settings');
   }, [open, initialTab]);
+
+  useEffect(() => {
+    if (open) setMounted(true);
+  }, [open]);
 
   // Load multi-instance preference from main process on mount
   useEffect(() => {
@@ -231,19 +240,22 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
     setShowHeadingAnchors: state.setShowHeadingAnchors,
   })));
 
-  if (!open) return null;
+  if (!mounted) return null;
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center">
+    <div className={`fixed inset-0 z-[9999] flex items-center justify-center ${open ? '' : 'pointer-events-none'}`} aria-hidden={!open}>
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm"
+        className={`absolute inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm ${open ? 'settings-backdrop--enter' : 'settings-backdrop--exit'}`}
         onClick={onClose}
       />
       {/* Modal */}
       <div
-        className="relative w-[520px] max-w-[92vw] max-h-[85vh] bg-white dark:bg-[#30353d] rounded-xl shadow-2xl border border-gray-200 dark:border-gray-600 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150"
+        className={`relative w-[520px] max-w-[92vw] max-h-[85vh] bg-white dark:bg-[#30353d] rounded-xl shadow-2xl border border-gray-200 dark:border-gray-600 overflow-hidden flex flex-col ${open ? 'settings-modal--enter' : 'settings-modal--exit'}`}
         style={matchToolbarPalette ? { backgroundColor: 'var(--pal-panel-bg)', borderColor: 'var(--pal-border)' } : undefined}
+        onAnimationEnd={(event) => {
+          if (event.target === event.currentTarget && !open) setMounted(false);
+        }}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-700/10 dark:border-white/5">
@@ -263,6 +275,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto pt-1">
+          <div key={tab} className="settings-tab-content">
           {tab === 'settings' && (
             <div className="divide-y divide-gray-700/10 dark:divide-white/5">
               {/* Appearance */}
@@ -520,6 +533,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
               <div className="h-4" />
             </div>
           )}
+          </div>
         </div>
       </div>
     </div>

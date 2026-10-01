@@ -122,6 +122,80 @@ textarea,
   }
 }
 
+.titlebar-menu {
+  transform-origin: top left;
+  -webkit-app-region: no-drag;
+}
+.titlebar-document-title {
+  animation: titlebar-document-title-in 260ms ease-out both;
+}
+@keyframes titlebar-document-title-in {
+  from { opacity: 0.35; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.titlebar-menu--enter {
+  animation: titlebar-menu-in 140ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.titlebar-menu--exit {
+  pointer-events: none;
+  animation: titlebar-menu-out 110ms ease-in both;
+}
+.toolbar-selector-menu {
+  transform-origin: top left;
+  -webkit-app-region: no-drag;
+}
+.toolbar-selector-menu--enter {
+  animation: titlebar-menu-in 140ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.toolbar-selector-menu--exit {
+  pointer-events: none;
+  animation: titlebar-menu-out 110ms ease-in both;
+}
+@keyframes titlebar-menu-in {
+  from { opacity: 0; transform: translateY(-5px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes titlebar-menu-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(-4px) scale(0.99); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .titlebar-document-title,
+  .titlebar-menu--enter,
+  .titlebar-menu--exit,
+  .toolbar-selector-menu--enter,
+  .toolbar-selector-menu--exit { animation-duration: 0.01ms; }
+}
+
+.settings-backdrop--enter { animation: settings-backdrop-in 180ms ease-out both; }
+.settings-backdrop--exit { animation: settings-backdrop-out 140ms ease-in both; }
+.settings-modal--enter { animation: settings-modal-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.settings-modal--exit { animation: settings-modal-out 140ms ease-in both; }
+.settings-tab-content { animation: settings-tab-in 140ms ease-out both; }
+.settings-tab-indicator { transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+@keyframes settings-backdrop-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes settings-backdrop-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes settings-modal-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes settings-modal-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(5px) scale(0.99); }
+}
+@keyframes settings-tab-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .settings-backdrop--enter,
+  .settings-backdrop--exit,
+  .settings-modal--enter,
+  .settings-modal--exit,
+  .settings-tab-content { animation-duration: 0.01ms; }
+  .settings-tab-indicator { transition-duration: 0ms; }
+}
+
 /* Splitter hover matches palette when setting enabled */
 html[data-match-palette] .splitter:hover {
   background-color: var(--splitter-hover) !important;

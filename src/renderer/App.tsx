@@ -11,6 +11,7 @@ import SearchBar from './components/SearchBar';
 import WelcomeScreen from './components/WelcomeScreen';
 import StatusBar from './components/StatusBar';
 import SettingsModal from './components/SettingsModal';
+import { FontSelector, PaletteSelector } from './components/ToolbarSelectors';
 
 const PALETTE_KEYS = [
   '--pal-viewer-bg', '--pal-editor-bg', '--pal-editor-toolbar-bg', '--pal-panel-bg', '--pal-border-soft',
@@ -85,6 +86,8 @@ const App: React.FC = () => {
 
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const flushEditorRef = useRef<(() => void) | null>(null);
+  const documentContentRef = useRef<HTMLDivElement>(null);
+  const [documentRevealVersion, setDocumentRevealVersion] = useState(0);
   const [showFontMenu, setShowFontMenu] = useState(false);
   const [showPaletteMenu, setShowPaletteMenu] = useState(false);
   const [showToc, setShowToc] = useState(false);
@@ -112,6 +115,15 @@ const App: React.FC = () => {
   const editorSearchApiRef = useRef<MarkdownEditorSearchApi | null>(null);
   const viewerScrollRef = useRef<HTMLElement | null>(null);
   const dragRatio = useRef(50); // ref for instant drag updates
+
+  useLayoutEffect(() => {
+    if (!documentRevealVersion || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const animation = documentContentRef.current?.animate(
+      [{ opacity: 0.9 }, { opacity: 1 }],
+      { duration: 320, easing: 'ease-out' },
+    );
+    return () => animation?.cancel();
+  }, [documentRevealVersion]);
 
   // Split view drag handlers — use ref for performance, commit on mouseup
   useEffect(() => {
@@ -147,6 +159,7 @@ const App: React.FC = () => {
   // Helper: load file content into both store and editor (textarea/contentEditable)
   const loadFileIntoEditor = useCallback((name: string | null, filePath: string | null, content: string) => {
     const state = useStore.getState();
+    const isNewDocument = state.currentFilePath !== filePath || state.currentFile !== name;
     // Save current scroll position before switching files
     if (state.currentFilePath && state.rememberScrollPosition && viewerScrollRef.current) {
       state.setScrollPosition(state.currentFilePath, viewerScrollRef.current.scrollTop);
@@ -175,6 +188,7 @@ const App: React.FC = () => {
     } else if (editorScrollRef.current instanceof HTMLDivElement) {
       editorScrollRef.current.textContent = content;
     }
+    if (isNewDocument) setDocumentRevealVersion(version => version + 1);
   }, []);
   const openWithDirtyCheck = useCallback((action: () => void) => {
     // Flush any pending debounced text to the store before checking
@@ -606,143 +620,20 @@ const App: React.FC = () => {
       setShowFontMenu(false);
       setShowPaletteMenu(false);
     };
-    setTimeout(() => document.addEventListener('mousedown', handler), 0);
-    return () => document.removeEventListener('mousedown', handler);
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowFontMenu(false);
+        setShowPaletteMenu(false);
+      }
+    };
+    const timer = window.setTimeout(() => document.addEventListener('mousedown', handler), 0);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('keydown', onKeyDown);
+    };
   }, [showFontMenu, showPaletteMenu]);
-
-  const FontSelector = () => {
-    const currentLabel = FONT_OPTIONS.find(o => o.value === fontFamily)?.label || 'System Default';
-    const btnRef = useRef<HTMLButtonElement>(null);
-    const [panelStyle, setPanelStyle] = useState<React.CSSProperties>({});
-
-    const openMenu = () => {
-      if (!showFontMenu && btnRef.current) {
-        const rect = btnRef.current.getBoundingClientRect();
-        setPanelStyle({ position: 'fixed', top: rect.bottom + 4, left: rect.left });
-      }
-      const shouldOpen = !showFontMenu;
-      setShowFontMenu(shouldOpen);
-      if (shouldOpen) setShowPaletteMenu(false);
-    };
-
-    return (
-    <div className="relative" ref={fontMenuRef}>
-      <button
-        ref={btnRef}
-        className="btn-icon text-xs gap-2 flex items-center"
-        onClick={openMenu}
-        title="Change font family"
-      >
-        <svg className="w-[18px] h-[18px] shrink-0" fill="currentColor" viewBox="0 0 16.5 16">
-          <path d="M6.71 10H2.332l-.874 2.498a.75.75 0 0 1-1.415-.496l3.39-9.688a1.217 1.217 0 0 1 2.302.018l3.227 9.681a.75.75 0 0 1-1.423.474Zm3.13-4.358C10.53 4.374 11.87 4 13 4c1.5 0 3 .939 3 2.601v5.649a.75.75 0 0 1-1.448.275C13.995 12.82 13.3 13 12.5 13c-.77 0-1.514-.231-2.078-.709c-.577-.488-.922-1.199-.922-2.041c0-.694.265-1.411.887-1.944C11 7.78 11.88 7.5 13 7.5h1.5v-.899c0-.54-.5-1.101-1.5-1.101c-.869 0-1.528.282-1.84.858a.75.75 0 1 1-1.32-.716M6.21 8.5L4.574 3.594L2.857 8.5Zm8.29.5H13c-.881 0-1.375.22-1.637.444c-.253.217-.363.5-.363.806c0 .408.155.697.39.896c.249.21.63.354 1.11.354c.732 0 1.26-.209 1.588-.449c.35-.257.412-.495.412-.551Z" />
-        </svg>
-        <span className="text-[12px] font-medium">Font</span>
-      </button>
-      {showFontMenu && (
-        <div className="w-52 bg-white/85 dark:bg-[#222c36]/85 backdrop-blur-md border border-gray-200/40 dark:border-gray-700/40 rounded-md shadow-2xl max-h-72 overflow-y-auto" style={{ position: 'fixed', zIndex: 9999, ...panelStyle, ...(matchToolbarPalette ? { backgroundColor: 'color-mix(in srgb, var(--pal-panel-bg) 85%, transparent)', borderColor: 'var(--pal-border-soft)' } : {}) }}>
-          {/* Current font header */}
-          <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400">
-            {currentLabel}
-          </div>
-          <div className="border-t border-gray-200 dark:border-gray-700" />
-          {FONT_OPTIONS.map((opt) => {
-            const isSelected = fontFamily === opt.value;
-            return (
-              <button
-                key={opt.value}
-                className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 transition-colors ${
-                  isSelected
-                    ? 'text-blue-500 bg-blue-500/10'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5'
-                }`}
-                onClick={() => { setFontFamily(opt.value); setShowFontMenu(false); }}
-                style={{ fontFamily: opt.value === 'system' ? undefined : opt.value }}
-              >
-                <span className="w-[18px] h-[18px] shrink-0 flex items-center justify-center">
-                  {isSelected ? (
-                    <svg className="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 24 24"><path d="m9.55 15.15l8.475-8.475q.3-.3.7-.3t.7.3t.3.713t-.3.712l-9.175 9.2q-.3.3-.7.3t-.7-.3L4.55 13q-.3-.3-.288-.712t.313-.713t.713-.3t.712.3z"/></svg>
-                  ) : (
-                    <svg className="w-[14px] h-[14px] text-gray-400 dark:text-gray-500" fill="currentColor" viewBox="0 0 15 15"><path d="M12.499 2a.5.5 0 0 1 .001 1H8.692l-.287.854c-.216.643-.51 1.518-.824 2.444L7.344 7H8.5a.5.5 0 0 1 0 1H7.004c-.437 1.285-.84 2.462-1.046 3.04c-.322.899-.751 1.446-1.291 1.738c-.504.273-1.025.272-1.383.272H3.25a.55.55 0 1 1 0-1.1c.392 0 .653-.01.894-.14c.22-.119.511-.396.778-1.142c.185-.517.531-1.527.92-2.668H4.5a.5.5 0 0 1 0-1h1.682l.357-1.055c.313-.925.607-1.799.823-2.441L7.532 3H5c-.849 0-1.5.651-1.5 1.5a.5.5 0 0 1-1 0C2.5 3.099 3.599 2 5 2z"/></svg>
-                  )}
-                </span>
-                {opt.label}
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-  };
-
-  const PaletteSelector = () => {
-    const currentLabel = PALETTE_OPTIONS.find(o => o.value === previewPalette)?.label || 'Default';
-    const btnRef = useRef<HTMLButtonElement>(null);
-    const [panelStyle, setPanelStyle] = useState<React.CSSProperties>({});
-
-    const openMenu = () => {
-      if (!showPaletteMenu && btnRef.current) {
-        const rect = btnRef.current.getBoundingClientRect();
-        setPanelStyle({ position: 'fixed', top: rect.bottom + 4, left: rect.left });
-      }
-      const shouldOpen = !showPaletteMenu;
-      setShowPaletteMenu(shouldOpen);
-      if (shouldOpen) setShowFontMenu(false);
-    };
-
-    return (
-    <div className="relative" ref={paletteMenuRef}>
-      <button
-        ref={btnRef}
-        className="btn-icon text-xs gap-1.5 flex items-center"
-        onClick={openMenu}
-        title="Change preview color palette"
-      >
-        <svg className="w-[18px] h-[18px] shrink-0" fill="currentColor" viewBox="0 0 17 16">
-          <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8"/>
-          <path d="M8 1a7 7 0 0 0 0 14V1z" opacity=".3"/>
-        </svg>
-        <span className="text-[12px] font-medium">Palette</span>
-      </button>
-      {showPaletteMenu && (
-        <div className="w-44 bg-white/85 dark:bg-[#222c36]/85 backdrop-blur-md border border-gray-200/40 dark:border-gray-700/40 rounded-md shadow-2xl overflow-y-auto" style={{ position: 'fixed', zIndex: 9999, ...panelStyle, ...(matchToolbarPalette ? { backgroundColor: 'color-mix(in srgb, var(--pal-panel-bg) 85%, transparent)', borderColor: 'var(--pal-border-soft)' } : {}) }}>
-          <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400">
-            {currentLabel}
-          </div>
-          <div className="border-t border-gray-200 dark:border-gray-700" />
-          {PALETTE_OPTIONS.map((opt) => {
-            const isSelected = previewPalette === opt.value;
-            return (
-              <button
-                key={opt.value}
-                className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 transition-colors ${
-                  isSelected
-                    ? 'text-blue-500 bg-blue-500/10'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5'
-                }`}
-                onClick={() => { setPreviewPalette(opt.value); setShowPaletteMenu(false); }}
-              >
-                {/* Color swatches */}
-                <span className="flex gap-0.5 shrink-0">
-                  <span className="w-2.5 h-2.5 rounded-full inline dark:hidden ring-1 ring-black/10" style={{ backgroundColor: opt.swatches[0] }} />
-                  <span className="w-2.5 h-2.5 rounded-full inline dark:hidden" style={{ backgroundColor: opt.swatches[1] }} />
-                  <span className="w-2.5 h-2.5 rounded-full inline dark:hidden" style={{ backgroundColor: opt.swatches[2] }} />
-                  <span className="w-2.5 h-2.5 rounded-full hidden dark:inline ring-1 ring-white/10" style={{ backgroundColor: opt.swatchesDark[0] }} />
-                  <span className="w-2.5 h-2.5 rounded-full hidden dark:inline" style={{ backgroundColor: opt.swatchesDark[1] }} />
-                  <span className="w-2.5 h-2.5 rounded-full hidden dark:inline" style={{ backgroundColor: opt.swatchesDark[2] }} />
-                </span>
-                <span className="flex-1">{opt.label}</span>
-                {isSelected && (
-                  <svg className="w-3.5 h-3.5 text-blue-500 shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="m9.55 15.15l8.475-8.475q.3-.3.7-.3t.7.3t.3.713t-.3.712l-9.175 9.2q-.3.3-.7.3t-.7-.3L4.55 13q-.3-.3-.288-.712t.313-.713t.713-.3t.712.3z"/></svg>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-  };
 
   // Drag-and-drop support
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -1030,10 +921,26 @@ const App: React.FC = () => {
               </div>
               <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-1 shrink-0" />
               {/* Font selector */}
-              <FontSelector />
+              <FontSelector
+                open={showFontMenu}
+                onOpenChange={setShowFontMenu}
+                onCloseOther={() => setShowPaletteMenu(false)}
+                matchToolbarPalette={matchToolbarPalette}
+                menuRef={fontMenuRef}
+                fontFamily={fontFamily}
+                onFontChange={setFontFamily}
+              />
               <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 shrink-0" />
               {/* Palette selector */}
-              <PaletteSelector />
+              <PaletteSelector
+                open={showPaletteMenu}
+                onOpenChange={setShowPaletteMenu}
+                onCloseOther={() => setShowFontMenu(false)}
+                matchToolbarPalette={matchToolbarPalette}
+                menuRef={paletteMenuRef}
+                previewPalette={previewPalette}
+                onPaletteChange={setPreviewPalette}
+              />
               <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 shrink-0" />
               {/* Zoom controls */}
               <button className="btn-icon" onClick={zoomOut} title="Zoom out">
@@ -1081,7 +988,7 @@ const App: React.FC = () => {
                 />
               </div>
             )}
-            <div key="document-content" className="flex-1 overflow-hidden flex">
+            <div key="document-content" ref={documentContentRef} className="flex-1 overflow-hidden flex">
             {!currentFile ? (
               <WelcomeScreen
                 onOpen={handleOpen}

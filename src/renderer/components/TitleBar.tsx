@@ -28,14 +28,16 @@ interface TitleBarProps {
 }
 
 const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, isMaximized, onOpenFile, onOpenFolder, onNewFile, onSaveFile, onSaveFileAs, onCloseFile, onReloadFile, onOpenRecentFile, recentFiles, paletteBg, paletteBgDark, distractionFree, onToggleDistractionFree, onEditDocument, onSettings, saveState, matchToolbarPalette }) => {
-  const { currentFile, isModified, theme, setTheme, toggleSidebar } = useStore(useShallow((state) => ({
+  const { currentFile, currentFilePath, isModified, theme, setTheme, toggleSidebar } = useStore(useShallow((state) => ({
     currentFile: state.currentFile,
+    currentFilePath: state.currentFilePath,
     isModified: state.isModified,
     theme: state.theme,
     setTheme: state.setTheme,
     toggleSidebar: state.toggleSidebar,
   })));
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuMounted, setMenuMounted] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const title = currentFile
@@ -50,11 +52,27 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
         setMenuOpen(false);
       }
     };
-    setTimeout(() => document.addEventListener('mousedown', handler), 0);
-    return () => document.removeEventListener('mousedown', handler);
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false);
+    };
+    const timer = window.setTimeout(() => document.addEventListener('mousedown', handler), 0);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('keydown', onKeyDown);
+    };
   }, [menuOpen]);
 
   const closeMenu = useCallback(() => setMenuOpen(false), []);
+  const toggleMenu = () => {
+    if (menuOpen) {
+      closeMenu();
+    } else {
+      setMenuMounted(true);
+      setMenuOpen(true);
+    }
+  };
 
   const menuItem = (label: string, shortcut: string | null, action: () => void) => (
     <button
@@ -86,8 +104,9 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
       <div className="flex items-center gap-2 relative z-10" ref={menuRef}>
         <button
           className="titlebar-button w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
-          onClick={() => setMenuOpen(!menuOpen)}
+          onClick={toggleMenu}
           title="Menu"
+          aria-expanded={menuOpen}
         >
           <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
@@ -99,9 +118,13 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
         </span>
 
         {/* Context Menu */}
-        {menuOpen && (
+        {menuMounted && (
           <div
-            className="absolute top-full left-0 mt-1 w-56 bg-white dark:bg-[#30353d] border border-gray-200 dark:border-gray-600 rounded-md shadow-2xl z-[60] py-1"
+            className={`titlebar-menu absolute top-full left-0 mt-1 w-56 bg-white dark:bg-[#30353d] border border-gray-200 dark:border-gray-600 rounded-md shadow-2xl z-[60] py-1 ${menuOpen ? 'titlebar-menu--enter' : 'titlebar-menu--exit'}`}
+            aria-hidden={!menuOpen}
+            onAnimationEnd={(e) => {
+              if (e.target === e.currentTarget && !menuOpen) setMenuMounted(false);
+            }}
             style={{
               ...(matchToolbarPalette ? { backgroundColor: 'var(--pal-panel-bg)', borderColor: 'var(--pal-border)' } : {}),
               filter: 'brightness(1.04) saturate(1.08)',
@@ -195,7 +218,7 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
             Saved
           </span>
         )}
-        <span className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[37vw] inline-block">
+        <span key={currentFilePath || currentFile || 'welcome'} className={`text-xs text-gray-500 dark:text-gray-400 truncate max-w-[37vw] inline-block ${currentFile ? 'titlebar-document-title' : ''}`}>
           {title}
         </span>
       </div>
