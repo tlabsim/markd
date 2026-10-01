@@ -23,6 +23,7 @@ interface EditorState {
   viewMode: ViewMode;
   theme: ThemeMode;
   isSidebarOpen: boolean;
+  startWithSidebarOpen: boolean;
   isSearchOpen: boolean;
   searchQuery: string;
   searchCurrentIndex: number;
@@ -67,6 +68,7 @@ interface EditorState {
   setViewMode: (mode: ViewMode) => void;
   setTheme: (theme: ThemeMode) => void;
   toggleSidebar: () => void;
+  setStartWithSidebarOpen: (open: boolean) => void;
   setSearchOpen: (open: boolean) => void;
   setSearchQuery: (query: string) => void;
   setSearchCurrentIndex: (index: number) => void;
@@ -89,7 +91,6 @@ interface EditorState {
   setAutoSave: (on: boolean) => void;
   setRememberScrollPosition: (on: boolean) => void;
   setScrollPosition: (filePath: string, scrollTop: number) => void;
-  setMatchToolbarPalette: (on: boolean) => void;
   setShowHeadingAnchors: (on: boolean) => void;
   zoomIn: () => void;
   zoomOut: () => void;
@@ -129,6 +130,7 @@ export const useStore = create<EditorState>()(
       viewMode: 'view',
       theme: 'dark',
       isSidebarOpen: true,
+      startWithSidebarOpen: true,
       isSearchOpen: false,
       searchQuery: '',
       searchCurrentIndex: 0,
@@ -149,7 +151,7 @@ export const useStore = create<EditorState>()(
       autoSave: false,
       rememberScrollPosition: true,
       scrollPositions: {},
-      matchToolbarPalette: false,
+      matchToolbarPalette: true,
       showHeadingAnchors: false,
 
       setCurrentFile: (name) => set({ currentFile: name }),
@@ -177,6 +179,7 @@ export const useStore = create<EditorState>()(
       setViewMode: (mode) => set({ viewMode: mode }),
       setTheme: (theme) => set({ theme }),
       toggleSidebar: () => set({ isSidebarOpen: !get().isSidebarOpen }),
+      setStartWithSidebarOpen: (open) => set({ startWithSidebarOpen: open }),
       setSearchOpen: (open) => set({ isSearchOpen: open }),
       setSearchQuery: (query) => set({ searchQuery: query }),
       setSearchCurrentIndex: (index) => set({ searchCurrentIndex: index }),
@@ -205,14 +208,13 @@ export const useStore = create<EditorState>()(
       setRememberScrollPosition: (on) => set({ rememberScrollPosition: on }),
       setScrollPosition: (filePath, scrollTop) =>
         set((s) => ({ scrollPositions: { ...s.scrollPositions, [filePath]: scrollTop } })),
-      setMatchToolbarPalette: (on) => set({ matchToolbarPalette: on }),
       setShowHeadingAnchors: (on) => set({ showHeadingAnchors: on }),
       zoomIn: () => set((s) => ({ zoomLevel: Math.min(200, s.zoomLevel + 10) })),
       zoomOut: () => set((s) => ({ zoomLevel: Math.max(50, s.zoomLevel - 10) })),
     }),
     {
       name: 'markd-preferences',
-      version: 2,
+      version: 4,
       migrate: (persistedState) => {
         const state = persistedState as EditorState;
         const fontReplacements: Record<string, string> = {
@@ -223,11 +225,14 @@ export const useStore = create<EditorState>()(
         return {
           ...state,
           fontFamily: fontReplacements[state.fontFamily] ?? state.fontFamily,
+          matchToolbarPalette: true,
+          startWithSidebarOpen: state.startWithSidebarOpen ?? true,
           showSvgBackgroundToggle: true,
         };
       },
       partialize: (state) => ({
         theme: state.theme,
+        startWithSidebarOpen: state.startWithSidebarOpen,
         fontFamily: state.fontFamily,
         zoomLevel: state.zoomLevel,
         previewPalette: state.previewPalette,
@@ -241,9 +246,13 @@ export const useStore = create<EditorState>()(
         autoSave: state.autoSave,
         rememberScrollPosition: state.rememberScrollPosition,
         scrollPositions: state.scrollPositions,
-        matchToolbarPalette: state.matchToolbarPalette,
         showHeadingAnchors: state.showHeadingAnchors,
       }),
+      merge: (persistedState, currentState) => {
+        const merged = { ...currentState, ...(persistedState as Partial<EditorState>) };
+        merged.isSidebarOpen = merged.startWithSidebarOpen;
+        return merged;
+      },
     }
   )
 );

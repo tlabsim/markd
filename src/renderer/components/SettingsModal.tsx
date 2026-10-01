@@ -109,12 +109,31 @@ const SegmentedControl: React.FC<{
 );
 
 // ----- Settings row -----
-const SettingRow: React.FC<{ label: React.ReactNode; children: React.ReactNode }> = ({ label, children }) => (
-  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700/10 dark:border-white/5">
-    <span className="text-[13px] text-gray-700 dark:text-gray-200">{label}</span>
-    {children}
-  </div>
-);
+const SettingRow: React.FC<{ label: React.ReactNode; tooltip?: string; children: React.ReactNode }> = ({ label, tooltip, children }) => {
+  const tooltipId = React.useId();
+  return (
+    <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700/10 dark:border-white/5">
+      <span
+        className={`group relative text-[13px] text-gray-700 dark:text-gray-200 ${tooltip ? 'cursor-help' : ''}`}
+        tabIndex={tooltip ? 0 : undefined}
+        aria-describedby={tooltip ? tooltipId : undefined}
+      >
+        {label}
+        {tooltip && (
+          <span
+            id={tooltipId}
+            role="tooltip"
+            className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 w-64 rounded-md border px-2.5 py-2 text-[11px] font-normal leading-relaxed opacity-0 shadow-xl transition-opacity duration-150 group-hover:opacity-100 group-focus:opacity-100"
+            style={{ backgroundColor: 'var(--pal-panel-bg)', borderColor: 'var(--pal-border)', color: 'var(--pal-text)' }}
+          >
+            {tooltip}
+          </span>
+        )}
+      </span>
+      {children}
+    </div>
+  );
+};
 
 // ----- iOS-style tab bar -----
 const TabBar: React.FC<{ activeTab: Tab; onTab: (t: Tab) => void }> = ({ activeTab, onTab }) => {
@@ -205,12 +224,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
     setTabSize,
     syntaxHighlight,
     setSyntaxHighlight,
-    autoSave,
-    setAutoSave,
     rememberScrollPosition,
     setRememberScrollPosition,
+    startWithSidebarOpen,
+    setStartWithSidebarOpen,
     matchToolbarPalette,
-    setMatchToolbarPalette,
     showHeadingAnchors,
     setShowHeadingAnchors,
   } = useStore(useShallow((state) => ({
@@ -230,12 +248,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
     setTabSize: state.setTabSize,
     syntaxHighlight: state.syntaxHighlight,
     setSyntaxHighlight: state.setSyntaxHighlight,
-    autoSave: state.autoSave,
-    setAutoSave: state.setAutoSave,
     rememberScrollPosition: state.rememberScrollPosition,
     setRememberScrollPosition: state.setRememberScrollPosition,
+    startWithSidebarOpen: state.startWithSidebarOpen,
+    setStartWithSidebarOpen: state.setStartWithSidebarOpen,
     matchToolbarPalette: state.matchToolbarPalette,
-    setMatchToolbarPalette: state.setMatchToolbarPalette,
     showHeadingAnchors: state.showHeadingAnchors,
     setShowHeadingAnchors: state.setShowHeadingAnchors,
   })));
@@ -294,7 +311,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
                 />
               </SettingRow>
 
-              <SettingRow label="Preview Palette">
+              <SettingRow label="Color Palette">
                 <select
                   className="text-[12px] rounded-md border border-gray-300 dark:border-gray-600 bg-gray-700/5 dark:bg-white/5 text-gray-700 dark:text-gray-200 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   value={previewPalette}
@@ -336,13 +353,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
                 </div>
               </SettingRow>
 
-              <SettingRow label="Titlebar & Panels Match Palette">
-                <ToggleSwitch
-                  checked={matchToolbarPalette}
-                  onChange={() => setMatchToolbarPalette(!matchToolbarPalette)}
-                />
-              </SettingRow>
-
               {SHOW_SVG_BACKGROUND_SETTING && (
                 <SettingRow label={
                   <span className="inline-flex items-center gap-1.5">
@@ -380,14 +390,20 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
                 />
               </SettingRow>
 
-              <SettingRow label="Syntax Highlighting">
+              <SettingRow
+                label="Syntax Highlighting"
+                tooltip="Colors Markdown syntax in the editor. This can use more resources with very large documents."
+              >
                 <ToggleSwitch
                   checked={syntaxHighlight}
                   onChange={() => (onSyntaxHighlightChange ?? setSyntaxHighlight)(!syntaxHighlight)}
                 />
               </SettingRow>
 
-              <SettingRow label="Heading Anchor Links">
+              <SettingRow
+                label="Heading Anchor Links"
+                tooltip="Shows a copy-link control when you hover over headings in the preview."
+              >
                 <ToggleSwitch
                   checked={showHeadingAnchors}
                   onChange={() => setShowHeadingAnchors(!showHeadingAnchors)}
@@ -411,28 +427,30 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
                 General
               </div>
 
-              <SettingRow label="Auto Save">
-                <ToggleSwitch
-                  checked={autoSave}
-                  onChange={() => setAutoSave(!autoSave)}
-                />
-              </SettingRow>
-
-              <SettingRow label="Remember Scroll Position">
+              <SettingRow
+                label="Remember Scroll Position"
+                tooltip="Restores the Preview panel's last position when you reopen a file."
+              >
                 <ToggleSwitch
                   checked={rememberScrollPosition}
                   onChange={() => setRememberScrollPosition(!rememberScrollPosition)}
                 />
               </SettingRow>
 
-              <SettingRow label="Start with Sidebar Open">
+              <SettingRow
+                label="Start with Sidebar Open"
+                tooltip="Controls whether the Explorer sidebar is open when Markd starts. You can still toggle it during a session."
+              >
                 <ToggleSwitch
-                  checked={useStore.getState().isSidebarOpen}
-                  onChange={() => useStore.getState().toggleSidebar()}
+                  checked={startWithSidebarOpen}
+                  onChange={() => setStartWithSidebarOpen(!startWithSidebarOpen)}
                 />
               </SettingRow>
 
-              <SettingRow label="Allow Multiple Windows">
+              <SettingRow
+                label="Allow Multiple Windows"
+                tooltip="Allows subsequent launches of Markd to create separate windows instead of reusing the current one."
+              >
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] text-gray-400 dark:text-gray-500">Restart required</span>
                   <ToggleSwitch
