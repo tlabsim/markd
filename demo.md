@@ -115,7 +115,7 @@ fibonacci(10)
 > const answer = 42;
 > ```
 
-## 7. Math (LaTeX via KaTeX)
+## 7. Math
 
 Inline math: $E = mc^2$ and the Pythagorean theorem $a^2 + b^2 = c^2$.
 
