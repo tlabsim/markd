@@ -149,6 +149,7 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ content, onClose, pin
   const tocFontSize = 12 + Math.max(0, (zoomLevel - 100) / 10) * 0.25;
   const tocRef = useRef<HTMLDivElement>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [isScrolled, setIsScrolled] = useState(false);
 
   const headings = useMemo(() => {
     const items: TocItem[] = [];
@@ -241,10 +242,14 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ content, onClose, pin
   return (
     <div
       ref={tocRef}
-      className="toc-panel flex h-full flex-col overflow-hidden shadow-xl rounded-lg border border-gray-200/50 dark:border-gray-700/50 bg-white/75 dark:bg-[#222c36]/85 backdrop-blur-md"
+      className="toc-panel h-full overflow-y-auto shadow-xl rounded-lg border border-gray-200/50 dark:border-gray-700/50 bg-white/75 dark:bg-[#222c36]/85 backdrop-blur-md"
       style={{ fontSize: tocFontSize, ...(matchPalette ? { backgroundColor: 'color-mix(in srgb, var(--pal-panel-bg) var(--toc-background-opacity), transparent)', borderColor: 'var(--pal-border-soft)' } : {}) }}
+      onScroll={(event) => setIsScrolled(event.currentTarget.scrollTop > 1)}
     >
-      <div className="flex shrink-0 items-center justify-between border-b border-gray-200/60 px-3 pb-2 pt-3 dark:border-gray-700/50" style={matchPalette ? { borderColor: 'var(--pal-border-soft)' } : undefined}>
+      <div
+        className={`sticky top-0 z-10 flex items-center justify-between rounded-t-lg px-3 pb-2 pt-3 transition-[background-color,backdrop-filter] duration-150 ${isScrolled ? 'bg-white/70 backdrop-blur-md dark:bg-[#222c36]/75' : 'bg-transparent'}`}
+        style={matchPalette && isScrolled ? { backgroundColor: 'color-mix(in srgb, var(--pal-panel-bg) 72%, transparent)' } : undefined}
+      >
         <h3 className="font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400" style={{ fontSize: `${tocFontSize * 0.833}px` }}>
           Contents
         </h3>
@@ -281,7 +286,7 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ content, onClose, pin
           </button>
         </div>
       </div>
-      <nav className="min-h-0 flex-1 overflow-y-auto px-3 pb-3 pt-2">
+      <nav className="px-3 pb-3 pt-1">
         {tree.map((node, i) => (
           <TreeNode
             key={node.item.id || i}
