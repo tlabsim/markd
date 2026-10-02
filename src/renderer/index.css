@@ -384,7 +384,7 @@ html[data-match-palette] .splitter:hover {
 }
 
 .markdown-body img {
-  @apply max-w-full h-auto rounded-lg my-4;
+  @apply inline-block max-w-full h-auto align-middle;
 }
 
 .markdown-body .media-block video,
@@ -647,6 +647,17 @@ h1, h2, h3, h4, h5, h6 {
   color: #7f1d1d;
 }
 .dark .admonition-danger, .dark .admonition-important { background: rgba(239, 68, 68, 0.1); color: #fca5a5; }
+
+/* Callout directives in the Markdown editor mirror their rendered callouts. */
+.editor-callout-directive { font-weight: 600; }
+.editor-callout-note { color: #2563eb; }
+.editor-callout-tip, .editor-callout-info { color: #059669; }
+.editor-callout-warning, .editor-callout-caution { color: #d97706; }
+.editor-callout-danger, .editor-callout-important { color: #dc2626; }
+.dark .editor-callout-note { color: #93c5fd; }
+.dark .editor-callout-tip, .dark .editor-callout-info { color: #6ee7b7; }
+.dark .editor-callout-warning, .dark .editor-callout-caution { color: #fcd34d; }
+.dark .editor-callout-danger, .dark .editor-callout-important { color: #fca5a5; }
 
 html[data-palette="contrast"] .admonition {
   --callout-outline: #d1d5db;

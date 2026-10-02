@@ -1,10 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 
-interface SvgBackgroundImageProps {
+interface SvgBackgroundImageProps extends Omit<React.ImgHTMLAttributes<HTMLImageElement>, 'src' | 'alt'> {
   src: string;
   alt: string;
-  className: string;
-  onError: () => void;
 }
 
 function hasTextWithoutBackground(src: string): boolean {
@@ -46,7 +44,7 @@ function hasTextWithoutBackground(src: string): boolean {
   }
 }
 
-const SvgBackgroundImage: React.FC<SvgBackgroundImageProps> = ({ src, alt, className, onError }) => {
+const SvgBackgroundImage: React.FC<SvgBackgroundImageProps> = ({ src, alt, className, loading, onError, style, ...imageProps }) => {
   const eligible = useMemo(() => hasTextWithoutBackground(src), [src]);
   const [whiteBackground, setWhiteBackground] = useState(false);
 
@@ -57,13 +55,14 @@ const SvgBackgroundImage: React.FC<SvgBackgroundImageProps> = ({ src, alt, class
   const buttonLabel = whiteBackground ? 'Remove white SVG background' : 'Show white SVG background';
 
   return (
-    <span className="relative inline-block max-w-full my-4 align-top group/svg">
+    <span className="relative inline-block max-w-full align-middle group/svg">
       <img
+        {...imageProps}
         src={src}
         alt={alt}
-        loading="lazy"
-        className={`${className} !my-0 block`}
-        style={whiteBackground ? { backgroundColor: '#fff' } : undefined}
+        loading={loading || 'lazy'}
+        className={`${className || ''} block !my-0`}
+        style={whiteBackground ? { ...style, backgroundColor: '#fff' } : style}
         onError={onError}
       />
       {eligible && (

@@ -48,12 +48,12 @@ const StatusBar: React.FC<{ matchPalette?: boolean; paletteBg?: string; paletteB
       </div>
       <div className="flex items-center gap-2">
         <button
-          className="inline-flex items-center text-[10px] rounded-md overflow-hidden border border-gray-300/50 dark:border-gray-600/50 hover:border-gray-400 dark:hover:border-gray-500 transition-colors"
+          className="inline-flex h-5 items-stretch text-[10px] leading-none rounded-md overflow-hidden border border-gray-300/50 dark:border-gray-600/50 hover:border-gray-400 dark:hover:border-gray-500 transition-colors"
           onClick={() => window.dispatchEvent(new CustomEvent('markd:open-shortcuts'))}
           title="Keyboard Shortcuts (Ctrl+/)"
         >
-          <span className="px-2 py-0.5 text-gray-500 dark:text-gray-400 bg-gray-200/50 dark:bg-gray-700/30">KB Shortcuts</span>
-          <span className="px-1.5 py-0.5 text-gray-400 dark:text-gray-500 bg-white/80 dark:bg-gray-800/30 border-l border-gray-300/50 dark:border-gray-600/50">Ctrl+/</span>
+          <span className="inline-flex items-center px-2 text-gray-500 dark:text-gray-400 bg-gray-200/50 dark:bg-gray-700/30">KB Shortcuts</span>
+          <span className="inline-flex items-center px-1.5 text-gray-400 dark:text-gray-500 bg-white/80 dark:bg-gray-800/30 border-l border-gray-300/50 dark:border-gray-600/50">Ctrl+/</span>
         </button>
         <span className="w-px h-3 bg-gray-300 dark:bg-gray-600" />
         <div className="inline-flex items-center text-[10px] rounded-md overflow-hidden border border-slate-300 dark:border-gray-600">

@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useLayoutEffect, useCallback, useMemo, useState, startTransition } from 'react';
 import { createPortal } from 'react-dom';
-import { useStore } from '../store';
+import { sameDocumentContent, useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 
 // ---- Regex-based Markdown syntax highlighter ----
@@ -61,8 +61,11 @@ function highlightSearchMatches(
 }
 
 function highlightMarkdown(raw: string, searchOptions?: SearchHighlightOptions | null): string {
-  if (searchOptions?.query.trim()) return highlightSearchMatches(raw, searchOptions);
-  const lines = raw.split('\n');
+  // HTML parsing treats a retained carriage return as another line break. Normalize
+  // before generating markup so CRLF files round-trip through contentEditable.
+  const text = raw.includes('\r') ? raw.replace(/\r\n?/g, '\n') : raw;
+  if (searchOptions?.query.trim()) return highlightSearchMatches(text, searchOptions);
+  const lines = text.split('\n');
   let inFence = false;
   return lines.map((line) => {
     if (/^```/.test(line)) { inFence = !inFence; return `<span class="text-purple-500 dark:text-purple-400">${esc(line)}</span>`; }
@@ -70,13 +73,36 @@ function highlightMarkdown(raw: string, searchOptions?: SearchHighlightOptions |
     let h = esc(line);
     if (/^#{1,6}\s/.test(line)) return `<span class="text-blue-600 dark:text-blue-400 font-bold">${h}</span>`;
     if (/^&gt;/.test(h)) return `<span class="text-orange-500 dark:text-orange-400">${h}</span>`;
-    h = h.replace(/`([^`]+)`/g, '<span class="text-emerald-600 dark:text-emerald-400 bg-gray-100 dark:bg-white/10 rounded px-px">`$1`</span>');
-    h = h.replace(/\*\*([^*]+)\*\*/g, '<strong class="text-gray-900 dark:text-gray-100">**$1**</strong>');
-    h = h.replace(/\*([^*]+)\*/g, '<em class="text-gray-700 dark:text-gray-300">*$1*</em>');
-    h = h.replace(/~~([^~]+)~~/g, '<span class="line-through text-gray-400 dark:text-gray-500">~~$1~~</span>');
-    h = h.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<span class="text-blue-500 dark:text-blue-400">[$1]($2)</span>');
+    const inlineTokens: string[] = [];
+    const protect = (html: string) => `\uE000${inlineTokens.push(html) - 1}\uE001`;
+    h = h.replace(/`([^`]+)`/g, (_match, content: string) =>
+      protect(`<span class="text-emerald-600 dark:text-emerald-400 bg-gray-100 dark:bg-white/10 rounded px-px">\`${content}\`</span>`));
+    h = h.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, label: string, href: string) =>
+      protect(`<span class="text-blue-500 dark:text-blue-400">[${label}](${href})</span>`));
+    h = h.replace(/\*\*\*([^*]+)\*\*\*/g, (_match, content: string) =>
+      protect(`<strong class="font-bold italic text-gray-900 dark:text-gray-100">***${content}***</strong>`));
+    h = h.replace(/\*\*([^*]+)\*\*/g, (_match, content: string) =>
+      protect(`<strong class="font-bold not-italic text-gray-900 dark:text-gray-100">**${content}**</strong>`));
+    h = h.replace(/(^|[^*])\*([^\s*](?:[^*]*[^\s*])?)\*(?!\*)/g, (_match, prefix: string, content: string) =>
+      `${prefix}${protect(`<em class="font-normal italic text-gray-700 dark:text-gray-300">*${content}*</em>`)}`);
+    h = h.replace(/~~([^~]+)~~/g, (_match, content: string) =>
+      protect(`<span class="line-through text-gray-400 dark:text-gray-500">~~${content}~~</span>`));
     if (/^(\s*)[-*+]\s/.test(line)) h = h.replace(/^(\s*)([-*+]\s)/, '$1<span class="text-amber-500 dark:text-amber-400">$2</span>');
-    return h;
+    h = h.replace(
+      /^(\s*)(:::(note|tip|info|warning|caution|danger|important))(?=\s|$)/i,
+      (_match, indent: string, directive: string, type: string) =>
+        `${indent}<span class="editor-callout-directive editor-callout-${type.toLowerCase()}">${directive}</span>`,
+    );
+    // Later formats can wrap placeholders created by earlier formats. Resolve
+    // repeatedly so combinations such as ~~***bold italic strike***~~ retain
+    // every nested style instead of leaving an unresolved placeholder behind.
+    let restored = h;
+    for (let depth = 0; depth < inlineTokens.length; depth++) {
+      const next = restored.replace(/\uE000(\d+)\uE001/g, (_match, index: string) => inlineTokens[Number(index)] ?? '');
+      if (next === restored) break;
+      restored = next;
+    }
+    return restored;
   }).join('\n');
 }
 
@@ -210,7 +236,18 @@ function getLineCol(el: EditorEl): { line: number; col: number; total: number } 
   return { line: lines.length, col: lines[lines.length - 1].length + 1, total: text.split('\n').length };
 }
 
+const RAPID_UNDO_WINDOW_MS = 500;
+
+function previousWordStart(text: string, cursor: number): number {
+  let index = Math.max(0, Math.min(cursor, text.length));
+  if (index > 0 && text[index - 1] === '\n') return index - 1;
+  while (index > 0 && text[index - 1] !== '\n' && /\s/.test(text[index - 1])) index--;
+  while (index > 0 && !/\s/.test(text[index - 1])) index--;
+  return index;
+}
+
 interface MarkdownEditorProps {
+  documentVersion: number;
   isActive: boolean;
   isSplitView: boolean;
   scrollSyncMode: 'heading' | 'position' | 'off';
@@ -233,10 +270,9 @@ export interface MarkdownEditorSearchApi {
   getContent: () => string;
 }
 
-const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, scrollSyncMode, onScrollSyncModeChange, onScrollRef, onSearchApiRef, wordWrap, onToggleWordWrap, onFlushRef, onSave, matchPalette, paletteBg, paletteBgDark }) => {
+const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ documentVersion, isActive, isSplitView, scrollSyncMode, onScrollSyncModeChange, onScrollRef, onSearchApiRef, wordWrap, onToggleWordWrap, onFlushRef, onSave, matchPalette, paletteBg, paletteBgDark }) => {
   const {
     fileContent,
-    currentFilePath,
     setFileContent,
     theme,
     isSearchOpen,
@@ -249,7 +285,6 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
     setSyntaxHighlight,
   } = useStore(useShallow((state) => ({
     fileContent: state.fileContent,
-    currentFilePath: state.currentFilePath,
     setFileContent: state.setFileContent,
     theme: state.theme,
     isSearchOpen: state.isSearchOpen,
@@ -460,15 +495,39 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  interface Snap { text: string; cursor: number }
+  interface Snap { text: string; cursor: number; cleanRevision: number | null; typedCharacter?: boolean }
   const undoStack = useRef<Snap[]>([]);
   const redoStack = useRef<Snap[]>([]);
+  const currentSnapshot = useRef<Snap>({
+    text: fileContent,
+    cursor: 0,
+    cleanRevision: useStore.getState().saveRevision,
+  });
   const isHighlighting = useRef(false);
   const highlightTimer = useRef<number>(0);
   const storeTimer = useRef<number>(0);
+  const historyGuardFrame = useRef<number>(0);
+  const lastUndoAtRef = useRef(0);
   const lastTypedRef = useRef(fileContent);
-  const lastDocumentPathRef = useRef<string | null>(currentFilePath);
+  const lastDocumentVersionRef = useRef(-1);
   const syncGuard = useRef(false); // prevents effect from overwriting textarea during programmatic changes
+
+  const makeSnapshot = useCallback((text: string, cursor: number, preserveClean = false): Snap => {
+    const state = useStore.getState();
+    const existing = currentSnapshot.current;
+    const preservesCurrentSave = preserveClean
+      && existing.text === text
+      && existing.cleanRevision === state.saveRevision;
+    return {
+      text,
+      cursor,
+      cleanRevision: preservesCurrentSave ? state.saveRevision : null,
+    };
+  }, []);
+
+  const resetRapidUndo = useCallback(() => {
+    lastUndoAtRef.current = 0;
+  }, []);
 
   // Push text to store (debounced for both modes to prevent effect from destroying undo)
   const pushToStore = useCallback((text: string) => {
@@ -506,30 +565,183 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
   }, [syntaxHighlight, searchHighlightOptions]);
 
   useEffect(() => {
-    if (lastDocumentPathRef.current === currentFilePath) return;
+    if (lastDocumentVersionRef.current === documentVersion) return;
+    clearTimeout(storeTimer.current);
+    clearTimeout(highlightTimer.current);
+    cancelAnimationFrame(historyGuardFrame.current);
+    syncGuard.current = false;
+    const initialText = useStore.getState().fileContent;
     undoStack.current = [];
     redoStack.current = [];
-    lastDocumentPathRef.current = currentFilePath;
-  }, [currentFilePath]);
+    resetRapidUndo();
+    currentSnapshot.current = {
+      text: initialText,
+      cursor: 0,
+      cleanRevision: useStore.getState().saveRevision,
+    };
+    lastTypedRef.current = initialText;
+    setLiveEditorText(initialText);
+    lastDocumentVersionRef.current = documentVersion;
+  }, [documentVersion, resetRapidUndo]);
 
   const pushUndo = useCallback(() => {
+    resetRapidUndo();
     const el = editorRef.current;
     if (!el) return;
     const text = getText(el);
     const cursor = getCursorOffset(el);
+    const snapshot = makeSnapshot(text, cursor, true);
+    currentSnapshot.current = snapshot;
     const last = undoStack.current[undoStack.current.length - 1];
-    const lastText = last ? (typeof last === 'string' ? last : last.text) : null;
-    if (lastText === text) return;
-    undoStack.current.push({ text, cursor });
+    if (last?.text === text) return;
+    undoStack.current.push(snapshot);
     if (undoStack.current.length > undoStackLimit) undoStack.current.splice(0, undoStack.current.length - undoStackLimit);
     redoStack.current = [];
-  }, [undoStackLimit]);
+  }, [makeSnapshot, resetRapidUndo, undoStackLimit]);
+
+  const recordNativeEdit = useCallback((text: string, cursor: number, inputEvent?: InputEvent) => {
+    resetRapidUndo();
+    const prior = currentSnapshot.current;
+    const insertedLength = cursor - prior.cursor;
+    const inputData = inputEvent?.data;
+    const typedCharacter = inputEvent?.inputType === 'insertText'
+      && insertedLength > 0
+      && text.length === prior.text.length + insertedLength
+      && (typeof inputData !== 'string'
+        ? insertedLength === 1
+        : inputData.length === insertedLength && Array.from(inputData).length === 1);
+    const previous = makeSnapshot(
+      prior.text,
+      prior.cursor,
+      true,
+    );
+    previous.typedCharacter = typedCharacter;
+    if (previous.text !== text) {
+      const last = undoStack.current[undoStack.current.length - 1];
+      if (last?.text !== previous.text) {
+        undoStack.current.push(previous);
+        if (undoStack.current.length > undoStackLimit) {
+          undoStack.current.splice(0, undoStack.current.length - undoStackLimit);
+        }
+      }
+      redoStack.current = [];
+    }
+    currentSnapshot.current = makeSnapshot(text, cursor);
+  }, [makeSnapshot, resetRapidUndo, undoStackLimit]);
 
   const scrollEditorToOffset = useCallback((el: EditorEl, offset: number) => {
     const line = getText(el).substring(0, offset).split('\n').length;
     const lineHeight = parseFloat(window.getComputedStyle(el).lineHeight) || 24;
     el.scrollTop = Math.max(0, (line - 3) * lineHeight);
   }, []);
+
+  const revealEditorOffsetIfNeeded = useCallback((el: EditorEl, offset: number, measureWrappedLine = false) => {
+    requestAnimationFrame(() => {
+      if (editorRef.current !== el) return;
+      const styles = window.getComputedStyle(el);
+      const lineHeight = parseFloat(styles.lineHeight) || 24;
+
+      if (el instanceof HTMLTextAreaElement) {
+        const textBeforeCursor = getText(el).substring(0, offset);
+        const line = textBeforeCursor.split('\n').length - 1;
+        const paddingTop = parseFloat(styles.paddingTop) || 0;
+        const paddingBottom = parseFloat(styles.paddingBottom) || 0;
+        let caretTop = paddingTop + line * lineHeight;
+        if (measureWrappedLine && wordWrap) {
+          const mirror = document.createElement('textarea');
+          mirror.wrap = el.wrap;
+          mirror.tabIndex = -1;
+          mirror.setAttribute('aria-hidden', 'true');
+          Object.assign(mirror.style, {
+            position: 'fixed', left: '-100000px', top: '0', visibility: 'hidden', pointerEvents: 'none',
+            boxSizing: 'border-box', width: `${el.clientWidth}px`, height: '0', minHeight: '0',
+            border: '0', overflow: 'hidden', resize: 'none', padding: styles.padding,
+            fontFamily: styles.fontFamily, fontSize: styles.fontSize, fontWeight: styles.fontWeight,
+            fontStyle: styles.fontStyle, lineHeight: styles.lineHeight, letterSpacing: styles.letterSpacing,
+            whiteSpace: styles.whiteSpace, overflowWrap: styles.overflowWrap, wordBreak: styles.wordBreak,
+            tabSize: styles.tabSize, direction: styles.direction,
+          });
+          mirror.value = `${textBeforeCursor}\u200b`;
+          document.body.appendChild(mirror);
+          caretTop = Math.max(paddingTop, mirror.scrollHeight - paddingBottom - lineHeight);
+          mirror.remove();
+        }
+        const caretBottom = caretTop + lineHeight;
+        const viewportTop = el.scrollTop + paddingTop;
+        const viewportBottom = el.scrollTop + el.clientHeight - paddingBottom;
+
+        if (caretTop < viewportTop) {
+          el.scrollTop = Math.max(0, caretTop - paddingTop - lineHeight);
+        } else if (caretBottom > viewportBottom) {
+          el.scrollTop = caretBottom - el.clientHeight + paddingBottom + lineHeight;
+        }
+
+        if (!wordWrap) {
+          const lineText = textBeforeCursor.substring(textBeforeCursor.lastIndexOf('\n') + 1);
+          const tabWidth = Number.parseInt(styles.tabSize, 10) || 2;
+          let column = 0;
+          let expandedLine = '';
+          for (const character of lineText) {
+            if (character === '\t') {
+              const spaces = tabWidth - (column % tabWidth);
+              expandedLine += ' '.repeat(spaces);
+              column += spaces;
+            } else {
+              expandedLine += character;
+              column++;
+            }
+          }
+          const context = document.createElement('canvas').getContext('2d');
+          if (context) {
+            context.font = `${styles.fontStyle} ${styles.fontWeight} ${styles.fontSize} ${styles.fontFamily}`;
+            const paddingLeft = parseFloat(styles.paddingLeft) || 0;
+            const paddingRight = parseFloat(styles.paddingRight) || 0;
+            const characterWidth = context.measureText('0').width || 8;
+            const margin = Math.max(12, characterWidth * 2);
+            const caretLeft = paddingLeft + context.measureText(expandedLine).width;
+            const viewportLeft = el.scrollLeft + paddingLeft;
+            const viewportRight = el.scrollLeft + el.clientWidth - paddingRight;
+            if (caretLeft < viewportLeft + margin) {
+              el.scrollLeft = Math.max(0, caretLeft - paddingLeft - margin);
+            } else if (caretLeft > viewportRight - margin) {
+              el.scrollLeft = caretLeft - el.clientWidth + paddingRight + margin;
+            }
+          }
+        }
+        syncTextareaSearchOverlay(el);
+      } else {
+        const selection = window.getSelection();
+        const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+        const caretRect = range?.getClientRects()[0] ?? range?.getBoundingClientRect();
+        if (caretRect) {
+          const editorRect = el.getBoundingClientRect();
+          if (caretRect.top < editorRect.top + lineHeight) {
+            el.scrollTop -= editorRect.top + lineHeight - caretRect.top;
+          } else if (caretRect.bottom > editorRect.bottom - lineHeight) {
+            el.scrollTop += caretRect.bottom - editorRect.bottom + lineHeight;
+          }
+          if (!wordWrap) {
+            const paddingLeft = parseFloat(styles.paddingLeft) || 0;
+            const paddingRight = parseFloat(styles.paddingRight) || 0;
+            const margin = 12;
+            const viewportLeft = editorRect.left + paddingLeft;
+            const viewportRight = editorRect.right - paddingRight;
+            if (caretRect.left < viewportLeft + margin) {
+              el.scrollLeft = Math.max(0, el.scrollLeft - (viewportLeft + margin - caretRect.left));
+            } else if (caretRect.right > viewportRight - margin) {
+              el.scrollLeft += caretRect.right - viewportRight + margin;
+            }
+          }
+        }
+      }
+
+      if (lineNumbersRef.current) lineNumbersRef.current.scrollTop = el.scrollTop;
+      const position = getLineCol(el);
+      savedCursorRef.current = offset;
+      setCursorPosition({ line: position.line, col: position.col });
+      setLineCount(position.total);
+    });
+  }, [syncTextareaSearchOverlay, wordWrap]);
 
   const scrollTextareaToCurrentSearchMatch = useCallback((el: HTMLTextAreaElement, fallbackOffset: number) => {
     const previousScrollLeft = el.scrollLeft;
@@ -553,7 +765,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
     if (!el || el instanceof HTMLTextAreaElement) return;
     const active = document.activeElement === el;
     const cursor = active && preserveSelection ? saveCursor(el) : 0;
-    const text = getText(el) || fileContent;
+    const text = getText(el) || useStore.getState().fileContent;
     const shouldRevealSearchMatch = pendingContentEditableRevealRef.current;
     syncGuard.current = true;
     el.innerHTML = highlightMarkdown(text, searchHighlightOptions) || '<br>';
@@ -567,9 +779,10 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
       });
     }
     setTimeout(() => { syncGuard.current = false; }, 100);
-  }, [fileContent, searchHighlightOptions]);
+  }, [searchHighlightOptions]);
 
   const revealRange = useCallback((start: number, end: number, options: { preserveFocus?: boolean } = {}) => {
+    resetRapidUndo();
     const el = editorRef.current;
     if (!el) return;
     const preserveFocus = options.preserveFocus !== false;
@@ -607,10 +820,11 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
 
     pendingContentEditableRevealRef.current = true;
     if (!preserveFocus) el.focus({ preventScroll: true });
-  }, [scrollEditorToOffset, scrollTextareaToCurrentSearchMatch, syncTextareaSearchOverlay]);
+  }, [resetRapidUndo, scrollEditorToOffset, scrollTextareaToCurrentSearchMatch, syncTextareaSearchOverlay]);
 
   const replaceContent = useCallback((nextText: string, cursor = 0) => {
     pushUndo();
+    currentSnapshot.current = makeSnapshot(nextText, cursor);
     lastTypedRef.current = nextText;
     setLiveEditorText(nextText);
     setFileContent(nextText);
@@ -628,7 +842,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
       setSel(nextEl, cursor, cursor);
       scrollEditorToOffset(nextEl, cursor);
     });
-  }, [pushUndo, scrollEditorToOffset, setFileContent, syntaxHighlight, searchHighlightOptions]);
+  }, [makeSnapshot, pushUndo, scrollEditorToOffset, setFileContent, syntaxHighlight, searchHighlightOptions]);
 
   const clearSearchHighlight = useCallback(() => {
     const el = editorRef.current;
@@ -671,17 +885,79 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
     syncTextareaSearchOverlay(el);
   }, [syntaxHighlight, textareaSearchHtml, scrollTextareaToCurrentSearchMatch, syncTextareaSearchOverlay, syncTextareaViewport]);
 
+  const applyProgrammaticEdit = useCallback((nextText: string, selectionStart: number, selectionEnd = selectionStart) => {
+    const el = editorRef.current;
+    if (!el) return;
+
+    clearTimeout(storeTimer.current);
+    clearTimeout(highlightTimer.current);
+    cancelAnimationFrame(historyGuardFrame.current);
+    syncGuard.current = true;
+    const scrollTop = el.scrollTop;
+
+    if (el instanceof HTMLTextAreaElement) {
+      el.value = nextText;
+    } else if (syntaxHighlight) {
+      el.innerHTML = highlightMarkdown(nextText, searchHighlightOptions) || '<br>';
+    } else {
+      el.textContent = nextText;
+    }
+
+    lastTypedRef.current = nextText;
+    setLiveEditorText(nextText);
+    currentSnapshot.current = makeSnapshot(nextText, selectionEnd);
+    setFileContent(nextText);
+    setSel(el, selectionStart, selectionEnd);
+    el.scrollTop = scrollTop;
+    focusEl(el);
+
+    const position = getLineCol(el);
+    savedCursorRef.current = selectionEnd;
+    setCursorPosition({ line: position.line, col: position.col });
+    setLineCount(position.total);
+    historyGuardFrame.current = requestAnimationFrame(() => {
+      syncGuard.current = false;
+    });
+  }, [makeSnapshot, searchHighlightOptions, setFileContent, syntaxHighlight]);
+
   // Smart toggle: wrap/unwrap selection with prefix/suffix
   const toggleWrap = useCallback((prefix: string, suffix: string, placeholder: string) => {
     const el = editorRef.current; if (!el) return;
     pushUndo();
-    const { start, end, text } = getSel(el);
+    const selection = getSel(el);
     const full = getText(el);
+    let { start, end } = selection;
     const pLen = prefix.length, sLen = suffix.length;
-    const selected = text || placeholder;
+    const hasSelection = end > start;
+
+    if (hasSelection) {
+      const leadingWhitespace = selection.text.match(/^[ \t]+/)?.[0].length ?? 0;
+      const trailingWhitespace = selection.text.match(/[ \t]+$/)?.[0].length ?? 0;
+
+      // Keep surrounding horizontal whitespace outside inline Markdown markers.
+      if (leadingWhitespace + trailingWhitespace < selection.text.length) {
+        start += leadingWhitespace;
+        end -= trailingWhitespace;
+      }
+    }
+
+    const selected = hasSelection ? full.substring(start, end) : placeholder;
+    const hasOverlappingDoubleMarker = prefix === suffix && (prefix === '*' || prefix === '~');
+    const countMarkerRun = (value: string, from: number, direction: -1 | 1) => {
+      let count = 0;
+      for (let index = from; index >= 0 && index < value.length && value[index] === prefix; index += direction) {
+        count++;
+      }
+      return count;
+    };
     // Check multiple unwrap conditions
-    const boundaryMatch = full.substring(start - pLen, start) === prefix && full.substring(end, end + sLen) === suffix;
-    const innerMatch = selected.startsWith(prefix) && selected.endsWith(suffix) && selected.length > pLen + sLen;
+    const boundaryMatch = hasOverlappingDoubleMarker
+      ? countMarkerRun(full, start - 1, -1) % 2 === 1 && countMarkerRun(full, end, 1) % 2 === 1
+      : full.substring(start - pLen, start) === prefix && full.substring(end, end + sLen) === suffix;
+    const innerMatch = selected.length > pLen + sLen && (hasOverlappingDoubleMarker
+      ? countMarkerRun(selected, 0, 1) % 2 === 1
+        && countMarkerRun(selected, selected.length - 1, -1) % 2 === 1
+      : selected.startsWith(prefix) && selected.endsWith(suffix));
     let newText: string; let selStart: number; let selEnd: number;
     if (boundaryMatch) {
       // Selection is exactly inside wrapped text — unwrap
@@ -696,18 +972,13 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
       selEnd = selStart + inner.length;
     } else {
       // Wrap
-      newText = full.substring(0, start) + prefix + selected + suffix + full.substring(end);
-      selStart = start + pLen;
-      selEnd = selStart + selected.length;
+      const wrapped = prefix + selected + suffix;
+      newText = full.substring(0, start) + wrapped + full.substring(end);
+      selStart = hasSelection ? start : start + pLen;
+      selEnd = hasSelection ? start + wrapped.length : selStart + selected.length;
     }
-    if (el instanceof HTMLTextAreaElement) { el.value = newText; lastTypedRef.current = newText; setLiveEditorText(newText); }
-    setFileContent(newText);
-    setTimeout(() => {
-      const el2 = editorRef.current; if (!el2) return;
-      setSel(el2, selStart, selEnd);
-      focusEl(el2);
-    }, 0);
-  }, [setFileContent, pushUndo]);
+    applyProgrammaticEdit(newText, selStart, selEnd);
+  }, [applyProgrammaticEdit, pushUndo]);
 
   // Smart toggle: add/remove/replace line prefix (heading, quote, list)
   const toggleLinePrefix = useCallback((pfx: string, placeholder: string) => {
@@ -730,14 +1001,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
       cursorDelta = pfx.length;
     }
     const newText = full.substring(0, lineStart) + newLine + full.substring(lineEnd);
-    if (el instanceof HTMLTextAreaElement) { el.value = newText; lastTypedRef.current = newText; setLiveEditorText(newText); }
-    setFileContent(newText);
-    setTimeout(() => {
-      const el2 = editorRef.current; if (!el2) return;
-      setSel(el2, start + cursorDelta, start + cursorDelta);
-      focusEl(el2);
-    }, 0);
-  }, [setFileContent, pushUndo]);
+    applyProgrammaticEdit(newText, start + cursorDelta);
+  }, [applyProgrammaticEdit, pushUndo]);
 
   // Smart heading toggle
   const toggleHeading = useCallback((level: number) => {
@@ -768,14 +1033,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
       cursorDelta = pfx.length;
     }
     const newText = full.substring(0, lineStart) + newLine + full.substring(lineEnd);
-    if (el instanceof HTMLTextAreaElement) { el.value = newText; lastTypedRef.current = newText; setLiveEditorText(newText); }
-    setFileContent(newText);
-    setTimeout(() => {
-      const el2 = editorRef.current; if (!el2) return;
-      setSel(el2, start + cursorDelta, start + cursorDelta);
-      focusEl(el2);
-    }, 0);
-  }, [setFileContent, pushUndo]);
+    applyProgrammaticEdit(newText, start + cursorDelta);
+  }, [applyProgrammaticEdit, pushUndo]);
 
   // ---- Block inserters for the More tools dropdown ----
   const insertBlock = useCallback((template: string, cursorOffset?: number) => {
@@ -785,6 +1044,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
     const t = getText(el);
     const nt = t.substring(0, start) + template + t.substring(start);
     const cursor = start + (cursorOffset ?? template.length);
+    currentSnapshot.current = makeSnapshot(nt, cursor);
     setFileContent(nt);
     setTimeout(() => {
       const el2 = editorRef.current; if (!el2) return;
@@ -792,7 +1052,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
       setSel(el2, cursor, cursor);
       focusEl(el2);
     }, 0);
-  }, [setFileContent, pushUndo, syntaxHighlight]);
+  }, [makeSnapshot, setFileContent, pushUndo, syntaxHighlight]);
 
   const insertFootnote = useCallback(() => {
     const el = editorRef.current; if (!el) return;
@@ -809,6 +1069,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
     const ref = `[^${n}]`;
     const def = `\n[^${n}]: `;
     const nt = t.substring(0, start) + ref + t.substring(start) + def;
+    currentSnapshot.current = makeSnapshot(nt, start + ref.length);
     setFileContent(nt);
     setTimeout(() => {
       const el2 = editorRef.current; if (!el2) return;
@@ -816,7 +1077,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
       setSel(el2, start + ref.length, start + ref.length);
       focusEl(el2);
     }, 0);
-  }, [pushUndo, setFileContent, syntaxHighlight]);
+  }, [makeSnapshot, pushUndo, setFileContent, syntaxHighlight]);
 
   const insertCallout = useCallback((type: string) => {
     insertBlock(`\n:::${type}\n\n:::\n`, 8);
@@ -837,6 +1098,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
     const t = getText(el);
     const nt = t.substring(0, start) + '<!-- ' + t.substring(start, end) + ' -->' + t.substring(end);
     const cursor = start + 5;
+    currentSnapshot.current = makeSnapshot(nt, cursor);
     setFileContent(nt);
     setTimeout(() => {
       const el2 = editorRef.current; if (!el2) return;
@@ -844,67 +1106,106 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
       setSel(el2, cursor, cursor);
       focusEl(el2);
     }, 0);
-  }, [pushUndo, setFileContent, syntaxHighlight]);
+  }, [makeSnapshot, pushUndo, setFileContent, syntaxHighlight]);
 
   const insertDeflist = useCallback(() => {
     insertBlock('\nTerm\n: Definition\n');
   }, [insertBlock]);
+
+  const restoreHistorySnapshot = useCallback((snapshot: Snap) => {
+    const el = editorRef.current;
+    if (!el) return;
+    const cursor = Math.min(snapshot.cursor, snapshot.text.length);
+
+    clearTimeout(storeTimer.current);
+    clearTimeout(highlightTimer.current);
+    cancelAnimationFrame(historyGuardFrame.current);
+    syncGuard.current = true;
+
+    if (el instanceof HTMLDivElement) {
+      el.innerHTML = syntaxHighlight ? (highlightMarkdown(snapshot.text) || '<br>') : esc(snapshot.text);
+      setSel(el, cursor, cursor);
+    } else {
+      el.value = snapshot.text;
+      el.selectionStart = el.selectionEnd = cursor;
+    }
+
+    lastTypedRef.current = snapshot.text;
+    currentSnapshot.current = { ...snapshot, cursor };
+    setLiveEditorText(snapshot.text);
+    const store = useStore.getState();
+    const restoresCurrentSave = snapshot.cleanRevision === store.saveRevision;
+    store.setModified(!restoresCurrentSave && !sameDocumentContent(snapshot.text, store.originalContent));
+    storeTimer.current = window.setTimeout(() => {
+      startTransition(() => {
+        useStore.setState((state) => ({
+          fileContent: snapshot.text,
+          isModified: snapshot.cleanRevision === state.saveRevision
+            ? false
+            : !sameDocumentContent(snapshot.text, state.originalContent),
+        }));
+      });
+    }, 75);
+    revealEditorOffsetIfNeeded(el, cursor);
+    historyGuardFrame.current = requestAnimationFrame(() => {
+      syncGuard.current = false;
+    });
+  }, [revealEditorOffsetIfNeeded, syntaxHighlight]);
 
   const handleUndo = useCallback(() => {
     const el = editorRef.current;
     if (!el || undoStack.current.length === 0) return;
     const curText = getText(el);
     const curCursor = getCursorOffset(el);
-    // Normalize entry (old code stored strings; new code stores {text,cursor})
-    const norm = (s: Snap | string): Snap =>
-      typeof s === 'string' ? { text: s, cursor: s.length } : s;
-    // If top of stack equals current state, skip it (it was pushed after the edit)
+    const now = performance.now();
+    const useWordStep = lastUndoAtRef.current > 0 && now - lastUndoAtRef.current <= RAPID_UNDO_WINDOW_MS;
     let prev: Snap | undefined;
-    while (undoStack.current.length > 0) {
-      prev = norm(undoStack.current.pop()!);
-      if (prev.text !== curText) break;
-      // Same text — this is a post-edit snapshot, discard and try next
+
+    if (useWordStep) {
+      const wordStart = previousWordStart(curText, curCursor);
+      if (wordStart < curCursor) {
+        const targetText = curText.substring(0, wordStart) + curText.substring(curCursor);
+        let newer: Pick<Snap, 'text' | 'cursor'> = { text: curText, cursor: curCursor };
+        for (let index = undoStack.current.length - 1; index >= 0; index--) {
+          const candidate = undoStack.current[index];
+          if (candidate.text === newer.text) continue;
+          if (!candidate.typedCharacter || candidate.cursor >= newer.cursor || candidate.cursor < wordStart) break;
+          if (candidate.text === targetText && candidate.cursor === wordStart) {
+            prev = candidate;
+            undoStack.current.splice(index);
+            break;
+          }
+          newer = candidate;
+        }
+      }
     }
-    if (!prev || prev.text === curText) return; // nothing to undo
-    redoStack.current.push({ text: curText, cursor: curCursor });
+
+    if (!prev) {
+      while (undoStack.current.length > 0) {
+        const candidate = undoStack.current.pop()!;
+        if (candidate.text !== curText) {
+          prev = candidate;
+          break;
+        }
+      }
+    }
+    if (!prev) return;
+    lastUndoAtRef.current = now;
+    redoStack.current.push(makeSnapshot(curText, curCursor, true));
     if (redoStack.current.length > undoStackLimit) redoStack.current.splice(0, redoStack.current.length - undoStackLimit);
-    syncGuard.current = true;
-    if (el instanceof HTMLDivElement && syntaxHighlight) {
-      el.innerHTML = highlightMarkdown(prev.text) || '<br>';
-      setSel(el, prev.cursor, prev.cursor);
-    } else if (el instanceof HTMLTextAreaElement) {
-      el.value = prev.text;
-      lastTypedRef.current = prev.text;
-      setLiveEditorText(prev.text);
-      el.selectionStart = el.selectionEnd = Math.min(prev.cursor, prev.text.length);
-    }
-    setFileContent(prev.text);
-    setTimeout(() => { syncGuard.current = false; }, 100);
-  }, [setFileContent, syntaxHighlight, undoStackLimit]);
+    restoreHistorySnapshot(prev);
+  }, [makeSnapshot, restoreHistorySnapshot, undoStackLimit]);
 
   const handleRedo = useCallback(() => {
+    resetRapidUndo();
     const el = editorRef.current;
     if (!el || redoStack.current.length === 0) return;
     const curText = getText(el);
     const curCursor = getCursorOffset(el);
-    undoStack.current.push({ text: curText, cursor: curCursor });
+    undoStack.current.push(makeSnapshot(curText, curCursor, true));
     if (undoStack.current.length > undoStackLimit) undoStack.current.splice(0, undoStack.current.length - undoStackLimit);
-    const norm = (s: Snap | string): Snap =>
-      typeof s === 'string' ? { text: s, cursor: s.length } : s;
-    const next = norm(redoStack.current.pop()!);
-    syncGuard.current = true;
-    if (el instanceof HTMLDivElement && syntaxHighlight) {
-      el.innerHTML = highlightMarkdown(next.text) || '<br>';
-      setSel(el, next.cursor, next.cursor);
-    } else if (el instanceof HTMLTextAreaElement) {
-      el.value = next.text;
-      lastTypedRef.current = next.text;
-      setLiveEditorText(next.text);
-      el.selectionStart = el.selectionEnd = Math.min(next.cursor, next.text.length);
-    }
-    setFileContent(next.text);
-    setTimeout(() => { syncGuard.current = false; }, 100);
-  }, [setFileContent, syntaxHighlight, undoStackLimit]);
+    restoreHistorySnapshot(redoStack.current.pop()!);
+  }, [makeSnapshot, resetRapidUndo, restoreHistorySnapshot, undoStackLimit]);
 
   // Pass flushStore to parent so App can flush pending text before saving
   useEffect(() => {
@@ -934,11 +1235,13 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
   const updateCursorPosition = useCallback(() => {
     const el = editorRef.current;
     if (!el) return;
-    if (document.activeElement === el) savedCursorRef.current = getSel(el).start;
+    const cursor = getSel(el).start;
+    if (document.activeElement === el) savedCursorRef.current = cursor;
+    currentSnapshot.current = makeSnapshot(getText(el), cursor, true);
     const { line, col, total } = getLineCol(el);
     setCursorPosition({ line, col });
     setLineCount(total);
-  }, []);
+  }, [makeSnapshot]);
 
   // Sync editor from store for external changes (file open, checkbox toggle in viewer)
   useLayoutEffect(() => {
@@ -951,10 +1254,25 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
         lastTypedRef.current = fileContent;
       }
       setLiveEditorText(el.value);
+      currentSnapshot.current = makeSnapshot(
+        el.value,
+        Math.min(el.selectionStart, el.value.length),
+        true,
+      );
       return;
     }
     // contentEditable: set initial content when file opens or mode switches
     if (el instanceof HTMLDivElement && syntaxHighlight) {
+      const currentText = getText(el);
+      if (sameDocumentContent(currentText, fileContent)) {
+        setLiveEditorText(currentText);
+        currentSnapshot.current = makeSnapshot(
+          currentText,
+          Math.min(saveCursor(el), currentText.length),
+          true,
+        );
+        return;
+      }
       const cursor = saveCursor(el);
       const st = el.scrollTop;
       syncGuard.current = true;
@@ -962,9 +1280,10 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
       setLiveEditorText(fileContent);
       restoreCursor(el, cursor);
       el.scrollTop = st;
+      currentSnapshot.current = makeSnapshot(fileContent, Math.min(cursor, fileContent.length), true);
       setTimeout(() => { syncGuard.current = false; }, 100);
     }
-  }, [fileContent, syntaxHighlight, searchHighlightOptions]);
+  }, [fileContent, makeSnapshot, syntaxHighlight]);
 
   // Register after the highlighted editor has its content and scroll range.
   useLayoutEffect(() => {
@@ -973,28 +1292,28 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
     return () => { if (onScrollRef) onScrollRef(null); };
   }, [onScrollRef, syntaxHighlight]);
 
-  // Input handler: push undo, debounce store, schedule highlighting
-  const handleInput = useCallback(() => {
+  // Native edits retain their prior snapshot without relying on beforeinput.
+  const handleInput = useCallback((event: React.FormEvent<HTMLDivElement>) => {
     const el = editorRef.current;
-    if (!el || syncGuard.current) return;
+    if (!el) return;
     pendingTextareaRevealOffsetRef.current = null;
     pendingContentEditableRevealRef.current = false;
     const text = getText(el);
+    recordNativeEdit(text, getCursorOffset(el), event.nativeEvent as InputEvent);
     setLiveEditorText(text);
-    pushUndo(); // per-keystroke undo for contentEditable
     pushToStore(text);
     applyHighlight();
     requestAnimationFrame(updateCursorPosition);
-  }, [pushToStore, applyHighlight, updateCursorPosition, pushUndo]);
+  }, [pushToStore, applyHighlight, recordNativeEdit, updateCursorPosition]);
 
   // textarea onChange — short debounce (150ms) + startTransition for interruptible preview
   const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     pendingTextareaRevealOffsetRef.current = null;
     pendingContentEditableRevealRef.current = false;
     const text = e.target.value;
+    recordNativeEdit(text, e.target.selectionStart, e.nativeEvent as InputEvent);
     syncTextareaViewport(e.target);
     setLiveEditorText(text);
-    pushUndo();
     lastTypedRef.current = text;
     clearTimeout(storeTimer.current);
     storeTimer.current = window.setTimeout(() => {
@@ -1002,7 +1321,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
         startTransition(() => { setFileContent(text); });
       }
     }, 150);
-  }, [setFileContent, pushUndo, syncTextareaViewport]);
+  }, [recordNativeEdit, setFileContent, syncTextareaViewport]);
 
   const handleScroll = useCallback(() => {
     if (editorRef.current && lineNumbersRef.current) {
@@ -1016,53 +1335,96 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     const el = editorRef.current; if (!el) return;
-    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
-      e.preventDefault(); toolbarUndo(); return;
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+      e.preventDefault();
+      if (e.shiftKey) handleRedo();
+      else handleUndo();
+      return;
     }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
-      e.preventDefault(); toolbarRedo(); return;
+      e.preventDefault(); handleRedo(); return;
     }
+    resetRapidUndo();
     const isTa = el instanceof HTMLTextAreaElement;
-    // Tab — insert 2 spaces natively, debounce store
+    // Tab — nest an empty ordered continuation, otherwise insert indentation.
     if (e.key === 'Tab') {
       e.preventDefault();
       pushUndo();
       const { start, end } = getSel(el);
       const value = getText(el);
-      if (!e.shiftKey) {
-        const nv = value.substring(0, start) + '  ' + value.substring(end);
+      const applyTabEdit = (nextValue: string, cursor: number) => {
+        currentSnapshot.current = makeSnapshot(nextValue, cursor);
         if (isTa) {
-          el.value = nv; lastTypedRef.current = nv;
-          setLiveEditorText(nv);
-          el.selectionStart = el.selectionEnd = start + 2;
-          pushUndo(); // snapshot post-Tab state for undo granularity
+          el.value = nextValue; lastTypedRef.current = nextValue;
+          setLiveEditorText(nextValue);
+          el.selectionStart = el.selectionEnd = cursor;
           clearTimeout(storeTimer.current);
-          storeTimer.current = window.setTimeout(() => { startTransition(() => { lastTypedRef.current = nv; setFileContent(nv); }); }, 150);
+          storeTimer.current = window.setTimeout(() => { startTransition(() => { lastTypedRef.current = nextValue; setFileContent(nextValue); }); }, 150);
         } else {
           syncGuard.current = true;
-          setFileContent(nv);
-          setTimeout(() => { const el2 = editorRef.current; if (el2 && !(el2 instanceof HTMLTextAreaElement) && syntaxHighlight) el2.innerHTML = highlightMarkdown(nv) || '<br>'; setSel(el2!, start + 2, start + 2); }, 0);
+          setFileContent(nextValue);
+          setTimeout(() => { const el2 = editorRef.current; if (el2 && !(el2 instanceof HTMLTextAreaElement) && syntaxHighlight) el2.innerHTML = highlightMarkdown(nextValue) || '<br>'; setSel(el2!, cursor, cursor); }, 0);
           setTimeout(() => { syncGuard.current = false; }, 50);
         }
         updateCursorPosition();
+      };
+      if (!e.shiftKey) {
+        const lineStart = value.lastIndexOf('\n', start - 1) + 1;
+        const lineEndIndex = value.indexOf('\n', start);
+        const lineEnd = lineEndIndex === -1 ? value.length : lineEndIndex;
+        const currentItem = value.substring(lineStart, lineEnd).match(/^(\s*)(\d+)\.\s*$/);
+        if (start === end && start === lineEnd && currentItem && lineStart > 0) {
+          const previousLineEnd = lineStart - 1;
+          const previousLineStart = value.lastIndexOf('\n', previousLineEnd - 1) + 1;
+          const previousItem = value.substring(previousLineStart, previousLineEnd).match(/^(\s*)(\d+)\.\s+(\S.*)$/);
+          if (previousItem && previousItem[1] === currentItem[1]) {
+            const childIndent = currentItem[1] + ' '.repeat(previousItem[2].length + 2);
+            const childMarker = `${childIndent}1. `;
+            applyTabEdit(
+              value.substring(0, lineStart) + childMarker + value.substring(lineEnd),
+              lineStart + childMarker.length,
+            );
+            return;
+          }
+        }
+        const nv = value.substring(0, start) + '  ' + value.substring(end);
+        applyTabEdit(nv, start + 2);
       } else {
         const ls = value.lastIndexOf('\n', start - 1) + 1;
+        const lineEndIndex = value.indexOf('\n', start);
+        const lineEnd = lineEndIndex === -1 ? value.length : lineEndIndex;
+        const currentLine = value.substring(ls, lineEnd);
+        const orderedItem = currentLine.match(/^([ \t]+)(\d+)\.([ \t]+)(.*)$/);
+        if (start === end && orderedItem) {
+          let previousEnd = ls - 1;
+          while (previousEnd >= 0) {
+            const previousStart = value.lastIndexOf('\n', previousEnd - 1) + 1;
+            const previousLine = value.substring(previousStart, previousEnd);
+            const previousIndent = previousLine.match(/^[ \t]*/)?.[0] || '';
+            if (previousLine.trim() && previousIndent.length < orderedItem[1].length) {
+              const parentItem = previousLine.match(/^([ \t]*)(\d+)\.[ \t]+.*$/);
+              if (parentItem) {
+                const nextPrefix = `${parentItem[1]}${parseInt(parentItem[2], 10) + 1}. `;
+                const previousPrefixLength = orderedItem[1].length + orderedItem[2].length + 1 + orderedItem[3].length;
+                const relativeCursor = start - ls;
+                const nextCursor = ls + (relativeCursor <= previousPrefixLength
+                  ? nextPrefix.length
+                  : relativeCursor + nextPrefix.length - previousPrefixLength);
+                const nextLine = nextPrefix + orderedItem[4];
+                applyTabEdit(
+                  value.substring(0, ls) + nextLine + value.substring(lineEnd),
+                  nextCursor,
+                );
+              }
+              return;
+            }
+            previousEnd = previousStart - 1;
+          }
+        }
         const bl = value.substring(ls, start);
         if (bl.startsWith('  ')) {
           const nv = value.substring(0, ls) + bl.substring(2) + value.substring(start);
-          if (isTa) {
-            el.value = nv; lastTypedRef.current = nv;
-            setLiveEditorText(nv);
-            el.selectionStart = el.selectionEnd = start - 2;
-            clearTimeout(storeTimer.current);
-            storeTimer.current = window.setTimeout(() => { startTransition(() => { lastTypedRef.current = nv; setFileContent(nv); }); }, 150);
-          } else {
-            syncGuard.current = true;
-            setFileContent(nv);
-            setTimeout(() => { const el2 = editorRef.current; if (el2 && !(el2 instanceof HTMLTextAreaElement) && syntaxHighlight) el2.innerHTML = highlightMarkdown(nv) || '<br>'; setSel(el2!, start - 2, start - 2); }, 0);
-            setTimeout(() => { syncGuard.current = false; }, 50);
-          }
-          updateCursorPosition();
+          applyTabEdit(nv, start - 2);
         }
       }
       return;
@@ -1073,16 +1435,23 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
       if (!isTa) syncGuard.current = true;
       pushUndo();
       const value = getText(el);
-      const { start } = getSel(el);
+      const { start, end } = getSel(el);
       const ls = value.lastIndexOf('\n', start - 1) + 1;
+      const lineEndIndex = value.indexOf('\n', start);
+      const lineEnd = lineEndIndex === -1 ? value.length : lineEndIndex;
       const cl = value.substring(ls, start);
+      const currentLine = value.substring(ls, lineEnd);
       const indent = cl.match(/^\s*/)?.[0] || '';
       const doApply = (nv: string, cursor: number) => {
+        currentSnapshot.current = makeSnapshot(nv, cursor);
         if (isTa) {
           el.value = nv; lastTypedRef.current = nv;
           setLiveEditorText(nv);
           el.selectionStart = el.selectionEnd = cursor;
-          pushUndo(); // snapshot post-Enter state for undo granularity
+          if (!wordWrap) {
+            el.scrollLeft = 0;
+            syncTextareaSearchOverlay(el);
+          }
           clearTimeout(storeTimer.current);
           storeTimer.current = window.setTimeout(() => { startTransition(() => { lastTypedRef.current = nv; setFileContent(nv); }); }, 150);
         } else {
@@ -1091,27 +1460,46 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
           requestAnimationFrame(() => {
             const el2 = editorRef.current;
             if (el2 && !(el2 instanceof HTMLTextAreaElement) && syntaxHighlight) el2.innerHTML = highlightMarkdown(nv) || '<br>';
-            setSel(el2 || el, cursor, cursor);
+            const target = el2 || el;
+            setSel(target, cursor, cursor);
+            if (!wordWrap) target.scrollLeft = 0;
             requestAnimationFrame(() => { syncGuard.current = false; });
           });
         }
+        revealEditorOffsetIfNeeded(el, cursor, true);
         updateCursorPosition();
       };
-      const tm = cl.match(/^(\s*)[-*+]\s+\[([ x])\]\s*(.*)/);
-      if (tm) { const ti = tm[1]; const tt = tm[3]; if (!tt) doApply(value.substring(0, ls) + '\n' + ti + value.substring(start), ls + 1 + ti.length); else { const ins = '\n' + ti + '- [ ] '; doApply(value.substring(0, start) + ins + value.substring(start), start + ins.length); } return; }
+
+      // A second Enter on an empty generated marker exits the continuation.
+      // Inspect the full line so Enter before existing text does not terminate it.
+      const isEmptyTask = /^\s*[-*+]\s+\[[ xX]\]\s*$/.test(currentLine);
+      const isEmptyFootnote = /^\s*\[\^\d+\]:\s*$/.test(currentLine);
+      const isEmptyListItem = /^\s*(?:[-*+]\s+|\d+\.\s+)$/.test(currentLine);
+      if (start === end && (isEmptyTask || isEmptyFootnote || isEmptyListItem)) {
+        doApply(value.substring(0, ls) + value.substring(lineEnd), ls);
+        return;
+      }
+
+      const tm = cl.match(/^(\s*)[-*+]\s+\[([ xX])\]\s*(.*)/);
+      if (tm) { const ti = tm[1]; const ins = '\n' + ti + '- [ ] '; doApply(value.substring(0, start) + ins + value.substring(start), start + ins.length); return; }
       // Footnote definition continuation: [^1]: text → [^2]: 
-      const fn = cl.match(/^\[\^(\d+)\]:\s*(.*)/);
-      if (fn) { const nextNum = parseInt(fn[1]) + 1; const ins = fn[2] ? `\n[^${nextNum}]: ` : '\n'; doApply(value.substring(0, start) + ins + value.substring(start), start + ins.length); return; }
+      const fn = cl.match(/^(\s*)\[\^(\d+)\]:\s*(.*)/);
+      if (fn) { const nextNum = parseInt(fn[2]) + 1; const ins = `\n${fn[1]}[^${nextNum}]: `; doApply(value.substring(0, start) + ins + value.substring(start), start + ins.length); return; }
       const lm = cl.match(/^(\s*)([-*+]\s+|(\d+\.)\s+)/);
       if (lm) { const ins = '\n' + indent + (lm[3] ? `${parseInt(lm[3]) + 1}. ` : '- '); doApply(value.substring(0, start) + ins + value.substring(start), start + ins.length); return; }
       const ins = indent ? '\n' + indent : '\n';
       doApply(value.substring(0, start) + ins + value.substring(start), start + ins.length);
     }
-  }, [setFileContent, updateCursorPosition, handleUndo, handleRedo, syntaxHighlight, pushUndo]);
+  }, [setFileContent, updateCursorPosition, handleUndo, handleRedo, makeSnapshot, syntaxHighlight, pushUndo, resetRapidUndo, revealEditorOffsetIfNeeded, syncTextareaSearchOverlay, wordWrap]);
 
   const handleCursorUpdate = useCallback(() => {
     updateCursorPosition();
   }, [updateCursorPosition]);
+
+  const handlePointerCursorUpdate = useCallback(() => {
+    resetRapidUndo();
+    updateCursorPosition();
+  }, [resetRapidUndo, updateCursorPosition]);
 
   const lines = useCallback(() => {
     const logicalLines = fileContent.split('\n');
@@ -1198,6 +1586,11 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
       {/* Editor toolbar — darker than editor area */}
       <div
         ref={toolbarRef}
+        onMouseDownCapture={(event) => {
+          if (event.button === 0 && (event.target as HTMLElement).closest('button')) {
+            event.preventDefault();
+          }
+        }}
         className="flex items-center gap-0.5 px-3 py-1.5 border-b border-gray-200/60 dark:border-gray-700/50 bg-gray-50/85 dark:bg-[#30353d]/85 backdrop-blur-md flex-wrap"
         style={matchPalette ? {
           backgroundColor: 'var(--pal-editor-toolbar-bg)',
@@ -1293,6 +1686,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
           const sel = t.substring(start, end);
           const ins = sel ? `\`\`\`\n${sel}\n\`\`\`` : '```\ncode block\n```';
           const nt = t.substring(0, start) + ins + t.substring(end);
+          currentSnapshot.current = makeSnapshot(nt, start + ins.length);
           setFileContent(nt);
           setTimeout(() => {
             const el2 = editorRef.current; if (!el2) return;
@@ -1325,6 +1719,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
           const t = getText(el);
           const ins = '\n| Col 1 | Col 2 | Col 3 |\n| --- | --- | --- |\n| Cell | Cell | Cell |\n';
           const nt = t.substring(0, start) + ins + t.substring(start);
+          currentSnapshot.current = makeSnapshot(nt, start + ins.length);
           setFileContent(nt);
           setTimeout(() => {
             const el2 = editorRef.current; if (!el2) return;
@@ -1358,6 +1753,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
           {moreOpen && createPortal(
             <div
               ref={morePanelRef}
+              onMouseDown={(event) => event.preventDefault()}
               className="bg-white dark:bg-[#30353d] border border-gray-200 dark:border-gray-600 rounded-md shadow-xl py-1 w-44 editor-popup"
               data-palette={matchPalette ? '' : undefined}
               data-placement={morePanelPlacement}
@@ -1379,6 +1775,18 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
               <button className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 dark:hover:bg-white/10 flex items-center gap-2 text-gray-600 dark:text-gray-300" onClick={() => { setMoreOpen(false); toggleWrap('==', '==', 'highlight'); }}>
                 <svg className="w-4 h-4 shrink-0 text-gray-500 dark:text-gray-400" fill="currentColor" viewBox="0 0 256 256"><path d="M253.66 106.34a8 8 0 0 0-11.32 0L192 156.69L107.31 72l50.35-50.34a8 8 0 1 0-11.32-11.32L96 60.69a16 16 0 0 0-2.82 18.81L72 100.69a16 16 0 0 0 0 22.62l4.69 4.69l-58.35 58.34a8 8 0 0 0 3.13 13.25l72 24A7.9 7.9 0 0 0 96 224a8 8 0 0 0 5.66-2.34L136 187.31l4.69 4.69a16 16 0 0 0 22.62 0l21.19-21.18a16 16 0 0 0 18.81-2.82l50.35-50.34a8 8 0 0 0 0-11.32M93.84 206.85l-55-18.35L88 139.31L124.69 176ZM152 180.69L83.31 112L104 91.31L172.69 160Z"/></svg>
                 Highlight ==text==
+              </button>
+              <button className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 dark:hover:bg-white/10 flex items-center gap-2 text-gray-600 dark:text-gray-300" onClick={() => { setMoreOpen(false); toggleWrap('~', '~', 'subscript'); }}>
+                <span className="flex h-4 w-4 shrink-0 items-center justify-center font-serif text-[13px] font-semibold leading-none text-gray-500 dark:text-gray-400" aria-hidden="true">
+                  x<span className="relative top-[3px] text-[8px]">2</span>
+                </span>
+                Subscript ~text~
+              </button>
+              <button className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 dark:hover:bg-white/10 flex items-center gap-2 text-gray-600 dark:text-gray-300" onClick={() => { setMoreOpen(false); toggleWrap('^', '^', 'superscript'); }}>
+                <span className="flex h-4 w-4 shrink-0 items-center justify-center font-serif text-[13px] font-semibold leading-none text-gray-500 dark:text-gray-400" aria-hidden="true">
+                  x<span className="relative bottom-[4px] text-[8px]">2</span>
+                </span>
+                Superscript ^text^
               </button>
               <button className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 dark:hover:bg-white/10 flex items-center gap-2 text-gray-600 dark:text-gray-300" onClick={() => { setMoreOpen(false); insertComment(); }}>
                 <svg className="w-4 h-4 shrink-0 text-gray-500 dark:text-gray-400" fill="currentColor" viewBox="0 0 64 64"><path d="M44.4 19.5H18.6c-1.2 0-2.3 1-2.3 2.3s1 2.3 2.3 2.3h25.9c1.2 0 2.3-1 2.3-2.3s-1.1-2.3-2.4-2.3m-5.2 12.2H18.6c-1.2 0-2.3 1-2.3 2.3s1 2.3 2.3 2.3h20.6c1.2 0 2.3-1 2.3-2.3s-1.1-2.3-2.3-2.3"/><path d="M56 7.9H8c-3.4 0-6.3 2.8-6.3 6.3v37.7c0 1.6.9 3.1 2.4 3.8c.6.3 1.2.4 1.8.4c1 0 1.9-.3 2.7-1l8.5-7H56c3.4 0 6.3-2.8 6.3-6.3V14.2c0-3.5-2.9-6.3-6.3-6.3m1.8 33.9c0 1-.8 1.8-1.8 1.8H16.3c-.5 0-1 .2-1.4.5l-8.6 7.1v-37c0-1 .8-1.8 1.8-1.8h48c1 0 1.8.8 1.8 1.8v27.6z"/></svg>
@@ -1486,6 +1894,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
               <span className="text-[11px] font-semibold uppercase tracking-wide">Scroll sync</span>
               <span className="text-xs font-semibold">Current: {scrollSyncMode === 'heading' ? 'Content' : scrollSyncMode === 'position' ? 'Position' : 'Off'}</span>
             </div>
+            <p className="scroll-sync-tooltip-muted pt-2 text-[11px] leading-snug">
+              Controls how the editor and preview panels scroll together.
+            </p>
             <div className="grid grid-cols-3 gap-1.5 pt-2">
               {([
                 { mode: 'heading', code: 'C', label: 'Content', detail: 'Aligns headings' },
@@ -1549,7 +1960,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
               onChange={handleChange}
               onKeyDown={handleKeyDown}
               onKeyUp={handleCursorUpdate}
-              onClick={handleCursorUpdate}
+              onClick={handlePointerCursorUpdate}
               onScroll={handleScroll}
               spellCheck={false}
               className={`relative z-10 w-full h-full bg-transparent text-sm leading-6 font-mono p-3 resize-none outline-none text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-600 scrollbar-expand ${wordWrap ? 'wrap' : 'no-wrap'}`}
@@ -1569,7 +1980,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ isActive, isSplitView, 
             onInput={handleInput}
             onKeyDown={handleKeyDown}
             onKeyUp={handleCursorUpdate}
-            onClick={handleCursorUpdate}
+            onClick={handlePointerCursorUpdate}
             onScroll={handleScroll}
             spellCheck={false}
             className={`flex-1 text-sm leading-6 font-mono p-3 outline-none whitespace-pre-wrap break-words overflow-y-auto overflow-x-auto text-gray-800 dark:text-gray-200 bg-transparent scrollbar-expand ${wordWrap ? '' : 'whitespace-pre'}`}

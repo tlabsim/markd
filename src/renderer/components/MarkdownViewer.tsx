@@ -254,7 +254,8 @@ function remarkSubSuper() {
   return (tree: any) => {
     function visit(node: any, parent: any, idx: number) {
       if (node.type === 'text') {
-        const parts: Array<{ type: 'text' | 'html'; value: string }> = [];
+        const parts: any[] = [];
+        let transformed = false;
         let i = 0;
         while (i < node.value.length) {
           // Superscript: ^text^ (needs closing ^)
@@ -262,7 +263,12 @@ function remarkSubSuper() {
             const end = node.value.indexOf('^', i + 1);
             if (end > i + 1) {
               const inner = node.value.slice(i + 1, end);
-              parts.push({ type: 'html', value: `<sup>${inner}</sup>` });
+              parts.push({
+                type: 'superscript',
+                data: { hName: 'sup' },
+                children: [{ type: 'text', value: inner }],
+              });
+              transformed = true;
               i = end + 1;
               continue;
             }
@@ -276,7 +282,12 @@ function remarkSubSuper() {
             const end = node.value.indexOf('~', i + 1);
             if (end > i + 1) {
               const inner = node.value.slice(i + 1, end);
-              parts.push({ type: 'html', value: `<sub>${inner}</sub>` });
+              parts.push({
+                type: 'subscript',
+                data: { hName: 'sub' },
+                children: [{ type: 'text', value: inner }],
+              });
+              transformed = true;
               i = end + 1;
               continue;
             }
@@ -293,13 +304,8 @@ function remarkSubSuper() {
           }
           i = j;
         }
-        if (parts.length > 1) {
-          const newChildren = parts.map(p =>
-            p.type === 'html' ? { type: 'html', value: p.value } : { type: 'text', value: p.value }
-          );
-          if (parent && Array.isArray(parent.children)) {
-            parent.children.splice(idx, 1, ...newChildren);
-          }
+        if (transformed && parent && Array.isArray(parent.children)) {
+          parent.children.splice(idx, 1, ...parts);
         }
       }
       if (node.children) {
@@ -877,7 +883,12 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, o
     );
   };
 
-  const ResolvedImage: React.FC<{ src: string; alt: string; className?: string }> = ({ src, alt, className }) => {
+  type ResolvedImageProps = Omit<React.ImgHTMLAttributes<HTMLImageElement>, 'src' | 'alt'> & {
+    src: string;
+    alt?: string;
+  };
+
+  const ResolvedImage: React.FC<ResolvedImageProps> = ({ src, alt = '', loading, onError, ...imageProps }) => {
     const [resolved, setResolved] = useState<string | null>(null);
     const [error, setError] = useState(false);
     const currentPath = useStore((s) => s.currentFilePath);
@@ -891,27 +902,32 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, o
       })();
       return () => { cancelled = true; };
     }, [src, currentPath, reloadToken]);
-    if (error || !resolved) return resolved === null ? <span className="block my-4 h-8 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" /> : null;
+    if (!resolved) return null;
+    if (error) {
+      return alt ? <span className="image-fallback" role="img" aria-label={alt}>{alt}</span> : null;
+    }
+
+    const handleError: React.ReactEventHandler<HTMLImageElement> = (event) => {
+      setError(true);
+      onError?.(event);
+    };
     const showSvgControl = theme === 'dark' && showSvgBackgroundToggle && /^data:image\/svg\+xml(?:;[^,]*)?,/i.test(resolved);
-    const imageClassName = className || 'max-w-full h-auto rounded-lg shadow-sm';
-    return (
-      <span className="block my-4">
-        {showSvgControl ? (
-          <React.Suspense fallback={<img src={resolved} alt={alt || ''} loading="lazy" className={imageClassName} onError={() => setError(true)} />}>
-            <SvgBackgroundImage src={resolved} alt={alt || ''} className={imageClassName} onError={() => setError(true)} />
-          </React.Suspense>
-        ) : (
-          <img src={resolved} alt={alt || ''} loading="lazy" className={imageClassName} onError={() => setError(true)} />
-        )}
-        {alt && <span className="block text-xs text-gray-500 text-center mt-1">{alt}</span>}
-      </span>
-    );
+
+    if (showSvgControl) {
+      return (
+        <React.Suspense fallback={<img {...imageProps} src={resolved} alt={alt} loading={loading || 'lazy'} onError={handleError} />}>
+          <SvgBackgroundImage {...imageProps} src={resolved} alt={alt} loading={loading} onError={handleError} />
+        </React.Suspense>
+      );
+    }
+
+    return <img {...imageProps} src={resolved} alt={alt} loading={loading || 'lazy'} onError={handleError} />;
   };
 
-  const AsyncImage: React.FC<{ src: string; alt: string; className?: string }> = ({ src, alt, className }) => {
+  const AsyncImage: React.FC<ResolvedImageProps> = ({ src, alt = '', className, ...imageProps }) => {
     if (isVideoSource(src)) return <AsyncVideo src={src} alt={alt} className={className} />;
     if (isAudioSource(src)) return <AsyncAudio src={src} title={alt} className={className} />;
-    return <ResolvedImage src={src} alt={alt} className={className} />;
+    return <ResolvedImage {...imageProps} src={src} alt={alt} className={className} />;
   };
 
   const computedFont = useMemo(() => fontFamily === 'system' ? undefined : fontFamily, [fontFamily]);
@@ -964,7 +980,7 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, o
     a: ({ href, children, ...props }: any) => (
       <a href={href} onClick={(e) => { if (href?.startsWith('http://') || href?.startsWith('https://')) { e.preventDefault(); window.markd?.openExternal(href); } }} {...props}>{children}</a>
     ),
-    img: ({ src, alt, ...props }: any) => <AsyncImage src={src} alt={alt} {...props} />,
+    img: ({ src, alt, node: _node, ...props }: any) => <AsyncImage src={src} alt={alt} {...props} />,
     video: ({ src, children, ...props }: any) => <AsyncVideo src={src} {...props}>{children}</AsyncVideo>,
     audio: ({ src, children, ...props }: any) => <AsyncAudio src={src} {...props}>{children}</AsyncAudio>,
     source: ({ src, ...props }: any) => <AsyncSource src={src} {...props} />,
@@ -1053,7 +1069,7 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, o
           style={{ fontFamily: computedFont, zoom: `${zoomLevel}%` }}>
           {fileContent ? (
             <ReactMarkdown
-              remarkPlugins={[remarkGfm, remarkMath, remarkEmoji, remarkFrontmatter, remarkSmartypants, remarkWikiLink, remarkDirective, remarkCallouts, remarkSubSuper, remarkHighlight, remarkDeflist]}
+              remarkPlugins={[[remarkGfm, { singleTilde: false }], remarkMath, remarkEmoji, remarkFrontmatter, [remarkSmartypants, { dashes: 'oldschool' }], remarkWikiLink, remarkDirective, remarkCallouts, remarkSubSuper, remarkHighlight, remarkDeflist]}
               rehypePlugins={[rehypeKatex, rehypeHighlight, rehypeRaw, rehypeFilterCustomElements, searchHighlightPlugin]}
               components={components}>
               {normalizedFileContent}

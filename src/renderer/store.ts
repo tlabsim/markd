@@ -5,6 +5,35 @@ import { PALETTE_OPTIONS } from './palettes';
 
 export const MAX_RECENT_FILES = 15;
 
+export function sameDocumentContent(a: string, b: string): boolean {
+  if (a === b) return true;
+
+  let aIndex = 0;
+  let bIndex = 0;
+  while (aIndex < a.length && bIndex < b.length) {
+    let aCode = a.charCodeAt(aIndex++);
+    let bCode = b.charCodeAt(bIndex++);
+
+    if (aCode === 13) {
+      if (a.charCodeAt(aIndex) === 10) aIndex++;
+      aCode = 10;
+    } else if (aCode === 160) {
+      aCode = 32;
+    }
+
+    if (bCode === 13) {
+      if (b.charCodeAt(bIndex) === 10) bIndex++;
+      bCode = 10;
+    } else if (bCode === 160) {
+      bCode = 32;
+    }
+
+    if (aCode !== bCode) return false;
+  }
+
+  return aIndex === a.length && bIndex === b.length;
+}
+
 interface EditorState {
   // File state
   currentFile: string | null;
@@ -12,6 +41,7 @@ interface EditorState {
   fileContent: string;
   originalContent: string;
   isModified: boolean;
+  saveRevision: number;
 
   // Folder state
   currentFolderPath: string | null;
@@ -124,6 +154,7 @@ export const useStore = create<EditorState>()(
       fileContent: '',
       originalContent: '',
       isModified: false,
+      saveRevision: 0,
       currentFolderPath: null,
       folderChildren: {},
       expandedFolderPaths: new Set<string>(),
@@ -157,8 +188,13 @@ export const useStore = create<EditorState>()(
       setCurrentFile: (name) => set({ currentFile: name }),
       setCurrentFilePath: (path) => set({ currentFilePath: path }),
       setFileContent: (content) =>
-        set({ fileContent: content, isModified: content !== get().originalContent }),
-      setOriginalContent: (content) => set({ originalContent: content, fileContent: content, isModified: false }),
+        set({ fileContent: content, isModified: !sameDocumentContent(content, get().originalContent) }),
+      setOriginalContent: (content) => set((state) => ({
+        originalContent: content,
+        fileContent: content,
+        isModified: false,
+        saveRevision: (state.saveRevision ?? 0) + 1,
+      })),
       setModified: (modified) => set({ isModified: modified }),
       setCurrentFolderPath: (path) => set({ currentFolderPath: path }),
       setFolderChildren: (folderPath, children) =>

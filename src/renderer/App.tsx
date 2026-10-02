@@ -34,6 +34,7 @@ const PALETTE_KEYS = [
 ];
 
 type ScrollSyncMode = 'heading' | 'position' | 'off';
+type DocumentNoticeKind = 'resume' | 'reloaded';
 
 function scrollRange(element: HTMLElement): number {
   return Math.max(0, element.scrollHeight - element.clientHeight);
@@ -246,6 +247,7 @@ const App: React.FC = () => {
   const flushEditorRef = useRef<(() => void) | null>(null);
   const documentContentRef = useRef<HTMLDivElement>(null);
   const [documentRevealVersion, setDocumentRevealVersion] = useState(0);
+  const [editorDocumentVersion, setEditorDocumentVersion] = useState(0);
   const [settingsModuleMounted, setSettingsModuleMounted] = useState(false);
   const [showFontMenu, setShowFontMenu] = useState(false);
   const [showPaletteMenu, setShowPaletteMenu] = useState(false);
@@ -259,11 +261,14 @@ const App: React.FC = () => {
   const [reloadModalOpen, setReloadModalOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<'settings' | 'shortcuts' | 'about'>('settings');
-  const [welcomeBackFile, setWelcomeBackFile] = useState<string | null>(null);
+  const [documentNotice, setDocumentNotice] = useState<{ kind: DocumentNoticeKind; id: number } | null>(null);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [searchShowReplace, setSearchShowReplace] = useState(false);
   const pendingOpenAction = useRef<(() => void) | null>(null);
   const pendingFilePath = useRef<string | null>(null);
+  const documentNoticeTimerRef = useRef<number>(0);
+  const documentNoticeDelayRef = useRef<number>(0);
+  const documentNoticeIdRef = useRef(0);
   const fontMenuRef = useRef<HTMLDivElement>(null);
   const paletteMenuRef = useRef<HTMLDivElement>(null);
   const tocButtonRef = useRef<HTMLButtonElement>(null);
@@ -272,6 +277,25 @@ const App: React.FC = () => {
   const paneScrollPositions = useRef<{ view?: number; edit?: number; splitEditor?: number; splitViewer?: number }>({});
   const lastPaneScrollIntent = useRef({ editor: -Infinity, viewer: -Infinity });
   const documentScrollVersion = useRef(0);
+
+  const dismissDocumentNotice = useCallback(() => {
+    clearTimeout(documentNoticeTimerRef.current);
+    clearTimeout(documentNoticeDelayRef.current);
+    setDocumentNotice(null);
+  }, []);
+
+  const showDocumentNotice = useCallback((kind: DocumentNoticeKind, duration = 5000) => {
+    clearTimeout(documentNoticeTimerRef.current);
+    clearTimeout(documentNoticeDelayRef.current);
+    documentNoticeIdRef.current++;
+    setDocumentNotice({ kind, id: documentNoticeIdRef.current });
+    documentNoticeTimerRef.current = window.setTimeout(() => setDocumentNotice(null), duration);
+  }, []);
+
+  useEffect(() => () => {
+    clearTimeout(documentNoticeTimerRef.current);
+    clearTimeout(documentNoticeDelayRef.current);
+  }, []);
   const [mountedPanes, setMountedPanes] = useState({ version: 0, editor: false, viewer: false });
   const changeViewModeRef = useRef<(mode: 'view' | 'edit' | 'split') => void>(() => {});
   const editorScrollRef = useRef<HTMLElement | null>(null);
@@ -368,6 +392,7 @@ const App: React.FC = () => {
       state.setScrollPosition(state.currentFilePath, viewerScrollRef.current.scrollTop);
     }
     if (isNewDocument || filePath === null || documentScrollVersion.current === 0) {
+      dismissDocumentNotice();
       paneScrollPositions.current = {};
       lastPaneScrollIntent.current = { editor: -Infinity, viewer: -Infinity };
       documentScrollVersion.current++;
@@ -377,6 +402,7 @@ const App: React.FC = () => {
     setCurrentFile(name);
     setCurrentFilePath(filePath);
     setOriginalContent(content);
+    setEditorDocumentVersion(version => version + 1);
     // A same-file reload keeps its current position instead of restoring an older saved one.
     if (shouldRestoreScroll && filePath && state.rememberScrollPosition) {
       const saved = state.scrollPositions[filePath];
@@ -387,28 +413,24 @@ const App: React.FC = () => {
             if (documentScrollVersion.current !== restoreVersion || useStore.getState().currentFilePath !== filePath) return;
             if (viewerScrollRef.current) {
               viewerScrollRef.current.scrollTop = saved;
-              setTimeout(() => setWelcomeBackFile(name), 500);
-              setTimeout(() => setWelcomeBackFile(null), 5500);
+              documentNoticeDelayRef.current = window.setTimeout(() => showDocumentNotice('resume'), 500);
             }
           });
         });
       }
     }
-    // Force-sync the editor (uncontrolled textarea needs explicit update)
+    // Force-sync only the uncontrolled textarea. The highlighted contentEditable
+    // owns its rendered HTML and synchronizes from the store in MarkdownEditor.
     if (editorScrollRef.current instanceof HTMLTextAreaElement) {
       editorScrollRef.current.value = content;
-    } else if (editorScrollRef.current instanceof HTMLDivElement) {
-      editorScrollRef.current.textContent = content;
     }
     if (isNewDocument) setDocumentRevealVersion(version => version + 1);
-  }, []);
+  }, [dismissDocumentNotice, showDocumentNotice]);
   const openWithDirtyCheck = useCallback((action: () => void) => {
     // Flush any pending debounced text to the store before checking
     flushEditorRef.current?.();
-    const content = useStore.getState().fileContent;
-    const original = useStore.getState().originalContent;
-    const current = useStore.getState().currentFile;
-    if (current && content !== original) {
+    const state = useStore.getState();
+    if (state.currentFile && state.isModified) {
       pendingOpenAction.current = action;
       setDirtyModalOpen(true);
     } else {
@@ -485,8 +507,9 @@ const App: React.FC = () => {
     if (result?.success && result.content !== undefined) {
       loadFileIntoEditor(filePath.split(/[/\\]/).pop() || null, filePath, result.content);
       useStore.getState().refreshLinkedAssets();
+      showDocumentNotice('reloaded');
     }
-  }, [loadFileIntoEditor]);
+  }, [loadFileIntoEditor, showDocumentNotice]);
 
   const handleCloseFile = useCallback(() => {
     openWithDirtyCheck(() => {
@@ -525,9 +548,7 @@ const App: React.FC = () => {
       if (filePath === currentFilePath) {
         // Same file — show reload confirmation instead
         flushEditorRef.current?.();
-        const content = useStore.getState().fileContent;
-        const original = useStore.getState().originalContent;
-        if (content !== original) {
+        if (useStore.getState().isModified) {
           pendingFilePath.current = filePath;
           setReloadModalOpen(true);
         } else {
@@ -830,9 +851,7 @@ const App: React.FC = () => {
       if (filePath === currentFilePath) {
         // Same file — show reload confirmation if dirty
         flushEditorRef.current?.();
-        const content = useStore.getState().fileContent;
-        const original = useStore.getState().originalContent;
-        if (content !== original) {
+        if (useStore.getState().isModified) {
           pendingFilePath.current = filePath;
           setReloadModalOpen(true);
         } else {
@@ -1006,7 +1025,7 @@ const App: React.FC = () => {
         onSaveFile={handleSave}
         onSaveFileAs={handleSaveAs}
         onCloseFile={handleCloseFile}
-        onReloadFile={() => { flushEditorRef.current?.(); const content = useStore.getState().fileContent; const original = useStore.getState().originalContent; if (content !== original) { pendingFilePath.current = currentFilePath; setReloadModalOpen(true); } else { pendingFilePath.current = currentFilePath; handleReloadConfirm(); } }}
+        onReloadFile={() => { flushEditorRef.current?.(); if (useStore.getState().isModified) { pendingFilePath.current = currentFilePath; setReloadModalOpen(true); } else { pendingFilePath.current = currentFilePath; handleReloadConfirm(); } }}
         onOpenRecentFile={handleOpenRecentFile}
         recentFiles={recentFiles}
         distractionFree={activeDistractionFree}
@@ -1035,9 +1054,7 @@ const App: React.FC = () => {
             onOpenPath={(path) => {
             if (path === currentFilePath) {
               flushEditorRef.current?.();
-              const content = useStore.getState().fileContent;
-              const original = useStore.getState().originalContent;
-              if (content !== original) {
+              if (useStore.getState().isModified) {
                 pendingFilePath.current = path;
                 setReloadModalOpen(true);
               } else {
@@ -1213,6 +1230,7 @@ const App: React.FC = () => {
                   >
                     <React.Suspense fallback={<DocumentPanelFallback />}>
                       <MarkdownEditor
+                        documentVersion={editorDocumentVersion}
                         isActive={visibleEditor}
                         isSplitView={viewMode === 'split'}
                         scrollSyncMode={scrollSyncMode}
@@ -1262,31 +1280,39 @@ const App: React.FC = () => {
                     <React.Suspense fallback={<DocumentPanelFallback />}>
                       <MarkdownViewer showToc={showToc} onToggleToc={() => setShowToc(false)} onOpenToc={() => setShowToc(true)} onScrollRef={registerViewerScroll} distractionFree={activeDistractionFree} />
                     </React.Suspense>
-                    {/* Welcome back toast — minimal, right-side, translucent */}
-                    {welcomeBackFile && (
-                      <div
-                        className="absolute bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl backdrop-blur-sm text-[13px] text-emerald-600 dark:text-emerald-400 shadow-lg animate-slide-in-right"
-                        style={{ backgroundColor: theme === 'dark'
-                          ? 'color-mix(in srgb, rgba(0, 0, 0, 0.78) 88%, var(--pal-viewer-bg) 12%)'
-                          : 'color-mix(in srgb, rgba(255, 255, 255, 0.78) 88%, var(--pal-viewer-bg) 12%)' }}
-                      >
-                        <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5"><path d="M20.5 15.8V8.2a1.91 1.91 0 0 0-.944-1.645l-6.612-3.8a1.88 1.88 0 0 0-1.888 0l-6.612 3.8A1.9 1.9 0 0 0 3.5 8.2v7.602a1.91 1.91 0 0 0 .944 1.644l6.612 3.8a1.88 1.88 0 0 0 1.888 0l6.612-3.8A1.9 1.9 0 0 0 20.5 15.8"/><path d="m8.667 12.633l1.505 1.721a1 1 0 0 0 1.564-.073L15.333 9.3"/></g></svg>
-                        <span>Picked up where you left off</span>
-                        <button
-                          className="flex items-center gap-1 text-[12px] text-blue-600 dark:text-blue-400 hover:underline shrink-0 ml-3 pl-3 border-l border-gray-200 dark:border-gray-600"
-                          onClick={() => {
-                            if (viewerScrollRef.current) viewerScrollRef.current.scrollTop = 0;
-                            setWelcomeBackFile(null);
-                          }}
-                        >
-                          <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24"><path fill="currentColor" d="M4.75 3.5a.75.75 0 0 1 0-1.5h14.5a.75.75 0 0 1 0 1.5zm.47 9.47a.749.749 0 1 0 1.06 1.06l4.97-4.969V21.25a.75.75 0 0 0 1.5 0V9.061l4.97 4.969a.749.749 0 1 0 1.06-1.06l-6.25-6.25a.75.75 0 0 0-1.06 0z"/></svg>
-                          Go to top
-                        </button>
-                      </div>
-                    )}
                   </div>
                 )}
               </>
+            )}
+            {documentNotice && currentFile && (
+              <div
+                key={documentNotice.id}
+                role="status"
+                aria-live="polite"
+                className="absolute bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl backdrop-blur-sm text-[13px] text-emerald-600 dark:text-emerald-400 shadow-lg animate-slide-in-right"
+                style={{ backgroundColor: theme === 'dark'
+                  ? 'color-mix(in srgb, rgba(0, 0, 0, 0.78) 88%, var(--pal-viewer-bg) 12%)'
+                  : 'color-mix(in srgb, rgba(255, 255, 255, 0.78) 88%, var(--pal-viewer-bg) 12%)' }}
+              >
+                {documentNotice.kind === 'resume' ? (
+                  <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5"><path d="M20.5 15.8V8.2a1.91 1.91 0 0 0-.944-1.645l-6.612-3.8a1.88 1.88 0 0 0-1.888 0l-6.612 3.8A1.9 1.9 0 0 0 3.5 8.2v7.602a1.91 1.91 0 0 0 .944 1.644l6.612 3.8a1.88 1.88 0 0 0 1.888 0l6.612-3.8A1.9 1.9 0 0 0 20.5 15.8"/><path d="m8.667 12.633l1.505 1.721a1 1 0 0 0 1.564-.073L15.333 9.3"/></g></svg>
+                ) : (
+                  <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24"><path fill="currentColor" d="M17.65 6.35a7.95 7.95 0 0 0-6.48-2.31c-3.67.37-6.69 3.35-7.1 7.02C3.52 15.91 7.27 20 12 20a7.98 7.98 0 0 0 7.21-4.56c.32-.67-.16-1.44-.9-1.44c-.37 0-.72.2-.88.53a5.994 5.994 0 0 1-6.8 3.31c-2.22-.49-4.01-2.3-4.48-4.52A6.002 6.002 0 0 1 12 6c1.66 0 3.14.69 4.22 1.78l-1.51 1.51c-.63.63-.19 1.71.7 1.71H19c.55 0 1-.45 1-1V6.41c0-.89-1.08-1.34-1.71-.71z"/></svg>
+                )}
+                <span>{documentNotice.kind === 'resume' ? 'Picked up where you left off' : 'File reloaded from disk'}</span>
+                {documentNotice.kind === 'resume' && (
+                  <button
+                    className="flex items-center gap-1 text-[12px] text-blue-600 dark:text-blue-400 hover:underline shrink-0 ml-3 pl-3 border-l border-gray-200 dark:border-gray-600"
+                    onClick={() => {
+                      if (viewerScrollRef.current) viewerScrollRef.current.scrollTop = 0;
+                      dismissDocumentNotice();
+                    }}
+                  >
+                    <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24"><path fill="currentColor" d="M4.75 3.5a.75.75 0 0 1 0-1.5h14.5a.75.75 0 0 1 0 1.5zm.47 9.47a.749.749 0 1 0 1.06 1.06l4.97-4.969V21.25a.75.75 0 0 0 1.5 0V9.061l4.97 4.969a.749.749 0 1 0 1.06-1.06l-6.25-6.25a.75.75 0 0 0-1.06 0z"/></svg>
+                    Go to top
+                  </button>
+                )}
+              </div>
             )}
           </div>
           </div>
