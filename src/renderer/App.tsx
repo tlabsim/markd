@@ -11,6 +11,7 @@ import WelcomeScreen from './components/WelcomeScreen';
 import StatusBar from './components/StatusBar';
 import { FontSelector, PaletteSelector } from './components/ToolbarSelectors';
 import { ListTree } from 'lucide-react';
+import HourglassIcon from './components/HourglassIcon';
 
 const loadMarkdownEditor = () => import('./components/MarkdownEditor');
 const loadMarkdownViewer = () => import('./components/MarkdownViewer');
@@ -265,11 +266,15 @@ const App: React.FC = () => {
   const [documentNotice, setDocumentNotice] = useState<{ kind: DocumentNoticeKind; id: number } | null>(null);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [searchShowReplace, setSearchShowReplace] = useState(false);
+  const [openingFilePath, setOpeningFilePath] = useState<string | null>(null);
+  const [showFileLoading, setShowFileLoading] = useState(false);
   const pendingOpenAction = useRef<(() => void) | null>(null);
   const pendingFilePath = useRef<string | null>(null);
   const documentNoticeTimerRef = useRef<number>(0);
   const documentNoticeDelayRef = useRef<number>(0);
   const documentNoticeIdRef = useRef(0);
+  const fileOpenRequestRef = useRef(0);
+  const fileOpenLoadingTimerRef = useRef<number>(0);
   const fontMenuRef = useRef<HTMLDivElement>(null);
   const paletteMenuRef = useRef<HTMLDivElement>(null);
   const tocButtonRef = useRef<HTMLButtonElement>(null);
@@ -311,6 +316,7 @@ const App: React.FC = () => {
   useEffect(() => () => {
     clearTimeout(documentNoticeTimerRef.current);
     clearTimeout(documentNoticeDelayRef.current);
+    clearTimeout(fileOpenLoadingTimerRef.current);
   }, []);
   const [mountedPanes, setMountedPanes] = useState({ version: 0, editor: false, viewer: false });
   const changeViewModeRef = useRef<(mode: 'view' | 'edit' | 'split') => void>(() => {});
@@ -398,11 +404,43 @@ const App: React.FC = () => {
     document.body.style.userSelect = 'none';
   };
 
+  const beginFileOpen = useCallback((filePath: string) => {
+    const requestId = ++fileOpenRequestRef.current;
+    clearTimeout(fileOpenLoadingTimerRef.current);
+    setOpeningFilePath(filePath);
+    setShowFileLoading(false);
+    fileOpenLoadingTimerRef.current = window.setTimeout(() => {
+      if (fileOpenRequestRef.current === requestId) setShowFileLoading(true);
+    }, 160);
+    return requestId;
+  }, []);
+
+  const finishFileOpen = useCallback((requestId: number, waitForDocumentPaint = false) => {
+    if (fileOpenRequestRef.current !== requestId) return;
+    clearTimeout(fileOpenLoadingTimerRef.current);
+    const clearLoadingState = () => {
+      if (fileOpenRequestRef.current !== requestId) return;
+      setShowFileLoading(false);
+      setOpeningFilePath(null);
+    };
+    if (waitForDocumentPaint) {
+      requestAnimationFrame(() => requestAnimationFrame(clearLoadingState));
+    } else {
+      clearLoadingState();
+    }
+  }, []);
+
+  const cancelFileOpen = useCallback(() => {
+    fileOpenRequestRef.current++;
+    clearTimeout(fileOpenLoadingTimerRef.current);
+    setShowFileLoading(false);
+    setOpeningFilePath(null);
+  }, []);
+
   // Helper: load file content into both store and editor (textarea/contentEditable)
   const loadFileIntoEditor = useCallback((name: string | null, filePath: string | null, content: string) => {
     const state = useStore.getState();
     const isNewDocument = state.currentFilePath !== filePath || state.currentFile !== name;
-    const shouldRestoreScroll = isNewDocument || documentScrollVersion.current === 0;
     // Save current scroll position before switching files.
     if (state.currentFilePath && state.rememberScrollPosition && viewerScrollRef.current) {
       state.setScrollPosition(state.currentFilePath, viewerScrollRef.current.scrollTop);
@@ -413,35 +451,18 @@ const App: React.FC = () => {
       lastPaneScrollIntent.current = { editor: -Infinity, viewer: -Infinity };
       documentScrollVersion.current++;
       if (editorScrollRef.current) editorScrollRef.current.scrollTop = 0;
-      if (viewerScrollRef.current) viewerScrollRef.current.scrollTop = 0;
     }
     setCurrentFile(name);
     setCurrentFilePath(filePath);
     setOriginalContent(content);
     setEditorDocumentVersion(version => version + 1);
-    // A same-file reload keeps its current position instead of restoring an older saved one.
-    if (shouldRestoreScroll && filePath && state.rememberScrollPosition) {
-      const saved = state.scrollPositions[filePath];
-      if (saved && saved > 800) {
-        const restoreVersion = documentScrollVersion.current;
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            if (documentScrollVersion.current !== restoreVersion || useStore.getState().currentFilePath !== filePath) return;
-            if (viewerScrollRef.current) {
-              viewerScrollRef.current.scrollTop = saved;
-              documentNoticeDelayRef.current = window.setTimeout(() => showDocumentNotice('resume'), 500);
-            }
-          });
-        });
-      }
-    }
     // Force-sync only the uncontrolled textarea. The highlighted contentEditable
     // owns its rendered HTML and synchronizes from the store in MarkdownEditor.
     if (editorScrollRef.current instanceof HTMLTextAreaElement) {
       editorScrollRef.current.value = content;
     }
     if (isNewDocument) setDocumentRevealVersion(version => version + 1);
-  }, [dismissDocumentNotice, showDocumentNotice]);
+  }, [dismissDocumentNotice]);
   const openWithDirtyCheck = useCallback((action: () => void) => {
     // Flush any pending debounced text to the store before checking
     flushEditorRef.current?.();
@@ -514,11 +535,12 @@ const App: React.FC = () => {
 
   const handleNewFile = useCallback(() => {
     openWithDirtyCheck(() => {
+      cancelFileOpen();
       loadFileIntoEditor('Untitled.md', null, '');
       setSearchQuery('');
       setViewMode('split');
     });
-  }, [openWithDirtyCheck, loadFileIntoEditor]);
+  }, [openWithDirtyCheck, cancelFileOpen, loadFileIntoEditor]);
 
   const reloadFileFromDisk = useCallback(async (filePath: string) => {
     const result = await window.markd?.getFileContent(filePath);
@@ -529,6 +551,51 @@ const App: React.FC = () => {
       await refreshKnownFileState(filePath);
     }
   }, [loadFileIntoEditor, refreshKnownFileState, showDocumentNotice]);
+
+  const handleOpenPath = useCallback((path: string, onMissing?: () => void) => {
+    if (path === currentFilePath) {
+      flushEditorRef.current?.();
+      if (useStore.getState().isModified) {
+        pendingFilePath.current = path;
+        setReloadModalOpen(true);
+      } else {
+        void reloadFileFromDisk(path);
+      }
+      return;
+    }
+
+    openWithDirtyCheck(async () => {
+      const requestId = beginFileOpen(path);
+      try {
+        const result = await window.markd?.getFileContent(path);
+        if (fileOpenRequestRef.current !== requestId) return;
+        if (!result?.success || result.content === undefined) {
+          if (result && !result.alreadyOpen) onMissing?.();
+          finishFileOpen(requestId);
+          return;
+        }
+
+        // Large documents can spend most of their time parsing/rendering rather
+        // than reading. Ensure the loading veil paints before that work begins.
+        if (result.content.length >= 300_000) {
+          clearTimeout(fileOpenLoadingTimerRef.current);
+          setShowFileLoading(true);
+          await new Promise<void>((resolve) => {
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+          });
+          if (fileOpenRequestRef.current !== requestId) return;
+        }
+
+        const name = path.split(/[/\\]/).pop() || null;
+        loadFileIntoEditor(name, path, result.content);
+        useStore.getState().addRecentFile(path);
+        finishFileOpen(requestId, true);
+      } catch (error) {
+        console.error('Unable to open file:', error);
+        finishFileOpen(requestId);
+      }
+    });
+  }, [beginFileOpen, currentFilePath, finishFileOpen, loadFileIntoEditor, openWithDirtyCheck, reloadFileFromDisk]);
 
   useEffect(() => {
     fileStateGeneration.current++;
@@ -580,6 +647,7 @@ const App: React.FC = () => {
 
   const handleCloseFile = useCallback(() => {
     openWithDirtyCheck(() => {
+      cancelFileOpen();
       paneScrollPositions.current = {};
       lastPaneScrollIntent.current = { editor: -Infinity, viewer: -Infinity };
       documentScrollVersion.current++;
@@ -593,7 +661,7 @@ const App: React.FC = () => {
       setOriginalContent('');
       useStore.setState({ fileContent: '' });
     });
-  }, [openWithDirtyCheck]);
+  }, [openWithDirtyCheck, cancelFileOpen]);
 
   const handleEditDocument = useCallback(() => {
     setDistractionFree(false);
@@ -643,6 +711,17 @@ const App: React.FC = () => {
   changeViewModeRef.current = changeViewMode;
 
   const activeDocumentVersion = documentScrollVersion.current;
+
+  const handleViewerDocumentRendered = useCallback((version: number, filePath: string | null) => {
+    if (version !== documentScrollVersion.current || !viewerScrollRef.current) return;
+    const state = useStore.getState();
+    const saved = filePath && state.rememberScrollPosition ? state.scrollPositions[filePath] : 0;
+    viewerScrollRef.current.scrollTop = saved && saved > 800 ? saved : 0;
+    if (saved && saved > 800) {
+      clearTimeout(documentNoticeDelayRef.current);
+      documentNoticeDelayRef.current = window.setTimeout(() => showDocumentNotice('resume'), 500);
+    }
+  }, [showDocumentNotice]);
 
   useLayoutEffect(() => {
     if (!currentFile) return;
@@ -1132,26 +1211,8 @@ const App: React.FC = () => {
         >
           {isSidebarOpen && <Sidebar
             onOpenFile={handleOpen}
-            onOpenPath={(path) => {
-            if (path === currentFilePath) {
-              flushEditorRef.current?.();
-              if (useStore.getState().isModified) {
-                pendingFilePath.current = path;
-                setReloadModalOpen(true);
-              } else {
-                reloadFileFromDisk(path);
-              }
-              return;
-            }
-            openWithDirtyCheck(async () => {
-              const result = await window.markd?.getFileContent(path);
-              if (result?.success && result.content !== undefined) {
-                const name = path.split(/[/\\]/).pop() || null;
-                loadFileIntoEditor(name, path, result.content);
-                useStore.getState().addRecentFile(path);
-              }
-            });
-          }}
+            onOpenPath={handleOpenPath}
+            openingFilePath={openingFilePath}
             matchPalette={matchToolbarPalette}
             paletteBg={PALETTE_OPTIONS.find(o => o.value === previewPalette)?.bg}
             paletteBgDark={PALETTE_OPTIONS.find(o => o.value === previewPalette)?.bgDark}
@@ -1359,7 +1420,15 @@ const App: React.FC = () => {
                       : { position: 'absolute', inset: 0, width: '100%', height: '100%', visibility: 'hidden', pointerEvents: 'none' }}
                   >
                     <React.Suspense fallback={<DocumentPanelFallback />}>
-                      <MarkdownViewer showToc={showToc} onToggleToc={() => setShowToc(false)} onOpenToc={() => setShowToc(true)} onScrollRef={registerViewerScroll} distractionFree={activeDistractionFree} />
+                      <MarkdownViewer
+                        showToc={showToc}
+                        onToggleToc={() => setShowToc(false)}
+                        onOpenToc={() => setShowToc(true)}
+                        onScrollRef={registerViewerScroll}
+                        distractionFree={activeDistractionFree}
+                        documentVersion={activeDocumentVersion}
+                        onDocumentRendered={handleViewerDocumentRendered}
+                      />
                     </React.Suspense>
                   </div>
                 )}
@@ -1393,6 +1462,31 @@ const App: React.FC = () => {
                     Go to top
                   </button>
                 )}
+              </div>
+            )}
+            {showFileLoading && openingFilePath && (
+              <div
+                role="status"
+                aria-live="polite"
+                className="absolute inset-0 z-[70] flex items-center justify-center backdrop-blur-[1px]"
+                style={{ backgroundColor: 'color-mix(in srgb, var(--pal-viewer-bg) 72%, transparent)' }}
+              >
+                <div
+                  className="flex min-w-52 max-w-[min(28rem,80%)] items-center gap-3 rounded-xl border px-4 py-3 shadow-lg"
+                  style={{
+                    color: 'var(--pal-text)',
+                    backgroundColor: 'color-mix(in srgb, var(--pal-panel-bg) 94%, transparent)',
+                    borderColor: 'var(--pal-border-soft)',
+                  }}
+                >
+                  <HourglassIcon className="h-5 w-5 shrink-0 text-blue-500" />
+                  <div className="min-w-0">
+                    <div className="text-[13px] font-semibold">Opening file</div>
+                    <div className="truncate text-[11px]" style={{ color: 'var(--pal-muted)' }}>
+                      {openingFilePath.split(/[/\\]/).pop() || openingFilePath}
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </div>

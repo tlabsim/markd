@@ -453,8 +453,7 @@ ipcMain.handle('get-file-content', async (_event, filePath: string) => {
     return { success: false, filePath, alreadyOpen: true };
   }
   try {
-    const content = fs.readFileSync(filePath, 'utf-8');
-    if (win) setWindowFile(win, filePath);
+    const content = await fs.promises.readFile(filePath, 'utf-8');
     return { success: true, content, filePath };
   } catch (err: any) {
     return { success: false, error: err.message };

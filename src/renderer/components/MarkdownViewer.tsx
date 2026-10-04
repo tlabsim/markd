@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useEffect, useLayoutEffect, useState, useCallback } from 'react';
+import React, { useMemo, useRef, useEffect, useLayoutEffect, useState, useCallback, useTransition } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -492,6 +492,8 @@ interface MarkdownViewerProps {
   onOpenToc?: () => void;
   onScrollRef?: (el: HTMLElement | null) => void;
   distractionFree?: boolean;
+  documentVersion: number;
+  onDocumentRendered?: (version: number, filePath: string | null) => void;
 }
 
 function escapeSearchRegex(s: string): string {
@@ -714,7 +716,7 @@ function cacheBustLocalFileUrl(src: string, token: number): string {
   return `${src}${separator}markdReload=${token}`;
 }
 
-const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, onOpenToc, onScrollRef, distractionFree = false }) => {
+const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, onOpenToc, onScrollRef, distractionFree = false, documentVersion, onDocumentRendered }) => {
   const {
     fileContent,
     currentFilePath,
@@ -772,6 +774,19 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, o
   })));
   const contentRef = useRef<HTMLDivElement>(null);
   const scrollbarWideRef = useRef(false);
+  const [previewDocument, setPreviewDocument] = useState<{ version: number; path: string | null; content: string }>({ version: -1, path: null, content: '' });
+  const [, startPreviewTransition] = useTransition();
+
+  useEffect(() => {
+    startPreviewTransition(() => {
+      setPreviewDocument({ version: documentVersion, path: currentFilePath, content: fileContent });
+    });
+  }, [currentFilePath, documentVersion, fileContent]);
+
+  useLayoutEffect(() => {
+    if (previewDocument.version < 0) return;
+    onDocumentRendered?.(previewDocument.version, previewDocument.path);
+  }, [onDocumentRendered, previewDocument.path, previewDocument.version]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const el = contentRef.current; if (!el) return;
@@ -1089,7 +1104,10 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, o
     },
   }), [makeHeading, theme, showSvgBackgroundToggle]);
 
-  const normalizedFileContent = useMemo(() => normalizeAiMathDelimiters(fileContent), [fileContent]);
+  const normalizedFileContent = useMemo(
+    () => normalizeAiMathDelimiters(previewDocument.content),
+    [previewDocument.content],
+  );
 
   const searchHighlightPlugin = useMemo(() => [rehypeSearchHighlight, {
     enabled: viewMode === 'view' && isSearchOpen,
@@ -1118,7 +1136,7 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, o
           data-definition-list-style={definitionListStyle}
           data-callout-style={calloutStyle}
           style={{ fontFamily: computedFont, zoom: `${zoomLevel}%` }}>
-          {fileContent ? (
+          {previewDocument.content ? (
             <ReactMarkdown
               remarkPlugins={[[remarkGfm, { singleTilde: false }], remarkMath, remarkEmoji, remarkFrontmatter, [remarkSmartypants, { dashes: 'oldschool' }], remarkWikiLink, remarkDirective, remarkLiteralNumericDirectives, remarkCallouts, remarkSubSuper, remarkHighlight, remarkDeflist]}
               rehypePlugins={[rehypeKatex, rehypeHighlight, rehypeRaw, rehypeFilterCustomElements, searchHighlightPlugin]}
@@ -1152,7 +1170,7 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, o
       )}
       <div className={`viewer-toc ${showToc && tocIsPinned ? 'viewer-toc--pinned' : 'viewer-toc--overlay'} ${showToc ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
         <TableOfContents
-          content={fileContent}
+          content={previewDocument.content}
           onClose={() => onToggleToc?.()}
           pinned={tocIsPinned}
           onPinToggle={() => setTocPinned(!tocPinned)}

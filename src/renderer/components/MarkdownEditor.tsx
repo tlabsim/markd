@@ -1933,9 +1933,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ documentVersion, isActi
             } : {}),
           }}
         >
-          {lines().map((num, idx) => (
-            <div key={idx} style={{ height: '1.5rem', lineHeight: '1.5rem' }}>{num > 0 ? num : '\u00A0'}</div>
-          ))}
+          <div className="whitespace-pre" style={{ lineHeight: '1.5rem' }}>
+            {lines().map(num => num > 0 ? String(num) : ' ').join('\n')}
+          </div>
         </div>
 
         {/* Editor: textarea (fast, no highlight) or contentEditable div (syntax colored) */}

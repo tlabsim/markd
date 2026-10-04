@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { MAX_RECENT_FILES, useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { FileEntry } from '../types';
+import HourglassIcon from './HourglassIcon';
 
 /** Recursive tree node renderer */
 const TreeNode: React.FC<{
@@ -9,7 +10,8 @@ const TreeNode: React.FC<{
   depth: number;
   onToggle: (entry: FileEntry) => void;
   onOpenFile?: (path: string) => void;
-}> = ({ entry, depth, onToggle, onOpenFile }) => {
+  openingFilePath?: string | null;
+}> = ({ entry, depth, onToggle, onOpenFile, openingFilePath }) => {
   const currentFilePath = useStore((state) => state.currentFilePath);
   const children = useStore((state) => state.folderChildren[entry.path]);
   const isExpanded = useStore((state) => state.expandedFolderPaths.has(entry.path));
@@ -18,6 +20,7 @@ const TreeNode: React.FC<{
 
   const isDir = entry.isDirectory;
   const isActive = currentFilePath === entry.path;
+  const isOpening = !isDir && openingFilePath === entry.path;
 
   const handleClick = useCallback(async () => {
     if (isDir) {
@@ -47,6 +50,7 @@ const TreeNode: React.FC<{
         style={{ paddingLeft: `${8 + depth * 24}px` }}
         onClick={handleClick}
         title={entry.path}
+        aria-busy={isOpening || undefined}
       >
         {isDir ? (
           <>
@@ -70,13 +74,16 @@ const TreeNode: React.FC<{
             <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9" />
           </svg>
         )}
-        <span className="truncate">{entry.name}</span>
+        <span className="truncate flex-1">{entry.name}</span>
+        {isOpening && (
+          <HourglassIcon className="w-3.5 h-3.5 shrink-0" />
+        )}
       </button>
       {/* Render children if directory is expanded and has children */}
       {isDir && isExpanded && children && children.length > 0 && (
         <div>
           {children.map((child) => (
-            <TreeNode key={child.path} entry={child} depth={depth + 1} onToggle={onToggle} onOpenFile={onOpenFile} />
+            <TreeNode key={child.path} entry={child} depth={depth + 1} onToggle={onToggle} onOpenFile={onOpenFile} openingFilePath={openingFilePath} />
           ))}
         </div>
       )}
@@ -89,11 +96,12 @@ const TreeNode: React.FC<{
 
 const Sidebar: React.FC<{
   onOpenFile?: () => void;
-  onOpenPath?: (path: string) => void;
+  onOpenPath?: (path: string, onMissing?: () => void) => void;
   matchPalette?: boolean;
   paletteBg?: string;
   paletteBgDark?: string;
-}> = ({ onOpenFile, onOpenPath, matchPalette, paletteBg, paletteBgDark }) => {
+  openingFilePath?: string | null;
+}> = ({ onOpenFile, onOpenPath, matchPalette, paletteBg, paletteBgDark, openingFilePath }) => {
   const paletteStyle = matchPalette ? { backgroundColor: 'var(--pal-panel-bg)' } : undefined;
   const paletteStyle85 = matchPalette ? { backgroundColor: 'color-mix(in srgb, var(--pal-panel-bg) 85%, transparent)' } : undefined;
   const {
@@ -135,13 +143,8 @@ const Sidebar: React.FC<{
     }, 600);
   }, [deadFiles, removeRecentFile]);
 
-  const handleRecentClick = useCallback(async (filePath: string) => {
-    const r = await window.markd?.getFileContent(filePath);
-    if (r?.success) {
-      onOpenPath?.(filePath);
-    } else {
-      markDead(filePath);
-    }
+  const handleRecentClick = useCallback((filePath: string) => {
+    onOpenPath?.(filePath, () => markDead(filePath));
   }, [onOpenPath, markDead]);
 
   const ensureRecentFileExists = useCallback(async (filePath: string) => {
@@ -276,6 +279,12 @@ const Sidebar: React.FC<{
     }
   }, []);
 
+  const handleCloseFolder = useCallback(() => {
+    setLoading(false);
+    clearFolderChildren();
+    setCurrentFolderPath(null);
+  }, [clearFolderChildren, setCurrentFolderPath]);
+
   return (
     <div className="flex flex-col h-full">
       {/* Sidebar Header */}
@@ -314,12 +323,23 @@ const Sidebar: React.FC<{
       {/* Folder path */}
       {currentFolderPath && (
         <div
-          className="px-3 py-1 border-b border-gray-200/60 dark:border-gray-700/50 bg-gray-50/85 dark:bg-[#202329]/85 backdrop-blur-md"
+          className="flex min-h-8 items-center gap-2 border-b border-gray-200/60 bg-gray-50/85 pl-3 pr-1.5 dark:border-gray-700/50 dark:bg-[#202329]/85 backdrop-blur-md"
           style={paletteStyle85}
         >
-          <p className="text-[10px] text-gray-500 truncate" title={currentFolderPath}>
+          <p className="min-w-0 flex-1 truncate text-[10px] text-gray-500" title={currentFolderPath}>
             {currentFolderPath.split(/[/\\]/).pop()}
           </p>
+          <button
+            type="button"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-gray-400 opacity-70 transition-colors hover:bg-gray-700/10 hover:text-gray-700 dark:text-gray-500 dark:hover:bg-gray-200/10 dark:hover:text-gray-200"
+            onClick={handleCloseFolder}
+            title="Close folder"
+            aria-label="Close current folder"
+          >
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
+              <path d="m7 7l10 10M17 7L7 17" />
+            </svg>
+          </button>
         </div>
       )}
 
@@ -330,9 +350,9 @@ const Sidebar: React.FC<{
       >
         {loading ? (
           <div className="flex items-center justify-center py-8">
-            <div className="w-5 h-5 border-2 border-transparent rounded-full animate-spin" style={{ borderTopColor: '#3b82f6' }} />
+            <HourglassIcon className="h-5 w-5 text-blue-500" />
           </div>
-        ) : rootChildren.length === 0 ? (
+        ) : !currentFolderPath ? (
           <div className="text-center py-6 px-4">
             <svg className="w-8 h-8 mx-auto mb-2 opacity-50" style={{ color: 'var(--pal-text)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44" />
@@ -342,7 +362,7 @@ const Sidebar: React.FC<{
               Open a folder
             </button>
 
-            {/* Recent files — always visible */}
+            {/* Recent files are shown only when Explorer has no folder context. */}
             <div className="text-left border-t border-gray-200 dark:border-gray-700 pt-3">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2 px-1">
                 Recent
@@ -368,7 +388,10 @@ const Sidebar: React.FC<{
                           <path d="M5 7.29L7 5h1v6H7V6.71L5 9L3 6.71V11H2V5h1zM11.5 11L9 8h2V5h1v3h2z" />
                           <path fillRule="evenodd" d="M12.8 3c1.12 0 1.68 0 2.11.218c.376.192.682.498.874.874c.218.428.218.988.218 2.11v3.6c0 1.12 0 1.68-.218 2.11l-.077.138a2 2 0 0 1-.797.736l-.168.071c-.41.146-.96.146-1.94.146h-9.6L2.46 13c-.542-.008-.906-.039-1.2-.144l-.168-.07a2 2 0 0 1-.797-.737l-.077-.138C0 11.483 0 10.923 0 9.801v-3.6c0-1.12 0-1.68.218-2.11c.192-.376.498-.682.874-.874c.32-.163.716-.205 1.37-.215L3.204 3h9.6zM3.2 4c-.577 0-.949.001-1.23.024c-.272.023-.372.06-.422.085a1 1 0 0 0-.437.437c-.025.05-.063.15-.085.422c-.023.283-.024.656-.024 1.23v3.6c0 .577 0 .95.024 1.23c.022.272.06.372.085.422a1 1 0 0 0 .437.436c.05.026.15.063.422.085c.283.024.656.025 1.23.025h9.6c.577 0 .949-.001 1.23-.025c.272-.022.372-.06.422-.085a1 1 0 0 0 .436-.436c.025-.049.063-.15.085-.422c.023-.283.024-.656.024-1.23v-3.6c0-.577 0-.949-.024-1.23c-.022-.272-.06-.372-.085-.422a1 1 0 0 0-.436-.437c-.05-.025-.15-.062-.422-.085A17 17 0 0 0 12.8 4z" clipRule="evenodd" />
                         </svg>
-                        <span className={`truncate ${isDead ? 'animate-strikethrough' : ''}`}>{name}</span>
+                        <span className={`truncate flex-1 ${isDead ? 'animate-strikethrough' : ''}`}>{name}</span>
+                        {openingFilePath === filePath && (
+                          <HourglassIcon className="w-3.5 h-3.5 shrink-0" />
+                        )}
                       </button>
                     );
                   })}
@@ -376,10 +399,14 @@ const Sidebar: React.FC<{
               )}
             </div>
           </div>
+        ) : rootChildren.length === 0 ? (
+          <div className="px-4 py-6 text-center text-xs italic" style={{ color: 'var(--pal-muted)' }}>
+            This folder is empty
+          </div>
         ) : (
           <div className="space-y-px pr-1">
             {rootChildren.map((entry) => (
-              <TreeNode key={entry.path} entry={entry} depth={0} onToggle={() => {}} onOpenFile={onOpenPath} />
+              <TreeNode key={entry.path} entry={entry} depth={0} onToggle={() => {}} onOpenFile={onOpenPath} openingFilePath={openingFilePath} />
             ))}
           </div>
         )}
