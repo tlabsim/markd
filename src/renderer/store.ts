@@ -5,6 +5,14 @@ import { PALETTE_OPTIONS } from './palettes';
 
 export const MAX_RECENT_FILES = 15;
 
+export type TableStyle = 'default' | 'minimal' | 'banded';
+export type CodeBlockStyle = 'default' | 'flat' | 'terminal';
+export type BlockquoteStyle = 'default' | 'quiet' | 'card';
+export type InlineCodeStyle = 'default' | 'subtle' | 'outline';
+export type TaskListStyle = 'default' | 'rounded' | 'outline';
+export type DefinitionListStyle = 'default' | 'indented' | 'card';
+export type CalloutStyle = 'default' | 'minimal' | 'solid';
+
 export function sameDocumentContent(a: string, b: string): boolean {
   if (a === b) return true;
 
@@ -68,6 +76,13 @@ interface EditorState {
   tocPinned: boolean;
   assetReloadToken: number;
   showSvgBackgroundToggle: boolean;
+  tableStyle: TableStyle;
+  codeBlockStyle: CodeBlockStyle;
+  blockquoteStyle: BlockquoteStyle;
+  inlineCodeStyle: InlineCodeStyle;
+  taskListStyle: TaskListStyle;
+  definitionListStyle: DefinitionListStyle;
+  calloutStyle: CalloutStyle;
 
   // Recent files
   recentFiles: string[];
@@ -111,6 +126,13 @@ interface EditorState {
   setTocPinned: (pinned: boolean) => void;
   refreshLinkedAssets: () => void;
   setShowSvgBackgroundToggle: (on: boolean) => void;
+  setTableStyle: (style: TableStyle) => void;
+  setCodeBlockStyle: (style: CodeBlockStyle) => void;
+  setBlockquoteStyle: (style: BlockquoteStyle) => void;
+  setInlineCodeStyle: (style: InlineCodeStyle) => void;
+  setTaskListStyle: (style: TaskListStyle) => void;
+  setDefinitionListStyle: (style: DefinitionListStyle) => void;
+  setCalloutStyle: (style: CalloutStyle) => void;
   addRecentFile: (path: string) => void;
   removeRecentFile: (path: string) => void;
   clearRecentFiles: () => void;
@@ -174,6 +196,13 @@ export const useStore = create<EditorState>()(
       tocPinned: false,
       assetReloadToken: 0,
       showSvgBackgroundToggle: true,
+      tableStyle: 'default',
+      codeBlockStyle: 'default',
+      blockquoteStyle: 'default',
+      inlineCodeStyle: 'default',
+      taskListStyle: 'default',
+      definitionListStyle: 'default',
+      calloutStyle: 'default',
       recentFiles: [],
       wordWrap: true,
       tabSize: 4,
@@ -228,6 +257,13 @@ export const useStore = create<EditorState>()(
       setTocPinned: (pinned) => set({ tocPinned: pinned }),
       refreshLinkedAssets: () => set((s) => ({ assetReloadToken: s.assetReloadToken + 1 })),
       setShowSvgBackgroundToggle: (on) => set({ showSvgBackgroundToggle: on }),
+      setTableStyle: (style) => set({ tableStyle: style }),
+      setCodeBlockStyle: (style) => set({ codeBlockStyle: style }),
+      setBlockquoteStyle: (style) => set({ blockquoteStyle: style }),
+      setInlineCodeStyle: (style) => set({ inlineCodeStyle: style }),
+      setTaskListStyle: (style) => set({ taskListStyle: style }),
+      setDefinitionListStyle: (style) => set({ definitionListStyle: style }),
+      setCalloutStyle: (style) => set({ calloutStyle: style }),
       addRecentFile: (filePath) =>
         set((state) => {
           const filtered = state.recentFiles.filter((p) => p !== filePath);
@@ -250,7 +286,7 @@ export const useStore = create<EditorState>()(
     }),
     {
       name: 'markd-preferences',
-      version: 4,
+      version: 7,
       migrate: (persistedState) => {
         const state = persistedState as EditorState;
         const fontReplacements: Record<string, string> = {
@@ -264,6 +300,13 @@ export const useStore = create<EditorState>()(
           matchToolbarPalette: true,
           startWithSidebarOpen: state.startWithSidebarOpen ?? true,
           showSvgBackgroundToggle: true,
+          tableStyle: state.tableStyle ?? 'default',
+          codeBlockStyle: state.codeBlockStyle ?? 'default',
+          blockquoteStyle: state.blockquoteStyle ?? 'default',
+          inlineCodeStyle: state.inlineCodeStyle ?? 'default',
+          taskListStyle: (state.taskListStyle as string) === 'minimal' ? 'outline' : (state.taskListStyle ?? 'default'),
+          definitionListStyle: state.definitionListStyle ?? 'default',
+          calloutStyle: state.calloutStyle ?? 'default',
         };
       },
       partialize: (state) => ({
@@ -274,6 +317,13 @@ export const useStore = create<EditorState>()(
         previewPalette: state.previewPalette,
         tocPinned: state.tocPinned,
         showSvgBackgroundToggle: state.showSvgBackgroundToggle,
+        tableStyle: state.tableStyle,
+        codeBlockStyle: state.codeBlockStyle,
+        blockquoteStyle: state.blockquoteStyle,
+        inlineCodeStyle: state.inlineCodeStyle,
+        taskListStyle: state.taskListStyle,
+        definitionListStyle: state.definitionListStyle,
+        calloutStyle: state.calloutStyle,
         recentFiles: state.recentFiles,
         wordWrap: state.wordWrap,
         tabSize: state.tabSize,

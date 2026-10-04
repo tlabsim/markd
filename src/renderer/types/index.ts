@@ -8,6 +8,7 @@ export interface FileResult {
   success: boolean;
   content?: string;
   filePath?: string;
+  alreadyOpen?: boolean;
   error?: string;
 }
 
@@ -15,6 +16,14 @@ export interface DirectoryResult {
   success: boolean;
   files?: FileEntry[];
   path?: string;
+  error?: string;
+}
+
+export interface FileStateResult {
+  success: boolean;
+  exists: boolean;
+  mtimeMs?: number;
+  size?: number;
   error?: string;
 }
 
@@ -26,6 +35,7 @@ export interface MarkdAPI {
   getSetting: (key: string) => Promise<unknown>;
   setSetting: (key: string, value: unknown) => Promise<void>;
   getFileContent: (filePath: string) => Promise<FileResult>;
+  getFileState: (filePath: string) => Promise<FileStateResult>;
   readDirectory: (dirPath: string) => Promise<DirectoryResult>;
   getAppPath: () => Promise<string>;
   getAppVersion?: () => Promise<string>;
@@ -34,6 +44,7 @@ export interface MarkdAPI {
   maximizeWindow: () => Promise<void>;
   closeWindow: () => Promise<void>;
   isMaximized: () => Promise<boolean>;
+  setWindowFile: (filePath: string | null) => Promise<boolean>;
   exportHtml: (data: { content: string; title: string }) => Promise<FileResult | null>;
   openExternal: (url: string) => Promise<void>;
   locateOnDisk: (filePath: string) => Promise<{ success: boolean; error?: string }>;

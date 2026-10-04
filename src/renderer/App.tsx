@@ -259,6 +259,7 @@ const App: React.FC = () => {
   const [pendingDropPath, setPendingDropPath] = useState<string | null>(null);
   const [dirtyModalOpen, setDirtyModalOpen] = useState(false);
   const [reloadModalOpen, setReloadModalOpen] = useState(false);
+  const [externalReloadPrompt, setExternalReloadPrompt] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<'settings' | 'shortcuts' | 'about'>('settings');
   const [documentNotice, setDocumentNotice] = useState<{ kind: DocumentNoticeKind; id: number } | null>(null);
@@ -277,6 +278,21 @@ const App: React.FC = () => {
   const paneScrollPositions = useRef<{ view?: number; edit?: number; splitEditor?: number; splitViewer?: number }>({});
   const lastPaneScrollIntent = useRef({ editor: -Infinity, viewer: -Infinity });
   const documentScrollVersion = useRef(0);
+  const knownFileState = useRef<{ path: string; mtimeMs: number; size: number } | null>(null);
+  const fileStateCheckInFlight = useRef(false);
+  const fileStateGeneration = useRef(0);
+
+  const refreshKnownFileState = useCallback(async (filePath: string | null) => {
+    const generation = ++fileStateGeneration.current;
+    if (!filePath) {
+      knownFileState.current = null;
+      return;
+    }
+    const result = await window.markd?.getFileState(filePath);
+    if (generation === fileStateGeneration.current && result?.success && result.exists && result.mtimeMs !== undefined && result.size !== undefined) {
+      knownFileState.current = { path: filePath, mtimeMs: result.mtimeMs, size: result.size };
+    }
+  }, []);
 
   const dismissDocumentNotice = useCallback(() => {
     clearTimeout(documentNoticeTimerRef.current);
@@ -475,12 +491,13 @@ const App: React.FC = () => {
           setCurrentFile(result.filePath.split(/[/\\]/).pop() || null);
         }
       }
+      await refreshKnownFileState(result.filePath || currentFilePath);
       setSaveState('saved');
       setTimeout(() => setSaveState('idle'), 3000);
     } else {
       setSaveState('idle');
     }
-  }, [currentFilePath]);
+  }, [currentFilePath, refreshKnownFileState]);
 
   const handleSaveAs = useCallback(async () => {
     flushEditorRef.current?.();
@@ -491,8 +508,9 @@ const App: React.FC = () => {
       setCurrentFilePath(result.filePath || null);
       setOriginalContent(content);
       if (result.filePath) useStore.getState().addRecentFile(result.filePath);
+      await refreshKnownFileState(result.filePath || null);
     }
-  }, [currentFilePath]);
+  }, [currentFilePath, refreshKnownFileState]);
 
   const handleNewFile = useCallback(() => {
     openWithDirtyCheck(() => {
@@ -508,8 +526,57 @@ const App: React.FC = () => {
       loadFileIntoEditor(filePath.split(/[/\\]/).pop() || null, filePath, result.content);
       useStore.getState().refreshLinkedAssets();
       showDocumentNotice('reloaded');
+      await refreshKnownFileState(filePath);
     }
-  }, [loadFileIntoEditor, showDocumentNotice]);
+  }, [loadFileIntoEditor, refreshKnownFileState, showDocumentNotice]);
+
+  useEffect(() => {
+    fileStateGeneration.current++;
+    knownFileState.current = null;
+    if (!currentFilePath) return;
+
+    let active = true;
+    const checkFileState = async (detectChanges: boolean) => {
+      if (!active || fileStateCheckInFlight.current || document.visibilityState !== 'visible') return;
+      fileStateCheckInFlight.current = true;
+      const generation = ++fileStateGeneration.current;
+      try {
+        const result = await window.markd?.getFileState(currentFilePath);
+        if (!active || generation !== fileStateGeneration.current || !result?.success || !result.exists || result.mtimeMs === undefined || result.size === undefined) return;
+
+        const previous = knownFileState.current;
+        const next = { path: currentFilePath, mtimeMs: result.mtimeMs, size: result.size };
+        knownFileState.current = next;
+        if (!detectChanges || !previous || previous.path !== currentFilePath) return;
+        if (previous.mtimeMs === next.mtimeMs && previous.size === next.size) return;
+
+        flushEditorRef.current?.();
+        if (useStore.getState().isModified) {
+          pendingFilePath.current = currentFilePath;
+          setExternalReloadPrompt(true);
+          setReloadModalOpen(true);
+        } else {
+          await reloadFileFromDisk(currentFilePath);
+        }
+      } finally {
+        fileStateCheckInFlight.current = false;
+      }
+    };
+
+    void checkFileState(false);
+    const interval = window.setInterval(() => void checkFileState(true), 5000);
+    const checkWhenVisible = () => {
+      if (document.visibilityState === 'visible') void checkFileState(true);
+    };
+    window.addEventListener('focus', checkWhenVisible);
+    document.addEventListener('visibilitychange', checkWhenVisible);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      window.removeEventListener('focus', checkWhenVisible);
+      document.removeEventListener('visibilitychange', checkWhenVisible);
+    };
+  }, [currentFilePath, reloadFileFromDisk]);
 
   const handleCloseFile = useCallback(() => {
     openWithDirtyCheck(() => {
@@ -666,6 +733,16 @@ const App: React.FC = () => {
     window.markd?.isMaximized().then(setMaximized);
   }, []);
 
+  // Keep the main-process file registry aligned with this window, including
+  // close-file transitions back to the Welcome screen.
+  useEffect(() => {
+    let active = true;
+    void window.markd?.setWindowFile(currentFilePath).then((registered) => {
+      if (active && currentFilePath && !registered) void window.markd?.closeWindow();
+    });
+    return () => { active = false; };
+  }, [currentFilePath]);
+
   // Startup: load file from query params (double-click open)
   // useLayoutEffect runs before paint — no sidebar flash in distraction-free mode
   useLayoutEffect(() => {
@@ -690,6 +767,9 @@ const App: React.FC = () => {
         if (result?.success && result.content !== undefined) {
           loadFileIntoEditor(name, filePath, result.content);
           useStore.getState().addRecentFile(filePath);
+        } else if (result?.alreadyOpen) {
+          // The owning window was restored and focused by the main process.
+          void window.markd?.closeWindow();
         }
       })();
     }
@@ -921,6 +1001,7 @@ const App: React.FC = () => {
 
   const handleReloadConfirm = useCallback(async () => {
     setReloadModalOpen(false);
+    setExternalReloadPrompt(false);
     const filePath = pendingFilePath.current;
     pendingFilePath.current = null;
     if (filePath) {
@@ -1356,12 +1437,18 @@ const App: React.FC = () => {
       {/* Reload confirmation — same file, different message */}
       <ConfirmModal
         open={reloadModalOpen}
-        title="Reload File"
-        message={`Reload "${currentFile}" from disk? Unsaved changes will be lost.`}
+        title={externalReloadPrompt ? 'File Changed on Disk' : 'Reload File'}
+        message={externalReloadPrompt
+          ? `"${currentFile}" changed outside Markd. Reload it? Your unsaved changes will be lost.`
+          : `Reload "${currentFile}" from disk? Unsaved changes will be lost.`}
         confirmLabel="Reload"
         cancelLabel="Cancel"
         onConfirm={handleReloadConfirm}
-        onCancel={() => setReloadModalOpen(false)}
+        onCancel={() => {
+          pendingFilePath.current = null;
+          setExternalReloadPrompt(false);
+          setReloadModalOpen(false);
+        }}
       />
 
       {/* Settings modal */}

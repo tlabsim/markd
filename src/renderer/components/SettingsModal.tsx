@@ -1,5 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useStore, FONT_OPTIONS } from '../store';
+import type {
+  BlockquoteStyle,
+  CalloutStyle,
+  CodeBlockStyle,
+  DefinitionListStyle,
+  InlineCodeStyle,
+  TableStyle,
+  TaskListStyle,
+} from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { PALETTE_OPTIONS } from '../palettes';
 import { ThemeMode } from '../types';
@@ -73,12 +82,12 @@ const ToggleSwitch: React.FC<{ checked: boolean; onChange: () => void }> = ({ ch
     role="switch"
     aria-checked={checked}
     onClick={onChange}
-    className={`relative inline-flex h-[26px] w-[44px] shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+    className={`relative inline-block h-[26px] w-[44px] shrink-0 cursor-pointer rounded-full border border-transparent align-middle transition-colors duration-200 ease-in-out focus:outline-none ${
       checked ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'
     }`}
   >
     <span
-      className={`pointer-events-none inline-block h-[22px] w-[22px] transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+      className={`pointer-events-none absolute left-px top-px block h-[22px] w-[22px] rounded-full bg-white shadow-sm ring-0 transition-transform duration-200 ease-in-out ${
         checked ? 'translate-x-[18px]' : 'translate-x-0'
       }`}
     />
@@ -105,6 +114,156 @@ const SegmentedControl: React.FC<{
         {opt.label}
       </button>
     ))}
+  </div>
+);
+
+type MarkdownStyleKind = 'table' | 'code' | 'inline-code' | 'task-list' | 'blockquote' | 'callout' | 'definition-list';
+
+const MarkdownStyleSample: React.FC<{ kind: MarkdownStyleKind; value: string }> = ({ kind, value }) => {
+  if (kind === 'table') {
+    return (
+      <div className="markdown-body markdown-style-preview" data-table-style={value}>
+        <div className="markdown-table-wrap overflow-hidden">
+          <table>
+            <thead><tr><th>Item</th><th>Value</th></tr></thead>
+            <tbody>
+              <tr><td>Alpha</td><td>24</td></tr>
+              <tr><td>Beta</td><td>42</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
+  if (kind === 'code') {
+    return (
+      <div className="markdown-body markdown-style-preview" data-code-style={value}>
+        <div className="code-block relative h-full rounded-lg border">
+          <div className="code-block-language-row flex px-2 -mt-1.5">
+            <span className="code-block-lang rounded px-1 py-px font-mono font-semibold uppercase">JS</span>
+          </div>
+          <span className="code-block-btn markdown-style-preview-copy absolute right-1 top-1 rounded p-1" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <path d="M9 8h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Z" />
+              <path d="M15 8V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" />
+            </svg>
+          </span>
+          <pre><code><span className="markdown-style-preview-keyword">const</span> total = <span className="markdown-style-preview-number">42</span>;<br /><span className="markdown-style-preview-keyword">return</span> total;</code></pre>
+        </div>
+      </div>
+    );
+  }
+
+  if (kind === 'inline-code') {
+    return (
+      <div className="markdown-body markdown-style-preview markdown-style-preview-centered markdown-style-preview-inline-code" data-inline-code-style={value}>
+        <p>Run <code>npm build</code></p>
+      </div>
+    );
+  }
+
+  if (kind === 'task-list') {
+    return (
+      <div className="markdown-body markdown-style-preview" data-task-list-style={value}>
+        <ul className="contains-task-list">
+          <li className="task-list-item">
+            <span className="task-check-wrapper"><span className="task-checkbox task-checkbox-checked markdown-style-preview-checkbox"><svg viewBox="0 0 12 12"><path d="m2 6 2.5 2.5L10 3" /></svg></span></span>
+            Draft outline
+          </li>
+          <li className="task-list-item">
+            <span className="task-check-wrapper"><span className="markdown-style-preview-checkbox" /></span>
+            Review changes
+          </li>
+        </ul>
+      </div>
+    );
+  }
+
+  if (kind === 'callout') {
+    return (
+      <div className="markdown-body markdown-style-preview markdown-style-preview-centered" data-callout-style={value}>
+        <div className="admonition admonition-note">
+          <div className="admonition-header"><span className="admonition-icon">i</span><span className="admonition-type">Note</span></div>
+          <div className="admonition-body"><p>Useful context for the reader.</p></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (kind === 'definition-list') {
+    return (
+      <div className="markdown-body markdown-style-preview markdown-style-preview-centered" data-definition-list-style={value}>
+        <dl><dt>Term</dt><dd>A concise definition.</dd></dl>
+      </div>
+    );
+  }
+
+  return (
+    <div className="markdown-body markdown-style-preview" data-blockquote-style={value}>
+      <blockquote>
+        <p>Clarity comes from removing what is not needed.</p>
+      </blockquote>
+    </div>
+  );
+};
+
+const MarkdownStylePicker: React.FC<{
+  label: string;
+  tooltip: string;
+  kind: MarkdownStyleKind;
+  options: { label: string; value: string }[];
+  value: string;
+  onChange: (value: string) => void;
+}> = ({ label, tooltip, kind, options, value, onChange }) => {
+  const tooltipId = React.useId();
+  return (
+    <div className="border-b border-gray-700/10 px-4 py-3 dark:border-white/5">
+      <span
+        className="group relative inline-block cursor-help text-[13px] text-gray-700 dark:text-gray-200"
+        tabIndex={0}
+        aria-describedby={tooltipId}
+      >
+        {label}
+        <span
+          id={tooltipId}
+          role="tooltip"
+          className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 w-64 rounded-md border px-2.5 py-2 text-[11px] font-normal leading-relaxed opacity-0 shadow-xl transition-opacity duration-150 group-hover:opacity-100 group-focus:opacity-100"
+          style={{ backgroundColor: 'var(--pal-panel-bg)', borderColor: 'var(--pal-border)', color: 'var(--pal-text)' }}
+        >
+          {tooltip}
+        </span>
+      </span>
+      <div className="mt-2 grid grid-cols-3 gap-2" role="radiogroup" aria-label={`${label} style`}>
+        {options.map((option) => {
+          const selected = value === option.value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              aria-label={option.label}
+              title={option.label}
+              onClick={() => onChange(option.value)}
+              className={`markdown-style-option relative h-[76px] min-w-0 overflow-hidden rounded-lg border p-2 text-left transition-colors ${
+                selected
+                  ? 'border-blue-500 bg-blue-500/10 ring-1 ring-blue-500/30'
+                  : 'border-gray-300 bg-gray-700/[0.025] hover:border-gray-400 dark:border-gray-600 dark:bg-white/[0.025] dark:hover:border-gray-500'
+              }`}
+            >
+              <MarkdownStyleSample kind={kind} value={option.value} />
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+const SettingsSectionHeader: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div className="settings-section-header px-4 py-2.5 text-[11px] font-bold uppercase tracking-[0.11em]">
+    {children}
   </div>
 );
 
@@ -231,6 +390,20 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
     matchToolbarPalette,
     showHeadingAnchors,
     setShowHeadingAnchors,
+    tableStyle,
+    setTableStyle,
+    codeBlockStyle,
+    setCodeBlockStyle,
+    blockquoteStyle,
+    setBlockquoteStyle,
+    inlineCodeStyle,
+    setInlineCodeStyle,
+    taskListStyle,
+    setTaskListStyle,
+    definitionListStyle,
+    setDefinitionListStyle,
+    calloutStyle,
+    setCalloutStyle,
   } = useStore(useShallow((state) => ({
     theme: state.theme,
     setTheme: state.setTheme,
@@ -255,6 +428,20 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
     matchToolbarPalette: state.matchToolbarPalette,
     showHeadingAnchors: state.showHeadingAnchors,
     setShowHeadingAnchors: state.setShowHeadingAnchors,
+    tableStyle: state.tableStyle,
+    setTableStyle: state.setTableStyle,
+    codeBlockStyle: state.codeBlockStyle,
+    setCodeBlockStyle: state.setCodeBlockStyle,
+    blockquoteStyle: state.blockquoteStyle,
+    setBlockquoteStyle: state.setBlockquoteStyle,
+    inlineCodeStyle: state.inlineCodeStyle,
+    setInlineCodeStyle: state.setInlineCodeStyle,
+    taskListStyle: state.taskListStyle,
+    setTaskListStyle: state.setTaskListStyle,
+    definitionListStyle: state.definitionListStyle,
+    setDefinitionListStyle: state.setDefinitionListStyle,
+    calloutStyle: state.calloutStyle,
+    setCalloutStyle: state.setCalloutStyle,
   })));
 
   if (!mounted) return null;
@@ -294,11 +481,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
         <div className="flex-1 overflow-y-auto pt-1">
           <div key={tab} className="settings-tab-content">
           {tab === 'settings' && (
-            <div className="divide-y divide-gray-700/10 dark:divide-white/5">
+            <div className="settings-page divide-y divide-gray-700/10 dark:divide-white/5">
               {/* Appearance */}
-              <div className="px-4 py-2.5 text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+              <SettingsSectionHeader>
                 Appearance
-              </div>
+              </SettingsSectionHeader>
 
               <SettingRow label="Theme">
                 <SegmentedControl
@@ -379,9 +566,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
               )}
 
               {/* Editor */}
-              <div className="px-4 py-2.5 text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+              <SettingsSectionHeader>
                 Editor
-              </div>
+              </SettingsSectionHeader>
 
               <SettingRow label="Word Wrap">
                 <ToggleSwitch
@@ -423,9 +610,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
               </SettingRow>
 
               {/* General */}
-              <div className="px-4 py-2.5 text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+              <SettingsSectionHeader>
                 General
-              </div>
+              </SettingsSectionHeader>
 
               <SettingRow
                 label="Remember Scroll Position"
@@ -464,6 +651,102 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
                 </div>
               </SettingRow>
 
+              {/* Markdown component styles */}
+              <SettingsSectionHeader>
+                Markdown Styles
+              </SettingsSectionHeader>
+
+              <MarkdownStylePicker
+                label="Code Blocks"
+                tooltip="Changes fenced code blocks without affecting inline code."
+                kind="code"
+                options={[
+                  { label: 'Default', value: 'default' },
+                  { label: 'Flat', value: 'flat' },
+                  { label: 'Terminal', value: 'terminal' },
+                ]}
+                value={codeBlockStyle}
+                onChange={(value) => setCodeBlockStyle(value as CodeBlockStyle)}
+              />
+
+              <MarkdownStylePicker
+                label="Inline Code"
+                tooltip="Changes inline code spans without affecting fenced code blocks."
+                kind="inline-code"
+                options={[
+                  { label: 'Default', value: 'default' },
+                  { label: 'Subtle', value: 'subtle' },
+                  { label: 'Outline', value: 'outline' },
+                ]}
+                value={inlineCodeStyle}
+                onChange={(value) => setInlineCodeStyle(value as InlineCodeStyle)}
+              />
+
+              <MarkdownStylePicker
+                label="Tables"
+                tooltip="Changes the visual treatment of tables in the Preview panel."
+                kind="table"
+                options={[
+                  { label: 'Default', value: 'default' },
+                  { label: 'Minimal', value: 'minimal' },
+                  { label: 'Banded', value: 'banded' },
+                ]}
+                value={tableStyle}
+                onChange={(value) => setTableStyle(value as TableStyle)}
+              />
+
+              <MarkdownStylePicker
+                label="Task Lists"
+                tooltip="Changes the layout and checkbox treatment of task lists."
+                kind="task-list"
+                options={[
+                  { label: 'Default', value: 'default' },
+                  { label: 'Rounded', value: 'rounded' },
+                  { label: 'Outline', value: 'outline' },
+                ]}
+                value={taskListStyle}
+                onChange={(value) => setTaskListStyle(value as TaskListStyle)}
+              />
+
+              <MarkdownStylePicker
+                label="Blockquotes"
+                tooltip="Changes the visual emphasis used for Markdown blockquotes."
+                kind="blockquote"
+                options={[
+                  { label: 'Default', value: 'default' },
+                  { label: 'Quiet', value: 'quiet' },
+                  { label: 'Card', value: 'card' },
+                ]}
+                value={blockquoteStyle}
+                onChange={(value) => setBlockquoteStyle(value as BlockquoteStyle)}
+              />
+
+              <MarkdownStylePicker
+                label="Callouts"
+                tooltip="Changes note, tip, warning, and danger callout containers while retaining their semantic colors."
+                kind="callout"
+                options={[
+                  { label: 'Default', value: 'default' },
+                  { label: 'Minimal', value: 'minimal' },
+                  { label: 'Solid', value: 'solid' },
+                ]}
+                value={calloutStyle}
+                onChange={(value) => setCalloutStyle(value as CalloutStyle)}
+              />
+
+              <MarkdownStylePicker
+                label="Definition Lists"
+                tooltip="Changes the presentation of terms and their definitions."
+                kind="definition-list"
+                options={[
+                  { label: 'Default', value: 'default' },
+                  { label: 'Indented', value: 'indented' },
+                  { label: 'Card', value: 'card' },
+                ]}
+                value={definitionListStyle}
+                onChange={(value) => setDefinitionListStyle(value as DefinitionListStyle)}
+              />
+
               <div className="h-4" />
             </div>
           )}
@@ -494,7 +777,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose, initialTab
                   Markd
                 </h3>
                 <p className="text-[12px] text-gray-500 dark:text-gray-400">
-                  v{appVersion || '1.0.4'} — A beautiful, feature-rich desktop markdown viewer and editor
+                  v{appVersion || '1.0.5'} — A beautiful, feature-rich desktop markdown viewer and editor
                 </p>
               </div>
 

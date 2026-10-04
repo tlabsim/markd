@@ -45,6 +45,12 @@ const TitleBar: React.FC<TitleBarProps> = ({ onMinimize, onMaximize, onClose, is
     : 'Markd';
   const hasDocumentActions = Boolean(currentFile && (!distractionFree || onEditDocument || onReloadFile || onCloseFile));
 
+  // Electron mirrors the document title to the native window title used by
+  // taskbar entries and previews, while the visible title bar remains custom.
+  useEffect(() => {
+    document.title = title;
+  }, [title]);
+
   // Close menu on click outside
   useEffect(() => {
     if (!menuOpen) return;

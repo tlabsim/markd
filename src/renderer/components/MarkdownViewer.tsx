@@ -249,6 +249,36 @@ function rehypeFilterCustomElements() {
   };
 }
 
+// ISO timestamps contain numeric `:NN` segments that remark-directive otherwise
+// parses as empty text directives and removes from the rendered output.
+function remarkLiteralNumericDirectives() {
+  return (tree: any) => {
+    const visit = (node: any) => {
+      if (!Array.isArray(node.children)) return;
+
+      for (let index = 0; index < node.children.length; index++) {
+        const child = node.children[index];
+        const isEmptyNumericDirective = child.type === 'textDirective'
+          && /^\d+$/.test(child.name || '')
+          && (!child.children || child.children.length === 0)
+          && (!child.attributes || Object.keys(child.attributes).length === 0);
+
+        if (isEmptyNumericDirective) {
+          node.children[index] = {
+            type: 'text',
+            value: `:${child.name}`,
+            position: child.position,
+          };
+        } else {
+          visit(child);
+        }
+      }
+    };
+
+    visit(tree);
+  };
+}
+
 // ---- Remark plugin: subscript ~text~ and superscript ^text^ ----
 function remarkSubSuper() {
   return (tree: any) => {
@@ -699,6 +729,13 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, o
     zoomOut,
     matchToolbarPalette,
     showHeadingAnchors,
+    tableStyle,
+    codeBlockStyle,
+    blockquoteStyle,
+    inlineCodeStyle,
+    taskListStyle,
+    definitionListStyle,
+    calloutStyle,
     viewMode,
     isSearchOpen,
     searchQuery,
@@ -719,6 +756,13 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, o
     zoomOut: state.zoomOut,
     matchToolbarPalette: state.matchToolbarPalette,
     showHeadingAnchors: state.showHeadingAnchors,
+    tableStyle: state.tableStyle,
+    codeBlockStyle: state.codeBlockStyle,
+    blockquoteStyle: state.blockquoteStyle,
+    inlineCodeStyle: state.inlineCodeStyle,
+    taskListStyle: state.taskListStyle,
+    definitionListStyle: state.definitionListStyle,
+    calloutStyle: state.calloutStyle,
     viewMode: state.viewMode,
     isSearchOpen: state.isSearchOpen,
     searchQuery: state.searchQuery,
@@ -985,7 +1029,7 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, o
     audio: ({ src, children, ...props }: any) => <AsyncAudio src={src} {...props}>{children}</AsyncAudio>,
     source: ({ src, ...props }: any) => <AsyncSource src={src} {...props} />,
     iframe: ({ src, ...props }: any) => <AsyncIframe src={src} {...props} />,
-    table: ({ children }: any) => <div className="overflow-x-auto"><table className="min-w-full">{children}</table></div>,
+    table: ({ children }: any) => <div className="markdown-table-wrap overflow-x-auto"><table className="min-w-full">{children}</table></div>,
     input: ({ type, checked, ...props }: any) => {
       if (type !== 'checkbox') return <input type={type} checked={checked} {...props} />;
       const handleToggle = (e: React.MouseEvent) => {
@@ -1004,7 +1048,7 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, o
       };
       return (
         <span className="task-check-wrapper inline-flex items-center justify-center cursor-pointer select-none" onClick={handleToggle}>
-          <span className={`inline-flex items-center justify-center w-[18px] h-[18px] rounded border-2 transition-all duration-150 ease-out ${checked ? 'bg-blue-500 border-blue-500 dark:bg-blue-400 dark:border-blue-400' : 'bg-transparent border-gray-300 dark:border-gray-500 hover:border-blue-400 dark:hover:border-blue-400'}`}>
+          <span className={`task-checkbox ${checked ? 'task-checkbox-checked' : ''} inline-flex items-center justify-center w-[18px] h-[18px] rounded border-2 transition-all duration-150 ease-out ${checked ? 'bg-blue-500 border-blue-500 dark:bg-blue-400 dark:border-blue-400' : 'bg-transparent border-gray-300 dark:border-gray-500 hover:border-blue-400 dark:hover:border-blue-400'}`}>
             <svg className={`w-3 h-3 text-white dark:text-[#1a222b] transition-all duration-150 ease-out ${checked ? 'scale-100 opacity-100' : 'scale-0 opacity-0'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
               <path d="M5 13l4 4L19 7" />
             </svg>
@@ -1028,7 +1072,7 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, o
       }, [codeText]);
       return (
         <div className={`code-block ${lang ? 'mt-4' : 'mt-2'} rounded-lg border p-0 relative group/cb ${isDiff ? 'diff-block' : ''}`}>
-          {lang && <div className="flex px-4 -mt-2.5"><span className="code-block-lang text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md font-mono">{lang}</span></div>}
+          {lang && <div className="code-block-language-row flex px-4 -mt-2.5"><span className="code-block-lang text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md font-mono">{lang}</span></div>}
           <button className="code-block-btn absolute top-2 right-2 opacity-0 group-hover/cb:opacity-100 transition-opacity p-1.5 rounded-md z-10" onClick={copyCode} title="Copy code">
             {copied
               ? <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
@@ -1066,10 +1110,17 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ showToc, onToggleToc, o
         onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}>
         <div className="max-w-4xl mx-auto markdown-body"
           data-palette={previewPalette !== 'default' || theme === 'dark' ? previewPalette : undefined}
+          data-table-style={tableStyle}
+          data-code-style={codeBlockStyle}
+          data-blockquote-style={blockquoteStyle}
+          data-inline-code-style={inlineCodeStyle}
+          data-task-list-style={taskListStyle}
+          data-definition-list-style={definitionListStyle}
+          data-callout-style={calloutStyle}
           style={{ fontFamily: computedFont, zoom: `${zoomLevel}%` }}>
           {fileContent ? (
             <ReactMarkdown
-              remarkPlugins={[[remarkGfm, { singleTilde: false }], remarkMath, remarkEmoji, remarkFrontmatter, [remarkSmartypants, { dashes: 'oldschool' }], remarkWikiLink, remarkDirective, remarkCallouts, remarkSubSuper, remarkHighlight, remarkDeflist]}
+              remarkPlugins={[[remarkGfm, { singleTilde: false }], remarkMath, remarkEmoji, remarkFrontmatter, [remarkSmartypants, { dashes: 'oldschool' }], remarkWikiLink, remarkDirective, remarkLiteralNumericDirectives, remarkCallouts, remarkSubSuper, remarkHighlight, remarkDeflist]}
               rehypePlugins={[rehypeKatex, rehypeHighlight, rehypeRaw, rehypeFilterCustomElements, searchHighlightPlugin]}
               components={components}>
               {normalizedFileContent}

@@ -4,6 +4,7 @@ export interface FileResult {
   success: boolean;
   content?: string;
   filePath?: string;
+  alreadyOpen?: boolean;
   error?: string;
 }
 
@@ -11,6 +12,14 @@ export interface DirectoryResult {
   success: boolean;
   files?: FileEntry[];
   path?: string;
+  error?: string;
+}
+
+export interface FileStateResult {
+  success: boolean;
+  exists: boolean;
+  mtimeMs?: number;
+  size?: number;
   error?: string;
 }
 
@@ -52,6 +61,7 @@ const api = {
   saveFile: (content: string, currentPath?: string): Promise<FileResult> => ipcRenderer.invoke('save-file', content, currentPath),
   saveFileAs: (content: string, currentPath?: string): Promise<FileResult> => ipcRenderer.invoke('save-file-as', content, currentPath),
   getFileContent: (filePath: string): Promise<FileResult> => ipcRenderer.invoke('get-file-content', filePath),
+  getFileState: (filePath: string): Promise<FileStateResult> => ipcRenderer.invoke('get-file-state', filePath),
   readDirectory: (dirPath: string): Promise<DirectoryResult> => ipcRenderer.invoke('read-directory', dirPath),
   getAppPath: (): Promise<string> => ipcRenderer.invoke('get-app-path'),
   getAppVersion: (): Promise<string> => ipcRenderer.invoke('get-app-version'),
@@ -60,6 +70,7 @@ const api = {
   maximizeWindow: (): Promise<void> => ipcRenderer.invoke('window-maximize'),
   closeWindow: (): Promise<void> => ipcRenderer.invoke('window-close'),
   isMaximized: (): Promise<boolean> => ipcRenderer.invoke('window-is-maximized'),
+  setWindowFile: (filePath: string | null): Promise<boolean> => ipcRenderer.invoke('set-window-file', filePath),
   exportHtml: (data: { content: string; title: string }): Promise<FileResult | null> =>
     ipcRenderer.invoke('export-html', data),
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke('open-external', url),

@@ -3,11 +3,36 @@ import * as path from 'path';
 import * as fs from 'fs';
 
 let mainWindow: BrowserWindow | null = null;
-let currentFilePath: string | null = null;
+const openFileByWindow = new Map<number, string>();
 
 const isDev = !app.isPackaged;
 const startupStartedAt = Date.now() - process.uptime() * 1000;
 const startupTraceEnabled = isDev || process.argv.includes('--trace-startup') || process.env.MARKD_STARTUP_TRACE === '1';
+
+function canonicalFilePath(filePath: string): string {
+  let resolved = path.resolve(filePath);
+  try {
+    resolved = fs.realpathSync.native(resolved);
+  } catch { /* The caller handles missing or unreadable files. */ }
+  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+}
+
+function focusWindowWithFile(filePath: string, exceptWindow?: BrowserWindow): boolean {
+  const canonicalPath = canonicalFilePath(filePath);
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (win === exceptWindow || win.isDestroyed() || openFileByWindow.get(win.id) !== canonicalPath) continue;
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+    return true;
+  }
+  return false;
+}
+
+function setWindowFile(win: BrowserWindow, filePath: string | null): void {
+  if (filePath) openFileByWindow.set(win.id, canonicalFilePath(filePath));
+  else openFileByWindow.delete(win.id);
+}
 
 // Required on Windows for proper taskbar grouping, notifications, and file association display name
 app.setAppUserModelId('com.markd.app');
@@ -60,6 +85,7 @@ if (multiInstance) {
       const cliFile = argv.find((arg, i) =>
         i > 0 && (arg.endsWith('.md') || arg.endsWith('.markdown')) && !arg.startsWith('-')
       );
+      if (cliFile && focusWindowWithFile(cliFile)) return;
       createWindow(cliFile);
     });
   }
@@ -223,6 +249,7 @@ function createWindow(filePath?: string): void {
   win.webContents.once('did-finish-load', () => traceStartup('renderer load finished'));
 
   win.on('closed', () => {
+    openFileByWindow.delete(win.id);
     if (win === mainWindow) mainWindow = null;
   });
 
@@ -244,6 +271,7 @@ function createWindow(filePath?: string): void {
 // Handle macOS open-file event (must be registered before app.whenReady)
 app.on('open-file', (_event, filePath) => {
   if (filePath.endsWith('.md') || filePath.endsWith('.markdown')) {
+    if (focusWindowWithFile(filePath)) return;
     createWindow(filePath);
   }
 });
@@ -420,11 +448,26 @@ ipcMain.handle('save-file-as', async (event, content: string, currentPath?: stri
 });
 
 ipcMain.handle('get-file-content', async (_event, filePath: string) => {
+  const win = BrowserWindow.fromWebContents(_event.sender);
+  if (win && focusWindowWithFile(filePath, win)) {
+    return { success: false, filePath, alreadyOpen: true };
+  }
   try {
     const content = fs.readFileSync(filePath, 'utf-8');
+    if (win) setWindowFile(win, filePath);
     return { success: true, content, filePath };
   } catch (err: any) {
     return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('get-file-state', async (_event, filePath: string) => {
+  try {
+    const stat = await fs.promises.stat(filePath);
+    return { success: true, exists: true, mtimeMs: stat.mtimeMs, size: stat.size };
+  } catch (err: any) {
+    if (err?.code === 'ENOENT') return { success: true, exists: false };
+    return { success: false, exists: false, error: err?.message || 'Unable to read file metadata' };
   }
 });
 
@@ -528,13 +571,21 @@ ipcMain.handle('window-is-maximized', (event) => {
   return BrowserWindow.fromWebContents(event.sender)?.isMaximized() ?? false;
 });
 
+ipcMain.handle('set-window-file', (event, filePath: string | null) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win) return false;
+  if (filePath && focusWindowWithFile(filePath, win)) return false;
+  setWindowFile(win, filePath);
+  return true;
+});
+
 ipcMain.handle('export-html', async (event, { content, title }) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   if (!win) return null;
   return await exportHtml(win, content, title);
 });
 
-async function openFile(senderWindow: BrowserWindow): Promise<{ success: boolean; content?: string; filePath?: string; error?: string } | null> {
+async function openFile(senderWindow: BrowserWindow): Promise<{ success: boolean; content?: string; filePath?: string; alreadyOpen?: boolean; error?: string } | null> {
   const result = await dialog.showOpenDialog(senderWindow, {
     title: 'Open Markdown File',
     filters: [
@@ -547,8 +598,12 @@ async function openFile(senderWindow: BrowserWindow): Promise<{ success: boolean
   if (result.canceled || result.filePaths.length === 0) return null;
 
   const filePath = result.filePaths[0];
+  if (focusWindowWithFile(filePath, senderWindow)) {
+    return { success: false, filePath, alreadyOpen: true };
+  }
   try {
     const content = fs.readFileSync(filePath, 'utf-8');
+    setWindowFile(senderWindow, filePath);
     senderWindow.setTitle(`Markd - ${path.basename(filePath)}`);
     return { success: true, content, filePath };
   } catch (err: any) {
@@ -568,7 +623,7 @@ async function openFolder(senderWindow: BrowserWindow): Promise<{ success: boole
 }
 
 async function saveFile(senderWindow: BrowserWindow, content?: string, currentPath?: string): Promise<{ success: boolean; filePath?: string; error?: string }> {
-  const filePath = currentPath || currentFilePath;
+  const filePath = currentPath;
   if (!filePath) {
     return await saveFileAs(senderWindow, content, currentPath);
   }
@@ -583,7 +638,7 @@ async function saveFile(senderWindow: BrowserWindow, content?: string, currentPa
   }
 }
 
-async function saveFileAs(senderWindow: BrowserWindow, content?: string, currentPath?: string): Promise<{ success: boolean; filePath?: string; error?: string }> {
+async function saveFileAs(senderWindow: BrowserWindow, content?: string, currentPath?: string): Promise<{ success: boolean; filePath?: string; alreadyOpen?: boolean; error?: string }> {
   const result = await dialog.showSaveDialog(senderWindow, {
     title: 'Save Markdown File',
     defaultPath: currentPath || undefined,
@@ -594,6 +649,10 @@ async function saveFileAs(senderWindow: BrowserWindow, content?: string, current
   });
 
   if (result.canceled || !result.filePath) return { success: false, error: 'Cancelled' };
+
+  if (focusWindowWithFile(result.filePath, senderWindow)) {
+    return { success: false, filePath: result.filePath, alreadyOpen: true };
+  }
 
   // If file exists, confirm overwrite
   if (fs.existsSync(result.filePath)) {
@@ -613,7 +672,7 @@ async function saveFileAs(senderWindow: BrowserWindow, content?: string, current
     if (content !== undefined) {
       fs.writeFileSync(result.filePath, content, 'utf-8');
     }
-    currentFilePath = result.filePath;
+    setWindowFile(senderWindow, result.filePath);
     senderWindow.setTitle(`Markd - ${path.basename(result.filePath)}`);
     return { success: true, filePath: result.filePath };
   } catch (err: any) {

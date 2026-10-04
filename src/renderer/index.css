@@ -208,6 +208,26 @@ textarea,
 .settings-modal--exit { animation: settings-modal-out 140ms ease-in both; }
 .settings-tab-content { animation: settings-tab-in 140ms ease-out both; }
 .settings-tab-indicator { transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+.settings-section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-color: var(--pal-border-soft);
+  background: color-mix(in srgb, var(--pal-border-soft) 48%, transparent);
+  color: color-mix(in srgb, var(--pal-text) 78%, var(--pal-muted));
+}
+.settings-section-header::before {
+  content: "";
+  width: 3px;
+  height: 12px;
+  flex: 0 0 3px;
+  border-radius: 999px;
+  background: var(--pal-link);
+  opacity: 0.8;
+}
+.settings-page > .settings-section-header:not(:first-child) {
+  margin-top: 0.45rem;
+}
 @keyframes settings-backdrop-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes settings-backdrop-out { from { opacity: 1; } to { opacity: 0; } }
 @keyframes settings-modal-in {
@@ -354,6 +374,18 @@ html[data-match-palette] .splitter:hover {
   @apply bg-gray-100 dark:bg-[#1e2733] px-1.5 py-0.5 rounded text-sm font-mono text-[#3d5a6b] dark:text-[#9cccd8];
 }
 
+div.markdown-body[data-inline-code-style="subtle"] :not(pre) > code {
+  padding: 0.08em 0.32em;
+  background: color-mix(in srgb, var(--pal-code-bg) 55%, transparent);
+  color: color-mix(in srgb, var(--pal-code-text) 82%, var(--pal-text));
+}
+
+div.markdown-body[data-inline-code-style="outline"] :not(pre) > code {
+  padding: 0.08em 0.38em;
+  border: 1px solid color-mix(in srgb, var(--pal-code-text) 32%, transparent);
+  background: transparent;
+}
+
 .markdown-body pre {
   @apply overflow-x-auto;
 }
@@ -381,6 +413,280 @@ html[data-match-palette] .splitter:hover {
 
 .markdown-body tr:nth-child(even) {
   @apply bg-gray-50/50 dark:bg-[#1e2a38]/30;
+}
+
+/* Markdown component style variants. Defaults intentionally use the rules above. */
+div.markdown-body[data-table-style="minimal"] table {
+  border-collapse: collapse;
+}
+
+div.markdown-body[data-table-style="minimal"] th {
+  background: transparent;
+  border-width: 0 0 2px;
+  padding: 0.55rem 0.75rem;
+}
+
+div.markdown-body[data-table-style="minimal"] td {
+  border-width: 0 0 1px;
+  padding: 0.55rem 0.75rem;
+}
+
+div.markdown-body[data-table-style="minimal"] tr:nth-child(even),
+.dark div.markdown-body[data-table-style="minimal"] tr:nth-child(even) {
+  background: transparent;
+}
+
+div.markdown-body[data-table-style="minimal"] tbody tr:last-child td {
+  border-bottom-width: 0;
+}
+
+div.markdown-body[data-table-style="banded"] .markdown-table-wrap {
+  margin-block: 1rem;
+  border: 1px solid var(--pal-td-border);
+  border-radius: 0.65rem;
+}
+
+div.markdown-body[data-table-style="banded"] table {
+  margin-block: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+div.markdown-body[data-table-style="banded"] th,
+div.markdown-body[data-table-style="banded"] td {
+  border-width: 0 0 1px;
+}
+
+div.markdown-body[data-table-style="banded"] th + th,
+div.markdown-body[data-table-style="banded"] td + td {
+  border-left-width: 1px;
+}
+
+div.markdown-body[data-table-style="banded"] tbody tr:last-child td {
+  border-bottom-width: 0;
+}
+
+div.markdown-body[data-table-style="banded"] tbody tr:nth-child(odd),
+.dark div.markdown-body[data-table-style="banded"] tbody tr:nth-child(odd) {
+  background: color-mix(in srgb, var(--pal-tr-even-bg) 45%, transparent);
+}
+
+div.markdown-body[data-table-style="banded"] tbody tr:nth-child(even),
+.dark div.markdown-body[data-table-style="banded"] tbody tr:nth-child(even) {
+  background: var(--pal-tr-even-bg);
+}
+
+div.markdown-body[data-code-style="flat"] .code-block {
+  border-color: transparent;
+  border-radius: 0.25rem;
+  box-shadow: none;
+}
+
+div.markdown-body[data-code-style="flat"] .code-block-language-row {
+  position: static;
+  margin: 0;
+  padding: 0.65rem 1rem 0;
+}
+
+div.markdown-body[data-code-style="flat"] .code-block-lang {
+  background: transparent;
+  padding-inline: 0;
+  opacity: 0.7;
+}
+
+html:not(.dark) div.markdown-body[data-code-style="flat"][data-blockquote-style="card"] blockquote .code-block {
+  background: color-mix(in srgb, var(--pal-cb-bg) 96%, var(--pal-text));
+}
+
+div.markdown-body[data-code-style="terminal"] .code-block {
+  padding-top: 2.25rem;
+  border-color: color-mix(in srgb, var(--pal-cb-border) 55%, transparent);
+  border-radius: 0.7rem;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--pal-text) 4%, transparent);
+}
+
+div.markdown-body[data-code-style="terminal"] .code-block::before {
+  content: "";
+  position: absolute;
+  top: 0.88rem;
+  left: 1rem;
+  width: 0.48rem;
+  height: 0.48rem;
+  border-radius: 999px;
+  background: #ef6b67;
+  box-shadow: 0.8rem 0 #d9aa48, 1.6rem 0 #62b879;
+}
+
+div.markdown-body[data-code-style="terminal"] .code-block-language-row {
+  position: absolute;
+  top: 0.65rem;
+  left: 50%;
+  margin: 0;
+  transform: translateX(-50%);
+}
+
+div.markdown-body[data-code-style="terminal"] .code-block-lang {
+  background: transparent;
+  padding: 0;
+  opacity: 0.72;
+}
+
+div.markdown-body[data-code-style="terminal"] .code-block-btn {
+  top: 0.25rem;
+  right: 0.5rem;
+}
+
+div.markdown-body[data-code-style="terminal"] .code-block pre {
+  border-top: 1px solid color-mix(in srgb, var(--pal-cb-border) 55%, transparent);
+}
+
+div.markdown-body[data-blockquote-style="quiet"] blockquote {
+  border-left-width: 2px;
+  padding-left: 1rem;
+  font-style: normal;
+  opacity: 0.88;
+}
+
+div.markdown-body[data-blockquote-style="card"] blockquote {
+  padding: 0.85rem 1.1rem;
+  border: 1px solid var(--pal-blockquote-border);
+  border-left-width: 1px;
+  border-radius: 0.65rem;
+  background: color-mix(in srgb, var(--pal-blockquote-border) 9%, transparent);
+  box-shadow: 0 1px 5px color-mix(in srgb, var(--pal-text) 3%, transparent);
+  font-style: normal;
+}
+
+div.markdown-body[data-blockquote-style="card"] blockquote > :first-child {
+  margin-top: 0;
+}
+
+div.markdown-body[data-blockquote-style="card"] blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+/* Compact, live samples used by the Markdown style settings. */
+.markdown-style-preview {
+  height: 100%;
+  color: var(--pal-text);
+  font-size: 7px;
+  line-height: 1.3;
+}
+
+.markdown-style-preview-centered {
+  display: flex;
+  align-items: center;
+}
+
+.markdown-style-preview-inline-code {
+  justify-content: center;
+}
+
+div.markdown-style-preview-inline-code p {
+  white-space: nowrap;
+}
+
+div.markdown-style-preview-inline-code :not(pre) > code {
+  font-size: 8px;
+}
+
+div.markdown-style-preview p {
+  margin-block: 0;
+  line-height: 1.5;
+}
+
+.markdown-style-preview .markdown-table-wrap {
+  height: 100%;
+  margin-block: 0 !important;
+}
+
+div.markdown-style-preview table {
+  height: 100%;
+  margin-block: 0;
+  font-size: 7px;
+}
+
+div.markdown-style-preview th,
+div.markdown-style-preview td {
+  padding: 3px 5px;
+}
+
+div.markdown-style-preview .code-block {
+  margin: 0;
+  background: var(--pal-cb-bg);
+  border-color: var(--pal-cb-border);
+}
+
+div.markdown-style-preview .code-block-language-row {
+  font-size: 6px;
+}
+
+div.markdown-style-preview .code-block pre {
+  margin: 0;
+  padding: 10px 7px 7px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+div.markdown-style-preview .code-block code {
+  font-size: 7px;
+  line-height: 1.55;
+}
+
+.markdown-style-preview-copy svg {
+  display: block;
+  width: 8px;
+  height: 8px;
+}
+
+.markdown-style-preview-keyword {
+  color: #d73a49;
+}
+
+.markdown-style-preview-number {
+  color: #1769aa;
+}
+
+div.markdown-style-preview[data-code-style="flat"] .code-block-language-row {
+  padding: 5px 7px 0;
+}
+
+div.markdown-style-preview[data-code-style="flat"] .code-block pre {
+  padding-top: 6px;
+}
+
+div.markdown-style-preview[data-code-style="terminal"] .code-block {
+  padding-top: 1.45rem;
+}
+
+div.markdown-style-preview[data-code-style="terminal"] .code-block::before {
+  top: 0.52rem;
+  left: 0.55rem;
+  width: 0.3rem;
+  height: 0.3rem;
+  box-shadow: 0.5rem 0 #d9aa48, 1rem 0 #62b879;
+}
+
+div.markdown-style-preview[data-code-style="terminal"] .code-block-language-row {
+  top: 0.34rem;
+}
+
+div.markdown-style-preview[data-code-style="terminal"] .code-block-btn {
+  top: 0.2rem;
+  right: 0.25rem;
+}
+
+div.markdown-style-preview blockquote {
+  display: flex;
+  height: 100%;
+  margin: 0;
+  align-items: center;
+  padding-block: 5px;
+  font-size: 7px;
+}
+
+div.markdown-style-preview blockquote p {
+  margin: 0;
 }
 
 .markdown-body img {
@@ -413,6 +719,114 @@ html[data-match-palette] .splitter:hover {
 
 .markdown-body .task-list-item input[type="checkbox"] {
   @apply rounded border-gray-400 dark:border-gray-600;
+}
+
+div.markdown-body[data-task-list-style="rounded"] .task-list-item {
+  padding: 0.38rem 0.55rem;
+  border-radius: 0.55rem;
+  background: color-mix(in srgb, var(--pal-border-soft) 12%, transparent);
+}
+
+div.markdown-body[data-task-list-style="rounded"] .task-check-wrapper > span {
+  border-radius: 999px;
+}
+
+div.markdown-body[data-task-list-style="outline"] .task-list-item {
+  gap: 0.55rem;
+}
+
+div.markdown-body[data-task-list-style="outline"] .task-check-wrapper > span {
+  width: 15px;
+  height: 15px;
+  border-width: 1.5px;
+  border-radius: 2px;
+  background: transparent;
+}
+
+div.markdown-body[data-task-list-style="outline"] .task-check-wrapper svg {
+  color: #059669;
+}
+
+div.markdown-body[data-task-list-style] .task-checkbox.task-checkbox-checked {
+  border-color: #10b981;
+  background: #10b981;
+  color: white;
+}
+
+div.markdown-body[data-task-list-style] .task-checkbox.task-checkbox-checked svg {
+  color: white;
+}
+
+.dark div.markdown-body[data-task-list-style] .task-checkbox.task-checkbox-checked {
+  border-color: #34d399;
+  background: #34d399;
+  color: #062e24;
+}
+
+.dark div.markdown-body[data-task-list-style] .task-checkbox.task-checkbox-checked svg {
+  color: #062e24;
+}
+
+div.markdown-body[data-task-list-style="outline"] .task-checkbox.task-checkbox-checked {
+  border-color: #10b981;
+  background: transparent;
+  color: #059669;
+}
+
+div.markdown-body[data-task-list-style="outline"] .task-checkbox.task-checkbox-checked svg {
+  color: #059669;
+}
+
+.dark div.markdown-body[data-task-list-style="outline"] .task-checkbox.task-checkbox-checked {
+  border-color: #34d399;
+  background: transparent;
+  color: #34d399;
+}
+
+.dark div.markdown-body[data-task-list-style="outline"] .task-checkbox.task-checkbox-checked svg {
+  color: #34d399;
+}
+
+div.markdown-style-preview .contains-task-list {
+  display: flex;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+}
+
+div.markdown-style-preview .task-list-item {
+  gap: 5px;
+  line-height: 1.2;
+}
+
+.markdown-style-preview-checkbox {
+  display: inline-flex;
+  width: 11px;
+  height: 11px;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid color-mix(in srgb, var(--pal-muted) 70%, transparent);
+  border-radius: 3px;
+}
+
+.markdown-style-preview-checkbox svg {
+  width: 8px;
+  height: 8px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+}
+
+div.markdown-style-preview[data-task-list-style="rounded"] .task-list-item {
+  padding: 4px 5px;
+}
+
+div.markdown-style-preview[data-task-list-style="outline"] .task-check-wrapper > span {
+  width: 10px;
+  height: 10px;
 }
 
 /* KaTeX math */
@@ -681,6 +1095,64 @@ html.dark[data-palette="contrast"] .admonition-caution { --callout-outline: #957
 html.dark[data-palette="contrast"] .admonition-danger,
 html.dark[data-palette="contrast"] .admonition-important { --callout-outline: #99464a; }
 
+div.markdown-body[data-callout-style="minimal"] .admonition {
+  padding: 0.5rem 0.85rem;
+  border-width: 0 0 0 3px;
+  border-radius: 0;
+  background: transparent;
+}
+
+div.markdown-body[data-callout-style="minimal"] .admonition-header {
+  margin-bottom: 0.2rem;
+}
+
+div.markdown-body[data-callout-style="solid"] .admonition {
+  border-width: 1px 1px 1px 4px;
+  border-style: solid;
+  background: color-mix(in srgb, currentColor 13%, var(--pal-viewer-bg));
+}
+
+div.markdown-body[data-callout-style="solid"] .admonition-header {
+  opacity: 0.95;
+}
+
+div.markdown-style-preview .admonition {
+  width: 100%;
+  margin: 0;
+  padding: 6px 7px;
+  border-left-width: 3px;
+  border-radius: 4px;
+  font-size: 7px;
+}
+
+div.markdown-style-preview .admonition-header {
+  gap: 4px;
+  margin-bottom: 3px;
+}
+
+div.markdown-style-preview .admonition-icon {
+  width: 10px;
+  height: 10px;
+  flex-basis: 10px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 6px;
+  font-weight: 700;
+}
+
+div.markdown-style-preview .admonition-type {
+  font-size: 6px;
+}
+
+div.markdown-style-preview[data-callout-style="minimal"] .admonition {
+  padding: 5px 7px;
+  border-left-width: 2px;
+}
+
+div.markdown-style-preview[data-callout-style="solid"] .admonition {
+  border-left-width: 3px;
+}
+
 /* ---- <mark> highlight ---- */
 mark {
   background: #fef08a;
@@ -763,6 +1235,66 @@ mark {
 }
 .markdown-body dd:last-child {
   margin-bottom: 0;
+}
+
+div.markdown-body[data-definition-list-style="indented"] dl {
+  padding: 0.2rem 0 0.2rem 0.65rem;
+  border-left: 0;
+  background: transparent;
+}
+
+div.markdown-body[data-definition-list-style="indented"] dd {
+  margin-top: 0.18rem;
+  padding-left: 1.5rem;
+}
+
+div.markdown-body[data-definition-list-style="card"] dl {
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--pal-border-soft);
+  border-radius: 0.6rem;
+  background: color-mix(in srgb, var(--pal-border-soft) 20%, transparent);
+}
+
+div.markdown-body[data-definition-list-style="card"] dt {
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid var(--pal-border-soft);
+}
+
+div.markdown-body[data-definition-list-style="card"] dd {
+  margin-top: 0.35rem;
+}
+
+div.markdown-style-preview dl {
+  width: 100%;
+  margin: 0;
+  padding: 5px 7px;
+  border-left-width: 2px;
+}
+
+div.markdown-style-preview dt {
+  margin: 0;
+  font-size: 7px;
+}
+
+div.markdown-style-preview dd {
+  margin: 2px 0 0;
+  padding-left: 12px;
+  font-size: 6.5px;
+}
+
+div.markdown-style-preview dd::before {
+  top: 0.1em;
+  width: 9px;
+  height: 9px;
+}
+
+div.markdown-style-preview[data-definition-list-style="indented"] dl {
+  padding-left: 4px;
+}
+
+div.markdown-style-preview[data-definition-list-style="card"] dl {
+  padding: 6px 7px;
+  border-radius: 4px;
 }
 
 /* ---- Print styles ---- */
